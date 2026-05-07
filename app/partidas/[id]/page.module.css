@@ -1,0 +1,300 @@
+.page { padding-bottom: 4rem; }
+
+.hero {
+  background: linear-gradient(160deg, #111 0%, #1a2a1a 60%, #111 100%);
+  border-bottom: 1px solid #222;
+  padding: 2.5rem 0;
+  margin-bottom: 2rem;
+}
+
+.info {
+  font-size: 0.75rem;
+  color: var(--texto-suave);
+  text-align: center;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.placar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.timeSide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.timeSide h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  color: var(--branco);
+  line-height: 1.1;
+}
+
+.timeSideRight {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.mando {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--texto-suave);
+}
+
+.placarCentro {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.placarNumeros {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 4rem;
+  color: var(--branco);
+  line-height: 1;
+}
+
+.sep { color: var(--verde); font-size: 2.5rem; }
+
+.vs {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.5rem;
+  color: var(--verde);
+  letter-spacing: 0.1em;
+}
+
+.rodadaTag {
+  font-size: 0.7rem;
+  color: var(--texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 0.25rem;
+}
+
+.publico {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+  margin-top: 1.25rem;
+}
+
+.content { display: flex; flex-direction: column; gap: 2rem; }
+
+.section {
+  background: var(--cinza);
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.sectionTitle {
+  font-size: 1.2rem;
+  color: var(--amarelo);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+/* GOLS */
+.timeline { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.golItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: #1e1e1e;
+  border-radius: 8px;
+  border-left: 3px solid var(--verde);
+}
+
+.golVisitante { border-left-color: var(--amarelo); }
+
+.golMinuto {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  color: var(--verde);
+  min-width: 40px;
+}
+
+.golVisitante .golMinuto { color: var(--amarelo); }
+
+.golBola { font-size: 1.2rem; }
+
+.golInfo { flex: 1; font-size: 0.85rem; }
+.golInfo strong { color: var(--branco); }
+.golInfo span { color: var(--texto-suave); }
+
+.golMeta {
+  font-size: 0.72rem;
+  color: #666;
+  margin-top: 0.2rem;
+}
+
+.golDesc {
+  font-size: 0.72rem;
+  color: var(--texto-suave);
+  margin-top: 0.3rem;
+  font-style: italic;
+}
+
+.golTime { flex-shrink: 0; }
+
+/* CARTÕES */
+.cartoesList { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.cartaoItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #1e1e1e;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.cartao {
+  width: 14px;
+  height: 20px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.amarelo { background: #FFDF00; }
+.vermelho { background: #ef4444; }
+
+.cartaoMinuto {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  color: var(--verde);
+  min-width: 32px;
+}
+
+.cartaoJogador { flex: 1; color: var(--branco); font-weight: 500; }
+
+.cartaoMotivo {
+  font-size: 0.72rem;
+  color: var(--texto-suave);
+}
+
+/* SUBS */
+.subsList { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.subItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #1e1e1e;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.subMinuto {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  color: var(--verde);
+  min-width: 32px;
+}
+
+.subSai { color: #22c55e; font-weight: 500; }
+.subEntra { color: #ef4444; font-weight: 500; }
+
+/* ESCALAÇÕES */
+.escalacoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.escalacao { display: flex; flex-direction: column; gap: 1rem; }
+
+.escHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.escHeader strong { color: var(--branco); font-size: 0.9rem; }
+
+.formacao {
+  font-size: 0.72rem;
+  color: var(--verde);
+  font-weight: 600;
+}
+
+.jogadoresList { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.posGrupo { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.posLabel {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--texto-suave);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.jogador {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  background: #1e1e1e;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.jogador.reserva { opacity: 0.6; }
+
+.numero {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.9rem;
+  color: var(--verde);
+  min-width: 28px;
+}
+
+.jogadorNome { flex: 1; color: var(--branco); }
+
+.posicao {
+  font-size: 0.65rem;
+  background: #2a2a2a;
+  color: var(--texto-suave);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+
+/* ARBITRAGEM */
+.arb { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.arbItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: #1e1e1e;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.arbItem span { color: var(--texto-suave); }
+.arbItem strong { color: var(--branco); }
+
+@media (max-width: 640px) {
+  .placar { flex-direction: column; align-items: center; text-align: center; }
+  .timeSide { align-items: center !important; }
+  .escalacoes { grid-template-columns: 1fr; }
+}
