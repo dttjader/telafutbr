@@ -1,11 +1,32 @@
+export interface Estadio {
+  id: string;
+  nome: string;
+  cidade: string;
+  estado: string;
+  capacidade?: number;
+}
+
 export interface Time {
   id: string;
   nome: string;
   sigla: string;
   cor_primaria: string;
   cor_secundaria: string;
-  escudo: string;
-  estadio: string;
+  estadio_id?: string;
+}
+
+export interface Transferencia {
+  time_id: string;
+  data: string; // AAAA-MM-DD
+}
+
+export interface Jogador {
+  id: string;
+  nome: string;
+  posicao: 'GOL' | 'ZAG' | 'LAT' | 'VOL' | 'MEI' | 'ATA';
+  numero?: number;
+  time_atual: string; // time_id
+  transferencias: Transferencia[]; // histórico
 }
 
 export interface Arbitragem {
@@ -16,43 +37,44 @@ export interface Arbitragem {
   var: string;
 }
 
-export interface Jogador {
-  numero: number;
-  nome: string;
-  posicao: string;
-}
-
-export interface Escalacao {
-  formacao: string;
-  titulares: Jogador[];
-  reservas: Jogador[];
-}
+export type StatusPartida = 'agendada' | 'ao_vivo' | 'encerrada' | 'adiada';
+export type TipoGol = 'normal' | 'penalti' | 'falta' | 'contra';
+export type TipoCartao = 'amarelo' | 'vermelho';
 
 export interface Gol {
   id: string;
   minuto: number;
   acrescimo: number;
-  time: string;
-  jogador: string;
-  assistencia: string | null;
-  tipo: 'normal' | 'penalti' | 'falta' | 'contra';
-  goleiro_adversario: string;
+  time_id: string;
+  jogador_id: string;
+  assistencia_id: string | null;
+  tipo: TipoGol;
+  goleiro_id: string;
   descricao: string;
 }
 
 export interface Cartao {
+  id: string;
   minuto: number;
-  tipo: 'amarelo' | 'vermelho';
-  jogador: string;
-  time: string;
+  tipo: TipoCartao;
+  jogador_id: string;
+  time_id: string;
   motivo: string;
 }
 
 export interface Substituicao {
+  id: string;
   minuto: number;
-  time: string;
-  sai: string;
-  entra: string;
+  time_id: string;
+  sai_id: string;
+  entra_id: string;
+}
+
+export interface EscalacaoJogador {
+  jogador_id: string;
+  numero: number;
+  posicao: string;
+  titular: boolean;
 }
 
 export interface Partida {
@@ -60,31 +82,25 @@ export interface Partida {
   rodada: number;
   data: string;
   hora: string;
-  status: 'agendada' | 'ao_vivo' | 'encerrada' | 'adiada';
-  time_casa: string;
-  time_visitante: string;
+  status: StatusPartida;
+  time_casa_id: string;
+  time_visitante_id: string;
   placar_casa: number;
   placar_visitante: number;
-  estadio: string;
-  cidade: string;
+  estadio_id: string;
   publico: number;
+  acrescimo_primeiro: number;
+  acrescimo_segundo: number;
   arbitragem: Arbitragem;
-  escalacao_casa: Escalacao;
-  escalacao_visitante: Escalacao;
+  escalacao_casa: EscalacaoJogador[];
+  escalacao_visitante: EscalacaoJogador[];
   gols: Gol[];
   cartoes: Cartao[];
   substituicoes: Substituicao[];
 }
 
-export interface Rodada {
-  numero: number;
-  status: 'futura' | 'em_andamento' | 'encerrada';
-  partidas: Partida[];
-}
-
-export interface TabelaTime {
-  posicao: number;
-  time: string;
+export interface TabelaEntry {
+  time_id: string;
   pontos: number;
   jogos: number;
   vitorias: number;
@@ -92,16 +108,4 @@ export interface TabelaTime {
   derrotas: number;
   gols_pro: number;
   gols_contra: number;
-  saldo: number;
-}
-
-export interface Campeonato {
-  campeonato: {
-    nome: string;
-    edicao: string;
-    organizador: string;
-  };
-  times: Time[];
-  rodadas: Rodada[];
-  tabela: TabelaTime[];
 }

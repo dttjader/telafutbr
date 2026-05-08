@@ -1,110 +1,135 @@
-import { Campeonato, Partida, Time, TabelaTime, Rodada } from './types';
-import data from '../data/campeonato.json';
+import fs from 'fs';
+import path from 'path';
+import { Estadio, Time, Jogador, Partida } from './types';
 
-const campeonato = data as Campeonato;
+const DATA_DIR = path.join(process.cwd(), 'data');
 
-export function getCampeonato(): Campeonato {
-  return campeonato;
+function readJson<T>(file: string): T {
+  const filePath = path.join(DATA_DIR, file);
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  return JSON.parse(raw) as T;
 }
 
+function writeJson<T>(file: string, data: T): void {
+  const filePath = path.join(DATA_DIR, file);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// ── Estádios ──────────────────────────────────────────────
+export function getEstadios(): Estadio[] {
+  return readJson<Estadio[]>('estadios.json');
+}
+export function saveEstadios(data: Estadio[]) {
+  writeJson('estadios.json', data);
+}
+export function getEstadio(id: string) {
+  return getEstadios().find(e => e.id === id);
+}
+
+// ── Times ─────────────────────────────────────────────────
 export function getTimes(): Time[] {
-  return campeonato.times;
+  return readJson<Time[]>('times.json');
+}
+export function getTime(id: string) {
+  return getTimes().find(t => t.id === id);
 }
 
-export function getTime(id: string): Time | undefined {
-  return campeonato.times.find(t => t.id === id);
+// ── Jogadores ─────────────────────────────────────────────
+export function getJogadores(): Jogador[] {
+  return readJson<Jogador[]>('jogadores.json');
+}
+export function saveJogadores(data: Jogador[]) {
+  writeJson('jogadores.json', data);
+}
+export function getJogador(id: string) {
+  return getJogadores().find(j => j.id === id);
+}
+export function getJogadoresDoTime(timeId: string) {
+  return getJogadores().filter(j => j.time_atual === timeId);
 }
 
-export function getRodadas(): Rodada[] {
-  return campeonato.rodadas;
+// ── Partidas ──────────────────────────────────────────────
+export function getPartidas(): Partida[] {
+  return readJson<Partida[]>('partidas.json');
+}
+export function savePartidas(data: Partida[]) {
+  writeJson('partidas.json', data);
+}
+export function getPartida(id: string) {
+  return getPartidas().find(p => p.id === id);
 }
 
-export function getRodada(numero: number): Rodada | undefined {
-  return campeonato.rodadas.find(r => r.numero === numero);
-}
+// ── Tabela ────────────────────────────────────────────────
+export function calcularTabela() {
+  const partidas = getPartidas().filter(p => p.status === 'encerrada');
+  const times = getTimes();
+  const map: Record<string, {
+    time_id: string; pontos: number; jogos: number; vitorias: number;
+    empates: number; derrotas: number; gols_pro: number; gols_contra: number;
+  }> = {};
 
-export function getPartida(id: string): Partida | undefined {
-  for (const rodada of campeonato.rodadas) {
-    const partida = rodada.partidas.find(p => p.id === id);
-    if (partida) return partida;
+  times.forEach(t => {
+    map[t.id] = { time_id: t.id, pontos: 0, jogos: 0, vitorias: 0, empates: 0, derrotas: 0, gols_pro: 0, gols_contra: 0 };
+  });
+
+  for (const p of partidas) {
+    const c = map[p.time_casa_id];
+    const v = map[p.time_visitante_id];
+    if (!c || !v) continue;
+    c.jogos++; v.jogos++;
+    c.gols_pro += p.placar_casa; c.gols_contra += p.placar_visitante;
+    v.gols_pro += p.placar_visitante; v.gols_contra += p.placar_casa;
+    if (p.placar_casa > p.placar_visitante) { c.vitorias++; c.pontos += 3; v.derrotas++; }
+    else if (p.placar_casa < p.placar_visitante) { v.vitorias++; v.pontos += 3; c.derrotas++; }
+    else { c.empates++; c.pontos++; v.empates++; v.pontos++; }
   }
-  return undefined;
+
+  return Object.values(map)
+    .filter(t => t.jogos > 0)
+    .sort((a, b) => b.pontos - a.pontos || (b.gols_pro - b.gols_contra) - (a.gols_pro - a.gols_contra) || b.gols_pro - a.gols_pro)
+    .map((t, i) => ({ ...t, posicao: i + 1, saldo: t.gols_pro - t.gols_contra }));
 }
 
-export function getTabela(): TabelaTime[] {
-  return campeonato.tabela;
-}
-
-export function getArtilharia() {
-  const gols: { jogador: string; time: string; quantidade: number }[] = [];
-
-  for (const rodada of campeonato.rodadas) {
-    for (const partida of rodada.partidas) {
-      for (const gol of partida.gols) {
-        if (gol.tipo === 'contra') continue;
-        const existing = gols.find(g => g.jogador === gol.jogador && g.time === gol.time);
-        if (existing) {
-          existing.quantidade++;
-        } else {
-          gols.push({ jogador: gol.jogador, time: gol.time, quantidade: 1 });
-        }
-      }
+// ── Artilharia ────────────────────────────────────────────
+export function calcularArtilharia() {
+  const partidas = getPartidas().filter(p => p.status === 'encerrada');
+  const map: Record<string, { jogador_id: string; time_id: string; quantidade: number }> = {};
+  for (const p of partidas) {
+    for (const g of p.gols) {
+      if (g.tipo === 'contra') continue;
+      const key = g.jogador_id;
+      if (!map[key]) map[key] = { jogador_id: g.jogador_id, time_id: g.time_id, quantidade: 0 };
+      map[key].quantidade++;
     }
   }
-
-  return gols.sort((a, b) => b.quantidade - a.quantidade).slice(0, 10);
+  return Object.values(map).sort((a, b) => b.quantidade - a.quantidade);
 }
 
-export function formatDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-');
-  return `${day}/${month}/${year}`;
+// ── Helpers ───────────────────────────────────────────────
+export function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-export function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    agendada: 'Agendada',
-    ao_vivo: 'Ao Vivo',
-    encerrada: 'Encerrada',
-    adiada: 'Adiada',
-  };
-  return labels[status] || status;
+export function formatDate(d: string) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
 }
 
-export function getStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    agendada: '#6B7280',
-    ao_vivo: '#EF4444',
-    encerrada: '#10B981',
-    adiada: '#F59E0B',
-  };
-  return colors[status] || '#6B7280';
+export function posicaoLabel(p: string) {
+  const l: Record<string, string> = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meia', ATA: 'Atacante' };
+  return l[p] ?? p;
 }
 
-export function getPosicaoLabel(posicao: string): string {
-  const labels: Record<string, string> = {
-    GOL: 'Goleiro',
-    ZAG: 'Zagueiro',
-    LAT: 'Lateral',
-    VOL: 'Volante',
-    MEI: 'Meia',
-    ATA: 'Atacante',
-  };
-  return labels[posicao] || posicao;
-}
-
-export function getGolTipoLabel(tipo: string): string {
-  const labels: Record<string, string> = {
-    normal: 'Gol',
-    penalti: 'Pênalti',
-    falta: 'Falta',
-    contra: 'Contra',
-  };
-  return labels[tipo] || tipo;
-}
-
-export function getZonaClassificacao(posicao: number): string {
-  if (posicao <= 4) return 'libertadores';
-  if (posicao <= 6) return 'sulamericana';
-  if (posicao >= 18) return 'rebaixamento';
+export function zonaClassificacao(pos: number) {
+  if (pos <= 4) return 'libertadores';
+  if (pos <= 6) return 'sulamericana';
+  if (pos >= 18) return 'rebaixamento';
   return 'neutro';
 }
+
+export const ESTADOS_BR = [
+  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA',
+  'MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN',
+  'RS','RO','RR','SC','SP','SE','TO'
+];
