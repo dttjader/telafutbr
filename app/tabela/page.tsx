@@ -1,70 +1,74 @@
-import { getTabela, getTime, getZonaClassificacao } from '@/lib/data';
+import { calcularTabela, getTimes, getEstadios } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
-import styles from './page.module.css';
+
+export const dynamic = 'force-dynamic';
 
 export default function TabelaPage() {
-  const tabela = getTabela();
+  const tabela = calcularTabela();
+  const times = getTimes();
+
+  const zona = (pos: number) => pos<=4?'libertadores':pos<=6?'sulamericana':pos>=18?'rebaixamento':'neutro';
+  const zonaColor: Record<string,string> = { libertadores:'var(--libertadores)', sulamericana:'var(--sulamericana)', rebaixamento:'var(--rebaixamento)', neutro:'transparent' };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.hero}>
+    <div style={{paddingBottom:'4rem'}}>
+      <div style={{background:'linear-gradient(135deg,#0a0a0a 0%,#0d1f0d 50%,#0a0a0a 100%)',borderBottom:'1px solid var(--border)',padding:'2.5rem 0 2rem',marginBottom:'2rem'}}>
         <div className="container">
-          <p className={styles.heroSub}>Classificação Geral</p>
-          <h1 className={styles.heroTitle}>Tabela</h1>
+          <p style={{fontSize:'.75rem',color:'var(--verde)',textTransform:'uppercase',letterSpacing:'.2em',fontWeight:700,marginBottom:'.4rem'}}>Classificação Geral</p>
+          <h1 style={{fontSize:'clamp(2.5rem,6vw,4rem)'}}>Tabela</h1>
         </div>
       </div>
-
       <div className="container">
-        <div className={styles.legenda}>
-          <span className={styles.legendaItem}><span className={`${styles.dot} ${styles.libertadores}`} /> Libertadores</span>
-          <span className={styles.legendaItem}><span className={`${styles.dot} ${styles.sulamericana}`} /> Sul-Americana</span>
-          <span className={styles.legendaItem}><span className={`${styles.dot} ${styles.rebaixamento}`} /> Rebaixamento</span>
+        <div style={{display:'flex',gap:'1.25rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+          {[['libertadores','Libertadores'],['sulamericana','Sul-Americana'],['rebaixamento','Rebaixamento']].map(([z,l])=>(
+            <span key={z} style={{display:'flex',alignItems:'center',gap:'.4rem',fontSize:'.75rem',color:'var(--text-muted)'}}>
+              <span style={{width:10,height:10,borderRadius:'50%',background:zonaColor[z],display:'inline-block'}} />{l}
+            </span>
+          ))}
         </div>
-
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
+        <div style={{overflowX:'auto',borderRadius:12,border:'1px solid var(--border)'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontFamily:"'Barlow',sans-serif",fontSize:'.875rem'}}>
+            <thead style={{background:'var(--surface2)',borderBottom:'2px solid var(--verde)'}}>
               <tr>
-                <th>#</th>
-                <th className={styles.thTime}>Time</th>
-                <th title="Pontos">P</th>
-                <th title="Jogos">J</th>
-                <th title="Vitórias">V</th>
-                <th title="Empates">E</th>
-                <th title="Derrotas">D</th>
-                <th title="Gols Pró">GP</th>
-                <th title="Gols Contra">GC</th>
-                <th title="Saldo de Gols">SG</th>
+                {['#','Time','P','J','V','E','D','GP','GC','SG'].map(h=>(
+                  <th key={h} style={{padding:'.7rem .9rem',textAlign:h==='Time'?'left':'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.9rem',letterSpacing:'.08em',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {tabela.map(row => {
-                const time = getTime(row.time);
-                const zona = getZonaClassificacao(row.posicao);
+              {tabela.map(row=>{
+                const z=zona(row.posicao);
+                const t=times.find(t=>t.id===row.time_id);
                 return (
-                  <tr key={row.time} className={`${styles.row} ${styles[`zona_${zona}`]}`}>
-                    <td className={styles.pos}>
-                      <span className={`${styles.posIndicador} ${styles[zona]}`} />
-                      {row.posicao}
+                  <tr key={row.time_id} style={{borderBottom:'1px solid #1e1e1e',background:z==='libertadores'?'rgba(34,197,94,.02)':z==='rebaixamento'?'rgba(239,68,68,.03)':'transparent'}}>
+                    <td style={{padding:'.6rem .9rem'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'.4rem'}}>
+                        <span style={{width:3,height:22,borderRadius:2,background:zonaColor[z],display:'inline-block'}} />
+                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.1rem'}}>{row.posicao}</span>
+                      </div>
                     </td>
-                    <td className={styles.tdTime}>
-                      <EscudoTime timeId={row.time} size="sm" />
-                      <span className={styles.timeNome}>{time?.nome}</span>
-                      <span className={styles.timeSigla}>{time?.sigla}</span>
+                    <td style={{padding:'.6rem .9rem'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'.6rem',whiteSpace:'nowrap'}}>
+                        <EscudoTime timeId={row.time_id} size={30} />
+                        <span style={{fontWeight:600}}>{t?.nome}</span>
+                      </div>
                     </td>
-                    <td className={styles.pontos}>{row.pontos}</td>
-                    <td>{row.jogos}</td>
-                    <td className={styles.v}>{row.vitorias}</td>
-                    <td>{row.empates}</td>
-                    <td className={styles.d}>{row.derrotas}</td>
-                    <td>{row.gols_pro}</td>
-                    <td>{row.gols_contra}</td>
-                    <td className={row.saldo > 0 ? styles.saldoPos : row.saldo < 0 ? styles.saldoNeg : ''}>
-                      {row.saldo > 0 ? `+${row.saldo}` : row.saldo}
+                    <td style={{textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--amarelo)',padding:'.6rem .9rem'}}>{row.pontos}</td>
+                    <td style={{textAlign:'center',padding:'.6rem .9rem'}}>{row.jogos}</td>
+                    <td style={{textAlign:'center',color:'var(--libertadores)',fontWeight:600,padding:'.6rem .9rem'}}>{row.vitorias}</td>
+                    <td style={{textAlign:'center',padding:'.6rem .9rem'}}>{row.empates}</td>
+                    <td style={{textAlign:'center',color:'var(--rebaixamento)',fontWeight:600,padding:'.6rem .9rem'}}>{row.derrotas}</td>
+                    <td style={{textAlign:'center',padding:'.6rem .9rem'}}>{row.gols_pro}</td>
+                    <td style={{textAlign:'center',padding:'.6rem .9rem'}}>{row.gols_contra}</td>
+                    <td style={{textAlign:'center',fontWeight:600,padding:'.6rem .9rem',color:row.saldo>0?'var(--libertadores)':row.saldo<0?'var(--rebaixamento)':'inherit'}}>
+                      {row.saldo>0?`+${row.saldo}`:row.saldo}
                     </td>
                   </tr>
                 );
               })}
+              {tabela.length===0&&(
+                <tr><td colSpan={10} style={{textAlign:'center',padding:'3rem',color:'var(--text-muted)'}}>Nenhuma partida encerrada ainda.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
