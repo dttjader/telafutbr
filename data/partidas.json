@@ -1,0 +1,42 @@
+[
+  {
+    "id": "p001",
+    "rodada": 19,
+    "data": "2024-08-10",
+    "hora": "16:00",
+    "status": "encerrada",
+    "time_casa_id": "FLA",
+    "time_visitante_id": "PAL",
+    "placar_casa": 2,
+    "placar_visitante": 1,
+    "estadio_id": "estadio-1",
+    "publico": 68420,
+    "acrescimo_primeiro": 3,
+    "acrescimo_segundo": 5,
+    "arbitragem": {
+      "principal": "Anderson Daronco",
+      "assistente1": "Bruno Raphael Pires",
+      "assistente2": "Fabricio Vilarinho",
+      "quarto": "Rodrigo Guarizo",
+      "var": "Rodrigo Nunes de Sá"
+    },
+    "escalacao_casa": [
+      { "jogador_id": "j003", "numero": 1, "posicao": "GOL", "titular": true },
+      { "jogador_id": "j002", "numero": 14, "posicao": "MEI", "titular": true },
+      { "jogador_id": "j001", "numero": 9, "posicao": "ATA", "titular": true }
+    ],
+    "escalacao_visitante": [
+      { "jogador_id": "j004", "numero": 1, "posicao": "GOL", "titular": true },
+      { "jogador_id": "j005", "numero": 23, "posicao": "MEI", "titular": true }
+    ],
+    "gols": [
+      { "id": "g001", "minuto": 23, "acrescimo": 0, "time_id": "FLA", "jogador_id": "j001", "assistencia_id": "j002", "tipo": "normal", "goleiro_id": "j004", "descricao": "Cabeceio após cruzamento" },
+      { "id": "g002", "minuto": 55, "acrescimo": 0, "time_id": "PAL", "jogador_id": "j005", "assistencia_id": null, "tipo": "penalti", "goleiro_id": "j003", "descricao": "Cobrança de pênalti" },
+      { "id": "g003", "minuto": 78, "acrescimo": 0, "time_id": "FLA", "jogador_id": "j001", "assistencia_id": null, "tipo": "normal", "goleiro_id": "j004", "descricao": "Chute de dentro da área" }
+    ],
+    "cartoes": [
+      { "id": "c001", "minuto": 34, "tipo": "amarelo", "jogador_id": "j002", "time_id": "FLA", "motivo": "Falta tática" }
+    ],
+    "substituicoes": []
+  }
+]

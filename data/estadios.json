@@ -1,0 +1,12 @@
+[
+  { "id": "estadio-1", "nome": "Maracanã", "cidade": "Rio de Janeiro", "estado": "RJ", "capacidade": 78838 },
+  { "id": "estadio-2", "nome": "Allianz Parque", "cidade": "São Paulo", "estado": "SP", "capacidade": 43713 },
+  { "id": "estadio-3", "nome": "Arena MRV", "cidade": "Belo Horizonte", "estado": "MG", "capacidade": 46000 },
+  { "id": "estadio-4", "nome": "Arena Castelão", "cidade": "Fortaleza", "estado": "CE", "capacidade": 63903 },
+  { "id": "estadio-5", "nome": "Nilton Santos", "cidade": "Rio de Janeiro", "estado": "RJ", "capacidade": 46831 },
+  { "id": "estadio-6", "nome": "MorumBIS", "cidade": "São Paulo", "estado": "SP", "capacidade": 72000 },
+  { "id": "estadio-7", "nome": "Neo Química Arena", "cidade": "São Paulo", "estado": "SP", "capacidade": 49205 },
+  { "id": "estadio-8", "nome": "Arena do Grêmio", "cidade": "Porto Alegre", "estado": "RS", "capacidade": 55000 },
+  { "id": "estadio-9", "nome": "Beira-Rio", "cidade": "Porto Alegre", "estado": "RS", "capacidade": 50128 },
+  { "id": "estadio-10", "nome": "Mineirão", "cidade": "Belo Horizonte", "estado": "MG", "capacidade": 61846 }
+]

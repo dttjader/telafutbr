@@ -1,0 +1,12 @@
+[
+  { "id": "j001", "nome": "Pedro", "posicao": "ATA", "numero": 9, "time_atual": "FLA", "transferencias": [{ "time_id": "FLA", "data": "2023-01-01" }] },
+  { "id": "j002", "nome": "Arrascaeta", "posicao": "MEI", "numero": 14, "time_atual": "FLA", "transferencias": [{ "time_id": "FLA", "data": "2019-01-01" }] },
+  { "id": "j003", "nome": "Rossi", "posicao": "GOL", "numero": 1, "time_atual": "FLA", "transferencias": [{ "time_id": "FLA", "data": "2022-01-01" }] },
+  { "id": "j004", "nome": "Weverton", "posicao": "GOL", "numero": 1, "time_atual": "PAL", "transferencias": [{ "time_id": "PAL", "data": "2017-01-01" }] },
+  { "id": "j005", "nome": "Raphael Veiga", "posicao": "MEI", "numero": 23, "time_atual": "PAL", "transferencias": [{ "time_id": "PAL", "data": "2019-01-01" }] },
+  { "id": "j006", "nome": "Hulk", "posicao": "ATA", "numero": 7, "time_atual": "ATL", "transferencias": [{ "time_id": "ATL", "data": "2021-01-01" }] },
+  { "id": "j007", "nome": "Everson", "posicao": "GOL", "numero": 24, "time_atual": "ATL", "transferencias": [{ "time_id": "ATL", "data": "2020-01-01" }] },
+  { "id": "j008", "nome": "Lucero", "posicao": "ATA", "numero": 9, "time_atual": "FOR", "transferencias": [{ "time_id": "FOR", "data": "2022-01-01" }] },
+  { "id": "j009", "nome": "João Ricardo", "posicao": "GOL", "numero": 1, "time_atual": "FOR", "transferencias": [{ "time_id": "FOR", "data": "2021-01-01" }] },
+  { "id": "j010", "nome": "Tiquinho Soares", "posicao": "ATA", "numero": 9, "time_atual": "BOT", "transferencias": [{ "time_id": "BOT", "data": "2023-01-01" }] }
+]
