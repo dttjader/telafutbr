@@ -1,0 +1,94 @@
+.page {
+  padding-bottom: 3rem;
+}
+
+.hero {
+  background: linear-gradient(135deg, #0d0d0d 0%, #1a2a1a 50%, #0d0d0d 100%);
+  border-bottom: 1px solid #1e1e1e;
+  padding: 2.5rem 0 2rem;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::after {
+  content: '⚽';
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 8rem;
+  opacity: 0.04;
+}
+
+.heroSub {
+  font-size: 0.75rem;
+  color: var(--verde);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.heroTitle {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  color: var(--branco);
+  line-height: 1;
+}
+
+.rodada {
+  margin-bottom: 3rem;
+}
+
+.rodadaHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #222;
+}
+
+.rodadaTitulo {
+  font-size: 1.8rem;
+  color: var(--branco);
+}
+
+.rodadaStatus {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+.rodadaStatus.encerrada {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.rodadaStatus.em_andamento {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.rodadaStatus.futura {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
