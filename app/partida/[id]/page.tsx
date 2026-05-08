@@ -1,184 +1,158 @@
 import { notFound } from 'next/navigation';
-import { getPartida, getTime, formatDate, getGolTipoLabel, getPosicaoLabel } from '@/lib/data';
+import { getPartidas, getTimes, getJogadores, getEstadios, formatDate } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
-import styles from './page.module.css';
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
+export const dynamic = 'force-dynamic';
 
-export default async function PartidaPage({ params }: Props) {
+const POSICAO: Record<string,string> = { GOL:'Goleiro', ZAG:'Zagueiro', LAT:'Lateral', VOL:'Volante', MEI:'Meia', ATA:'Atacante' };
+const TIPO_GOL: Record<string,string> = { normal:'Gol', penalti:'Pênalti', falta:'Falta', contra:'Contra' };
+
+export default async function PartidaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const partida = getPartida(id);
+  const partida = getPartidas().find(p=>p.id===id);
   if (!partida) notFound();
 
-  const timeCasa = getTime(partida.time_casa)!;
-  const timeVisitante = getTime(partida.time_visitante)!;
-  const isEncerrada = partida.status === 'encerrada';
+  const times = getTimes();
+  const jogadores = getJogadores();
+  const estadios = getEstadios();
+  const tc = times.find(t=>t.id===partida.time_casa_id)!;
+  const tv = times.find(t=>t.id===partida.time_visitante_id)!;
+  const estadio = estadios.find(e=>e.id===partida.estadio_id);
+  const nomeJog = (jid: string) => jogadores.find(j=>j.id===jid)?.nome ?? jid;
+  const enc = partida.status==='encerrada';
+
+  const sectionStyle = { background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:'1.5rem', marginBottom:'1rem' };
+  const secTitle = { fontSize:'1.1rem', color:'var(--amarelo)', marginBottom:'1rem', paddingBottom:'.75rem', borderBottom:'1px solid var(--border)' };
 
   return (
-    <div className={styles.page}>
-      {/* Cabeçalho do placar */}
-      <div className={styles.hero}>
+    <div style={{paddingBottom:'4rem'}}>
+      {/* Hero */}
+      <div style={{background:'linear-gradient(160deg,#0a0a0a 0%,#0d1f0d 60%,#0a0a0a 100%)',borderBottom:'1px solid var(--border)',padding:'2.5rem 0',marginBottom:'1.5rem'}}>
         <div className="container">
-          <p className={styles.info}>{formatDate(partida.data)} · {partida.hora} · {partida.estadio}, {partida.cidade}</p>
-
-          <div className={styles.placar}>
-            <div className={styles.timeSide}>
-              <EscudoTime timeId={partida.time_casa} size="lg" />
-              <h2>{timeCasa.nome}</h2>
-              <span className={styles.mando}>Mandante</span>
+          <p style={{textAlign:'center',fontSize:'.75rem',color:'var(--text-muted)',marginBottom:'1rem',letterSpacing:'.05em'}}>
+            Rodada {partida.rodada} · {formatDate(partida.data)} · {partida.hora} · {estadio?.nome}, {estadio?.cidade}/{estadio?.estado}
+          </p>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'1.5rem',maxWidth:660,margin:'0 auto'}}>
+            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'.5rem'}}>
+              <EscudoTime timeId={partida.time_casa_id} size={72} />
+              <h2 style={{fontSize:'1.4rem'}}>{tc?.nome}</h2>
+              <span style={{fontSize:'.65rem',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>Mandante</span>
             </div>
-
-            <div className={styles.placarCentro}>
-              {isEncerrada ? (
-                <div className={styles.placarNumeros}>
-                  <span>{partida.placar_casa}</span>
-                  <span className={styles.sep}>×</span>
-                  <span>{partida.placar_visitante}</span>
-                </div>
-              ) : (
-                <div className={styles.vs}>VS</div>
-              )}
-              <div className={styles.rodadaTag}>Rodada {partida.rodada}</div>
+            <div style={{textAlign:'center'}}>
+              {enc
+                ? <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'4rem',display:'flex',alignItems:'center',gap:'.5rem',color:'var(--text)'}}><span>{partida.placar_casa}</span><span style={{color:'var(--verde)',fontSize:'2.5rem'}}>×</span><span>{partida.placar_visitante}</span></div>
+                : <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'2.5rem',color:'var(--verde)'}}>VS</div>}
+              <div style={{fontSize:'.7rem',color:'var(--text-muted)',marginTop:'.3rem'}}>
+                +{partida.acrescimo_primeiro}' · +{partida.acrescimo_segundo}'
+              </div>
             </div>
-
-            <div className={`${styles.timeSide} ${styles.timeSideRight}`}>
-              <EscudoTime timeId={partida.time_visitante} size="lg" />
-              <h2>{timeVisitante.nome}</h2>
-              <span className={styles.mando}>Visitante</span>
+            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'.5rem'}}>
+              <EscudoTime timeId={partida.time_visitante_id} size={72} />
+              <h2 style={{fontSize:'1.4rem',textAlign:'right'}}>{tv?.nome}</h2>
+              <span style={{fontSize:'.65rem',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>Visitante</span>
             </div>
           </div>
-
-          {isEncerrada && partida.publico > 0 && (
-            <p className={styles.publico}>👥 {partida.publico.toLocaleString('pt-BR')} presentes</p>
-          )}
+          {enc&&partida.publico>0&&<p style={{textAlign:'center',fontSize:'.8rem',color:'var(--text-muted)',marginTop:'1rem'}}>👥 {partida.publico.toLocaleString('pt-BR')} presentes</p>}
         </div>
       </div>
 
-      <div className={`container ${styles.content}`}>
-        {/* GOLS */}
-        {partida.gols.length > 0 && (
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>⚽ Gols</h3>
-            <div className={styles.timeline}>
-              {partida.gols.map(gol => {
-                const isCasa = gol.time === partida.time_casa;
-                return (
-                  <div key={gol.id} className={`${styles.golItem} ${isCasa ? styles.golCasa : styles.golVisitante}`}>
-                    <div className={styles.golMinuto}>
-                      {gol.minuto}{gol.acrescimo > 0 ? `+${gol.acrescimo}` : ''}&apos;
-                    </div>
-                    <div className={styles.golBola}>⚽</div>
-                    <div className={styles.golInfo}>
-                      <strong>{gol.jogador}</strong>
-                      {gol.assistencia && <span> · Assistência: {gol.assistencia}</span>}
-                      <div className={styles.golMeta}>
-                        {getGolTipoLabel(gol.tipo)} · Goleiro: {gol.goleiro_adversario}
-                      </div>
-                      {gol.descricao && <div className={styles.golDesc}>{gol.descricao}</div>}
-                    </div>
-                    <div className={styles.golTime}>
-                      <EscudoTime timeId={gol.time} size="sm" />
-                    </div>
+      <div className="container">
+        {/* Gols */}
+        {partida.gols.length>0 && (
+          <div style={sectionStyle}>
+            <h3 style={secTitle}>⚽ Gols</h3>
+            {partida.gols.map(g=>(
+              <div key={g.id} style={{display:'flex',alignItems:'flex-start',gap:'.75rem',padding:'.6rem .75rem',background:'var(--surface2)',borderRadius:8,marginBottom:'.4rem',borderLeft:`3px solid ${g.time_id===partida.time_casa_id?'var(--verde)':'var(--amarelo)'}`}}>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.1rem',color:'var(--verde)',minWidth:40}}>{g.minuto}{g.acrescimo>0?`+${g.acrescimo}`:''}&apos;</span>
+                <span>⚽</span>
+                <div style={{flex:1}}>
+                  <strong>{nomeJog(g.jogador_id)}</strong>
+                  {g.assistencia_id&&<span style={{color:'var(--text-muted)',fontSize:'.85rem'}}> · Assist. {nomeJog(g.assistencia_id)}</span>}
+                  <div style={{fontSize:'.73rem',color:'var(--text-muted)',marginTop:'.1rem'}}>
+                    {TIPO_GOL[g.tipo]}{g.goleiro_id?` · Goleiro: ${nomeJog(g.goleiro_id)}`:''}
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* CARTÕES */}
-        {partida.cartoes.length > 0 && (
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>🟨 Cartões</h3>
-            <div className={styles.cartoesList}>
-              {partida.cartoes.map((cartao, i) => (
-                <div key={i} className={styles.cartaoItem}>
-                  <span className={`${styles.cartao} ${cartao.tipo === 'vermelho' ? styles.vermelho : styles.amarelo}`} />
-                  <span className={styles.cartaoMinuto}>{cartao.minuto}&apos;</span>
-                  <span className={styles.cartaoJogador}>{cartao.jogador}</span>
-                  <EscudoTime timeId={cartao.time} size="sm" />
-                  <span className={styles.cartaoMotivo}>{cartao.motivo}</span>
+                  {g.descricao&&<div style={{fontSize:'.73rem',color:'var(--text-muted)',fontStyle:'italic'}}>{g.descricao}</div>}
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* SUBSTITUIÇÕES */}
-        {partida.substituicoes.length > 0 && (
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>🔄 Substituições</h3>
-            <div className={styles.subsList}>
-              {partida.substituicoes.map((sub, i) => (
-                <div key={i} className={styles.subItem}>
-                  <span className={styles.subMinuto}>{sub.minuto}&apos;</span>
-                  <EscudoTime timeId={sub.time} size="sm" />
-                  <span className={styles.subSai}>↑ {sub.entra}</span>
-                  <span className={styles.subEntra}>↓ {sub.sai}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ESCALAÇÕES */}
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>👕 Escalações</h3>
-          <div className={styles.escalacoes}>
-            {[
-              { time: timeCasa, escalacao: partida.escalacao_casa },
-              { time: timeVisitante, escalacao: partida.escalacao_visitante },
-            ].map(({ time, escalacao }) => (
-              <div key={time.id} className={styles.escalacao}>
-                <div className={styles.escHeader}>
-                  <EscudoTime timeId={time.id} size="sm" />
-                  <div>
-                    <strong>{time.nome}</strong>
-                    <div className={styles.formacao}>{escalacao.formacao}</div>
-                  </div>
-                </div>
-                <div className={styles.jogadoresList}>
-                  <div className={styles.posGrupo}>
-                    <span className={styles.posLabel}>Titulares</span>
-                    {escalacao.titulares.map(j => (
-                      <div key={j.numero} className={styles.jogador}>
-                        <span className={styles.numero}>#{j.numero}</span>
-                        <span className={styles.jogadorNome}>{j.nome}</span>
-                        <span className={styles.posicao}>{j.posicao}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {escalacao.reservas.length > 0 && (
-                    <div className={styles.posGrupo}>
-                      <span className={styles.posLabel}>Reservas / Entraram</span>
-                      {escalacao.reservas.map(j => (
-                        <div key={j.numero} className={`${styles.jogador} ${styles.reserva}`}>
-                          <span className={styles.numero}>#{j.numero}</span>
-                          <span className={styles.jogadorNome}>{j.nome}</span>
-                          <span className={styles.posicao}>{j.posicao}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <EscudoTime timeId={g.time_id} size={28} />
               </div>
             ))}
           </div>
-        </section>
+        )}
 
-        {/* ARBITRAGEM */}
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>🟢 Arbitragem</h3>
-          <div className={styles.arb}>
-            <div className={styles.arbItem}><span>Principal</span><strong>{partida.arbitragem.principal}</strong></div>
-            <div className={styles.arbItem}><span>Assistente 1</span><strong>{partida.arbitragem.assistente1}</strong></div>
-            <div className={styles.arbItem}><span>Assistente 2</span><strong>{partida.arbitragem.assistente2}</strong></div>
-            <div className={styles.arbItem}><span>4º Árbitro</span><strong>{partida.arbitragem.quarto}</strong></div>
-            <div className={styles.arbItem}><span>VAR</span><strong>{partida.arbitragem.var}</strong></div>
+        {/* Cartões */}
+        {partida.cartoes.length>0 && (
+          <div style={sectionStyle}>
+            <h3 style={secTitle}>🟨 Cartões</h3>
+            {partida.cartoes.map(c=>(
+              <div key={c.id} style={{display:'flex',alignItems:'center',gap:'.75rem',padding:'.5rem .75rem',background:'var(--surface2)',borderRadius:8,marginBottom:'.4rem',fontSize:'.875rem'}}>
+                <span style={{width:12,height:18,borderRadius:2,background:c.tipo==='vermelho'?'var(--rebaixamento)':'var(--amarelo)',flexShrink:0,display:'inline-block'}} />
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1rem',color:'var(--verde)',minWidth:32}}>{c.minuto}&apos;</span>
+                <strong style={{flex:1}}>{nomeJog(c.jogador_id)}</strong>
+                <EscudoTime timeId={c.time_id} size={24} />
+                {c.motivo&&<span style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{c.motivo}</span>}
+              </div>
+            ))}
           </div>
-        </section>
+        )}
+
+        {/* Substituições */}
+        {partida.substituicoes.length>0 && (
+          <div style={sectionStyle}>
+            <h3 style={secTitle}>🔄 Substituições</h3>
+            {partida.substituicoes.map(s=>(
+              <div key={s.id} style={{display:'flex',alignItems:'center',gap:'.75rem',padding:'.5rem .75rem',background:'var(--surface2)',borderRadius:8,marginBottom:'.4rem',fontSize:'.875rem'}}>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1rem',color:'var(--verde)',minWidth:32}}>{s.minuto}&apos;</span>
+                <EscudoTime timeId={s.time_id} size={24} />
+                <span style={{color:'#22c55e'}}>↑ {nomeJog(s.entra_id)}</span>
+                <span style={{color:'#ef4444'}}>↓ {nomeJog(s.sai_id)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Escalações */}
+        {(partida.escalacao_casa.length>0||partida.escalacao_visitante.length>0) && (
+          <div style={sectionStyle}>
+            <h3 style={secTitle}>👕 Escalações</h3>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}}>
+              {[{time:tc,esc:partida.escalacao_casa},{time:tv,esc:partida.escalacao_visitante}].map(({time,esc})=>(
+                <div key={time?.id}>
+                  <div style={{display:'flex',alignItems:'center',gap:'.6rem',marginBottom:'.75rem'}}>
+                    <EscudoTime timeId={time?.id??''} size={32} />
+                    <strong style={{fontSize:'.95rem'}}>{time?.nome}</strong>
+                  </div>
+                  {['Titulares','Reservas'].map(grupo=>{
+                    const lista=esc.filter(e=>grupo==='Titulares'?e.titular:!e.titular);
+                    if(lista.length===0) return null;
+                    return (
+                      <div key={grupo} style={{marginBottom:'.75rem'}}>
+                        <p style={{fontSize:'.65rem',textTransform:'uppercase',letterSpacing:'.1em',color:'var(--text-muted)',marginBottom:'.3rem',fontWeight:700}}>{grupo}</p>
+                        {lista.map((e,i)=>(
+                          <div key={i} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.3rem .5rem',background:'var(--surface2)',borderRadius:4,marginBottom:'.2rem',fontSize:'.82rem'}}>
+                            <span style={{fontFamily:"'Bebas Neue',sans-serif",color:'var(--verde)',minWidth:26}}>#{e.numero}</span>
+                            <span style={{flex:1}}>{nomeJog(e.jogador_id)}</span>
+                            <span style={{fontSize:'.68rem',background:'var(--surface)',color:'var(--text-muted)',padding:'.1rem .3rem',borderRadius:3}}>{e.posicao}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Arbitragem */}
+        <div style={sectionStyle}>
+          <h3 style={secTitle}>🟢 Arbitragem</h3>
+          {[['Árbitro principal',partida.arbitragem.principal],['Assistente 1',partida.arbitragem.assistente1],['Assistente 2',partida.arbitragem.assistente2],['4º árbitro',partida.arbitragem.quarto],['VAR',partida.arbitragem.var]].map(([label,nome])=> nome ? (
+            <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'.45rem .75rem',background:'var(--surface2)',borderRadius:6,marginBottom:'.3rem',fontSize:'.875rem'}}>
+              <span style={{color:'var(--text-muted)'}}>{label}</span>
+              <strong>{nome}</strong>
+            </div>
+          ):null)}
+        </div>
       </div>
     </div>
   );
