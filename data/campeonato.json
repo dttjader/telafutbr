@@ -1,0 +1,354 @@
+{
+  "campeonato": {
+    "nome": "Campeonato Brasileiro Série A",
+    "edicao": "2024",
+    "organizador": "CBF"
+  },
+  "times": [
+    { "id": "FLA", "nome": "Flamengo", "sigla": "FLA", "cor_primaria": "#FF0000", "cor_secundaria": "#000000", "escudo": "/escudos/flamengo.png", "estadio": "Maracanã" },
+    { "id": "PAL", "nome": "Palmeiras", "sigla": "PAL", "cor_primaria": "#006437", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/palmeiras.png", "estadio": "Allianz Parque" },
+    { "id": "ATL", "nome": "Atlético-MG", "sigla": "CAM", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/atletico.png", "estadio": "Arena MRV" },
+    { "id": "FOR", "nome": "Fortaleza", "sigla": "FOR", "cor_primaria": "#0000FF", "cor_secundaria": "#FF0000", "escudo": "/escudos/fortaleza.png", "estadio": "Arena Castelão" },
+    { "id": "BOT", "nome": "Botafogo", "sigla": "BOT", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/botafogo.png", "estadio": "Nilton Santos" },
+    { "id": "VAS", "nome": "Vasco", "sigla": "VAS", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/vasco.png", "estadio": "São Januário" },
+    { "id": "SAO", "nome": "São Paulo", "sigla": "SPF", "cor_primaria": "#FF0000", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/saopaulo.png", "estadio": "MorumBIS" },
+    { "id": "COR", "nome": "Corinthians", "sigla": "COR", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/corinthians.png", "estadio": "Neo Química Arena" },
+    { "id": "GRE", "nome": "Grêmio", "sigla": "GRE", "cor_primaria": "#0000FF", "cor_secundaria": "#000000", "escudo": "/escudos/gremio.png", "estadio": "Arena do Grêmio" },
+    { "id": "INT", "nome": "Internacional", "sigla": "INT", "cor_primaria": "#FF0000", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/internacional.png", "estadio": "Beira-Rio" },
+    { "id": "CRU", "nome": "Cruzeiro", "sigla": "CRU", "cor_primaria": "#0000FF", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/cruzeiro.png", "estadio": "Mineirão" },
+    { "id": "BAH", "nome": "Bahia", "sigla": "BAH", "cor_primaria": "#0000FF", "cor_secundaria": "#FF0000", "escudo": "/escudos/bahia.png", "estadio": "Arena Fonte Nova" },
+    { "id": "ATG", "nome": "Athletico-PR", "sigla": "CAP", "cor_primaria": "#FF0000", "cor_secundaria": "#000000", "escudo": "/escudos/athletico.png", "estadio": "Ligga Arena" },
+    { "id": "CUI", "nome": "Cuiabá", "sigla": "CUI", "cor_primaria": "#FFD700", "cor_secundaria": "#228B22", "escudo": "/escudos/cuiaba.png", "estadio": "Arena Pantanal" },
+    { "id": "CRB", "nome": "CRB", "sigla": "CRB", "cor_primaria": "#000000", "cor_secundaria": "#FF0000", "escudo": "/escudos/crb.png", "estadio": "Rei Pelé" },
+    { "id": "JUV", "nome": "Juventude", "sigla": "JUV", "cor_primaria": "#228B22", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/juventude.png", "estadio": "Alfredo Jaconi" },
+    { "id": "VIT", "nome": "Vitória", "sigla": "VIT", "cor_primaria": "#FF0000", "cor_secundaria": "#000000", "escudo": "/escudos/vitoria.png", "estadio": "Barradão" },
+    { "id": "FLU", "nome": "Fluminense", "sigla": "FLU", "cor_primaria": "#800000", "cor_secundaria": "#228B22", "escudo": "/escudos/fluminense.png", "estadio": "Maracanã" },
+    { "id": "RBB", "nome": "RB Bragantino", "sigla": "RBB", "cor_primaria": "#FF0000", "cor_secundaria": "#FFFFFF", "escudo": "/escudos/bragantino.png", "estadio": "Nabi Abi Chedid" },
+    { "id": "CFC", "nome": "Criciúma", "sigla": "CFC", "cor_primaria": "#FFD700", "cor_secundaria": "#000000", "escudo": "/escudos/criciuma.png", "estadio": "Heriberto Hülse" }
+  ],
+  "rodadas": [
+    {
+      "numero": 19,
+      "status": "encerrada",
+      "partidas": [
+        {
+          "id": "2024-19-001",
+          "rodada": 19,
+          "data": "2024-08-10",
+          "hora": "16:00",
+          "status": "encerrada",
+          "time_casa": "FLA",
+          "time_visitante": "PAL",
+          "placar_casa": 2,
+          "placar_visitante": 1,
+          "estadio": "Maracanã",
+          "cidade": "Rio de Janeiro",
+          "publico": 68420,
+          "arbitragem": {
+            "principal": "Anderson Daronco",
+            "assistente1": "Bruno Raphael Pires",
+            "assistente2": "Fabricio Vilarinho da Silva",
+            "quarto": "Rodrigo Guarizo Ferreira",
+            "var": "Rodrigo Nunes de Sá"
+          },
+          "escalacao_casa": {
+            "formacao": "4-2-3-1",
+            "titulares": [
+              { "numero": 1, "nome": "Rossi", "posicao": "GOL" },
+              { "numero": 2, "nome": "Varela", "posicao": "ZAG" },
+              { "numero": 4, "nome": "Fabrício Bruno", "posicao": "ZAG" },
+              { "numero": 6, "nome": "Léo Ortiz", "posicao": "ZAG" },
+              { "numero": 22, "nome": "Ayrton Lucas", "posicao": "LAT" },
+              { "numero": 8, "nome": "Erick Pulgar", "posicao": "VOL" },
+              { "numero": 7, "nome": "Gerson", "posicao": "MEI" },
+              { "numero": 10, "nome": "Arrascaeta", "posicao": "MEI" },
+              { "numero": 11, "nome": "Luiz Araújo", "posicao": "ATA" },
+              { "numero": 9, "nome": "Pedro", "posicao": "ATA" },
+              { "numero": 21, "nome": "Everton Cebolinha", "posicao": "ATA" }
+            ],
+            "reservas": [
+              { "numero": 23, "nome": "Matheus Cunha", "posicao": "MEI" },
+              { "numero": 14, "nome": "Carlinhos", "posicao": "ATA" },
+              { "numero": 5, "nome": "Nicolás De La Cruz", "posicao": "MEI" }
+            ]
+          },
+          "escalacao_visitante": {
+            "formacao": "4-3-3",
+            "titulares": [
+              { "numero": 1, "nome": "Weverton", "posicao": "GOL" },
+              { "numero": 2, "nome": "Marcos Rocha", "posicao": "LAT" },
+              { "numero": 3, "nome": "Gustavo Gómez", "posicao": "ZAG" },
+              { "numero": 5, "nome": "Murilo", "posicao": "ZAG" },
+              { "numero": 6, "nome": "Piquerez", "posicao": "LAT" },
+              { "numero": 7, "nome": "Mayke", "posicao": "LAT" },
+              { "numero": 8, "nome": "Aníbal Moreno", "posicao": "VOL" },
+              { "numero": 15, "nome": "Zé Rafael", "posicao": "MEI" },
+              { "numero": 10, "nome": "Raphael Veiga", "posicao": "MEI" },
+              { "numero": 9, "nome": "Flaco López", "posicao": "ATA" },
+              { "numero": 11, "nome": "Endrick", "posicao": "ATA" }
+            ],
+            "reservas": [
+              { "numero": 21, "nome": "Lázaro", "posicao": "ATA" },
+              { "numero": 14, "nome": "Rômulo", "posicao": "MEI" }
+            ]
+          },
+          "gols": [
+            {
+              "id": "g001",
+              "minuto": 23,
+              "acrescimo": 0,
+              "time": "FLA",
+              "jogador": "Pedro",
+              "assistencia": "Arrascaeta",
+              "tipo": "normal",
+              "goleiro_adversario": "Weverton",
+              "descricao": "Cabeceio após cruzamento de Arrascaeta pela esquerda"
+            },
+            {
+              "id": "g002",
+              "minuto": 55,
+              "acrescimo": 0,
+              "time": "PAL",
+              "jogador": "Raphael Veiga",
+              "assistencia": null,
+              "tipo": "penalti",
+              "goleiro_adversario": "Rossi",
+              "descricao": "Cobrança de pênalti convertida no canto direito"
+            },
+            {
+              "id": "g003",
+              "minuto": 78,
+              "acrescimo": 0,
+              "time": "FLA",
+              "jogador": "Everton Cebolinha",
+              "assistencia": "Luiz Araújo",
+              "tipo": "normal",
+              "goleiro_adversario": "Weverton",
+              "descricao": "Finalização de pé direito dentro da área após passe em profundidade"
+            }
+          ],
+          "cartoes": [
+            { "minuto": 34, "tipo": "amarelo", "jogador": "Erick Pulgar", "time": "FLA", "motivo": "Falta tática" },
+            { "minuto": 67, "tipo": "amarelo", "jogador": "Aníbal Moreno", "time": "PAL", "motivo": "Reclamação" },
+            { "minuto": 89, "tipo": "amarelo", "jogador": "Gustavo Gómez", "time": "PAL", "motivo": "Falta" }
+          ],
+          "substituicoes": [
+            { "minuto": 60, "time": "FLA", "sai": "Luiz Araújo", "entra": "Nicolás De La Cruz" },
+            { "minuto": 70, "time": "FLA", "sai": "Gerson", "entra": "Matheus Cunha" },
+            { "minuto": 75, "time": "PAL", "sai": "Endrick", "entra": "Lázaro" },
+            { "minuto": 80, "time": "PAL", "sai": "Zé Rafael", "entra": "Rômulo" }
+          ]
+        },
+        {
+          "id": "2024-19-002",
+          "rodada": 19,
+          "data": "2024-08-11",
+          "hora": "18:30",
+          "status": "encerrada",
+          "time_casa": "ATL",
+          "time_visitante": "BOT",
+          "placar_casa": 1,
+          "placar_visitante": 1,
+          "estadio": "Arena MRV",
+          "cidade": "Belo Horizonte",
+          "publico": 42000,
+          "arbitragem": {
+            "principal": "Raphael Claus",
+            "assistente1": "Danilo Ricardo Simon Manis",
+            "assistente2": "Leandro Rodrigues de Sá",
+            "quarto": "Flávio Rodrigues de Souza",
+            "var": "Wagner Reway"
+          },
+          "escalacao_casa": {
+            "formacao": "4-2-3-1",
+            "titulares": [
+              { "numero": 1, "nome": "Everson", "posicao": "GOL" },
+              { "numero": 13, "nome": "Guilherme Arana", "posicao": "LAT" },
+              { "numero": 3, "nome": "Junior Alonso", "posicao": "ZAG" },
+              { "numero": 4, "nome": "Jemerson", "posicao": "ZAG" },
+              { "numero": 2, "nome": "Mariano", "posicao": "LAT" },
+              { "numero": 5, "nome": "Otávio", "posicao": "VOL" },
+              { "numero": 6, "nome": "Fausto Vera", "posicao": "VOL" },
+              { "numero": 8, "nome": "Bernard", "posicao": "MEI" },
+              { "numero": 10, "nome": "Paulinho", "posicao": "MEI" },
+              { "numero": 7, "nome": "Vargas", "posicao": "ATA" },
+              { "numero": 9, "nome": "Hulk", "posicao": "ATA" }
+            ],
+            "reservas": []
+          },
+          "escalacao_visitante": {
+            "formacao": "4-3-3",
+            "titulares": [
+              { "numero": 1, "nome": "John", "posicao": "GOL" },
+              { "numero": 2, "nome": "Rafael", "posicao": "LAT" },
+              { "numero": 4, "nome": "Bastos", "posicao": "ZAG" },
+              { "numero": 3, "nome": "Barboza", "posicao": "ZAG" },
+              { "numero": 6, "nome": "Marçal", "posicao": "LAT" },
+              { "numero": 8, "nome": "Marlon Freitas", "posicao": "VOL" },
+              { "numero": 5, "nome": "Danilo Barbosa", "posicao": "VOL" },
+              { "numero": 10, "nome": "Eduardo", "posicao": "MEI" },
+              { "numero": 7, "nome": "Luiz Henrique", "posicao": "ATA" },
+              { "numero": 9, "nome": "Tiquinho Soares", "posicao": "ATA" },
+              { "numero": 11, "nome": "Júnior Santos", "posicao": "ATA" }
+            ],
+            "reservas": []
+          },
+          "gols": [
+            {
+              "id": "g004",
+              "minuto": 41,
+              "acrescimo": 0,
+              "time": "ATL",
+              "jogador": "Hulk",
+              "assistencia": "Paulinho",
+              "tipo": "normal",
+              "goleiro_adversario": "John",
+              "descricao": "Chute de fora da área no ângulo"
+            },
+            {
+              "id": "g005",
+              "minuto": 88,
+              "acrescimo": 2,
+              "time": "BOT",
+              "jogador": "Tiquinho Soares",
+              "assistencia": "Luiz Henrique",
+              "tipo": "normal",
+              "goleiro_adversario": "Everson",
+              "descricao": "Gol de cabeça nos acréscimos"
+            }
+          ],
+          "cartoes": [
+            { "minuto": 28, "tipo": "amarelo", "jogador": "Fausto Vera", "time": "ATL", "motivo": "Falta" },
+            { "minuto": 55, "tipo": "amarelo", "jogador": "Danilo Barbosa", "time": "BOT", "motivo": "Falta" },
+            { "minuto": 72, "tipo": "vermelho", "jogador": "Mariano", "time": "ATL", "motivo": "Segundo amarelo" }
+          ],
+          "substituicoes": [
+            { "minuto": 65, "time": "ATL", "sai": "Vargas", "entra": "Cadu" },
+            { "minuto": 73, "time": "BOT", "sai": "Eduardo", "entra": "Almada" }
+          ]
+        },
+        {
+          "id": "2024-19-003",
+          "rodada": 19,
+          "data": "2024-08-11",
+          "hora": "20:30",
+          "status": "encerrada",
+          "time_casa": "FOR",
+          "time_visitante": "SAO",
+          "placar_casa": 3,
+          "placar_visitante": 0,
+          "estadio": "Arena Castelão",
+          "cidade": "Fortaleza",
+          "publico": 51200,
+          "arbitragem": {
+            "principal": "Bráulio da Silva Machado",
+            "assistente1": "Alex dos Santos",
+            "assistente2": "Luiz Cláudio Regazone",
+            "quarto": "Emerson de Almeida Ferreira",
+            "var": "Adriano Milczvski"
+          },
+          "escalacao_casa": {
+            "formacao": "4-3-3",
+            "titulares": [
+              { "numero": 1, "nome": "João Ricardo", "posicao": "GOL" },
+              { "numero": 2, "nome": "Tinga", "posicao": "LAT" },
+              { "numero": 4, "nome": "Titi", "posicao": "ZAG" },
+              { "numero": 3, "nome": "Brítez", "posicao": "ZAG" },
+              { "numero": 6, "nome": "Felipe Jonatan", "posicao": "LAT" },
+              { "numero": 8, "nome": "Rossetto", "posicao": "VOL" },
+              { "numero": 5, "nome": "Zé Welison", "posicao": "VOL" },
+              { "numero": 10, "nome": "Pochettino", "posicao": "MEI" },
+              { "numero": 7, "nome": "Moisés", "posicao": "ATA" },
+              { "numero": 9, "nome": "Lucero", "posicao": "ATA" },
+              { "numero": 11, "nome": "Renato Kayzer", "posicao": "ATA" }
+            ],
+            "reservas": []
+          },
+          "escalacao_visitante": {
+            "formacao": "4-2-3-1",
+            "titulares": [
+              { "numero": 1, "nome": "Rafael", "posicao": "GOL" },
+              { "numero": 2, "nome": "Igor Vinicius", "posicao": "LAT" },
+              { "numero": 4, "nome": "Arboleda", "posicao": "ZAG" },
+              { "numero": 3, "nome": "Alan Franco", "posicao": "ZAG" },
+              { "numero": 6, "nome": "Welington", "posicao": "LAT" },
+              { "numero": 8, "nome": "Alisson", "posicao": "VOL" },
+              { "numero": 5, "nome": "Luiz Gustavo", "posicao": "VOL" },
+              { "numero": 10, "nome": "Luciano", "posicao": "MEI" },
+              { "numero": 7, "nome": "Lucas", "posicao": "ATA" },
+              { "numero": 9, "nome": "Calleri", "posicao": "ATA" },
+              { "numero": 11, "nome": "Ferreira", "posicao": "ATA" }
+            ],
+            "reservas": []
+          },
+          "gols": [
+            {
+              "id": "g006",
+              "minuto": 12,
+              "acrescimo": 0,
+              "time": "FOR",
+              "jogador": "Lucero",
+              "assistencia": "Pochettino",
+              "tipo": "normal",
+              "goleiro_adversario": "Rafael",
+              "descricao": "Gol de cabeça após cruzamento pela direita"
+            },
+            {
+              "id": "g007",
+              "minuto": 49,
+              "acrescimo": 0,
+              "time": "FOR",
+              "jogador": "Renato Kayzer",
+              "assistencia": "Moisés",
+              "tipo": "normal",
+              "goleiro_adversario": "Rafael",
+              "descricao": "Chute cruzado de pé esquerdo"
+            },
+            {
+              "id": "g008",
+              "minuto": 85,
+              "acrescimo": 0,
+              "time": "FOR",
+              "jogador": "Pochettino",
+              "assistencia": null,
+              "tipo": "falta",
+              "goleiro_adversario": "Rafael",
+              "descricao": "Falta direta cobrada no ângulo superior direito"
+            }
+          ],
+          "cartoes": [
+            { "minuto": 44, "tipo": "amarelo", "jogador": "Alan Franco", "time": "SAO", "motivo": "Falta" },
+            { "minuto": 58, "tipo": "amarelo", "jogador": "Luiz Gustavo", "time": "SAO", "motivo": "Reclamação" },
+            { "minuto": 81, "tipo": "amarelo", "jogador": "Calleri", "time": "SAO", "motivo": "Simulação" }
+          ],
+          "substituicoes": [
+            { "minuto": 62, "time": "FOR", "sai": "Renato Kayzer", "entra": "Breno Lopes" },
+            { "minuto": 70, "time": "SAO", "sai": "Lucas", "entra": "André Anderson" }
+          ]
+        }
+      ]
+    }
+  ],
+  "tabela": [
+    { "posicao": 1, "time": "BOT", "pontos": 38, "jogos": 19, "vitorias": 11, "empates": 5, "derrotas": 3, "gols_pro": 30, "gols_contra": 17, "saldo": 13 },
+    { "posicao": 2, "time": "PAL", "pontos": 37, "jogos": 19, "vitorias": 11, "empates": 4, "derrotas": 4, "gols_pro": 28, "gols_contra": 14, "saldo": 14 },
+    { "posicao": 3, "time": "FLA", "pontos": 35, "jogos": 19, "vitorias": 10, "empates": 5, "derrotas": 4, "gols_pro": 35, "gols_contra": 22, "saldo": 13 },
+    { "posicao": 4, "time": "FOR", "pontos": 34, "jogos": 19, "vitorias": 10, "empates": 4, "derrotas": 5, "gols_pro": 27, "gols_contra": 18, "saldo": 9 },
+    { "posicao": 5, "time": "ATL", "pontos": 31, "jogos": 19, "vitorias": 9, "empates": 4, "derrotas": 6, "gols_pro": 29, "gols_contra": 22, "saldo": 7 },
+    { "posicao": 6, "time": "SAO", "pontos": 28, "jogos": 19, "vitorias": 8, "empates": 4, "derrotas": 7, "gols_pro": 22, "gols_contra": 24, "saldo": -2 },
+    { "posicao": 7, "time": "INT", "pontos": 27, "jogos": 19, "vitorias": 7, "empates": 6, "derrotas": 6, "gols_pro": 24, "gols_contra": 22, "saldo": 2 },
+    { "posicao": 8, "time": "CRU", "pontos": 26, "jogos": 19, "vitorias": 7, "empates": 5, "derrotas": 7, "gols_pro": 21, "gols_contra": 22, "saldo": -1 },
+    { "posicao": 9, "time": "GRE", "pontos": 25, "jogos": 19, "vitorias": 7, "empates": 4, "derrotas": 8, "gols_pro": 20, "gols_contra": 24, "saldo": -4 },
+    { "posicao": 10, "time": "BAH", "pontos": 24, "jogos": 19, "vitorias": 7, "empates": 3, "derrotas": 9, "gols_pro": 19, "gols_contra": 26, "saldo": -7 },
+    { "posicao": 11, "time": "COR", "pontos": 23, "jogos": 19, "vitorias": 6, "empates": 5, "derrotas": 8, "gols_pro": 18, "gols_contra": 23, "saldo": -5 },
+    { "posicao": 12, "time": "ATG", "pontos": 22, "jogos": 19, "vitorias": 6, "empates": 4, "derrotas": 9, "gols_pro": 17, "gols_contra": 24, "saldo": -7 },
+    { "posicao": 13, "time": "FLU", "pontos": 20, "jogos": 19, "vitorias": 5, "empates": 5, "derrotas": 9, "gols_pro": 18, "gols_contra": 27, "saldo": -9 },
+    { "posicao": 14, "time": "RBB", "pontos": 19, "jogos": 19, "vitorias": 5, "empates": 4, "derrotas": 10, "gols_pro": 22, "gols_contra": 32, "saldo": -10 },
+    { "posicao": 15, "time": "VAS", "pontos": 18, "jogos": 19, "vitorias": 4, "empates": 6, "derrotas": 9, "gols_pro": 16, "gols_contra": 26, "saldo": -10 },
+    { "posicao": 16, "time": "JUV", "pontos": 17, "jogos": 19, "vitorias": 4, "empates": 5, "derrotas": 10, "gols_pro": 15, "gols_contra": 29, "saldo": -14 },
+    { "posicao": 17, "time": "VIT", "pontos": 15, "jogos": 19, "vitorias": 3, "empates": 6, "derrotas": 10, "gols_pro": 14, "gols_contra": 30, "saldo": -16 },
+    { "posicao": 18, "time": "CUI", "pontos": 14, "jogos": 19, "vitorias": 3, "empates": 5, "derrotas": 11, "gols_pro": 13, "gols_contra": 31, "saldo": -18 },
+    { "posicao": 19, "time": "CRB", "pontos": 12, "jogos": 19, "vitorias": 3, "empates": 3, "derrotas": 13, "gols_pro": 12, "gols_contra": 35, "saldo": -23 },
+    { "posicao": 20, "time": "CFC", "pontos": 10, "jogos": 19, "vitorias": 2, "empates": 4, "derrotas": 13, "gols_pro": 11, "gols_contra": 33, "saldo": -22 }
+  ]
+}
