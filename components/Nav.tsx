@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 const publicLinks = [
   { href: '/', label: 'Rodadas' },
   { href: '/tabela', label: 'Tabela' },
+  { href: '/confrontos', label: 'Confrontos' },
   { href: '/artilharia', label: 'Artilharia' },
 ];
 const adminLinks = [
