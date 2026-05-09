@@ -49,7 +49,7 @@ export default function TabelaPage() {
                     </td>
                     <td style={{padding:'.6rem .9rem'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'.6rem',whiteSpace:'nowrap'}}>
-                        <EscudoTime timeId={row.time_id} size={30} />
+                        <EscudoTime time={t} size={30} />
                         <span style={{fontWeight:600}}>{t?.nome}</span>
                       </div>
                     </td>
