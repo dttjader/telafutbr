@@ -48,7 +48,7 @@ export function Nav() {
           <span style={s.logoIcon}>🇧🇷</span>
           <div>
             <div style={s.logoTitle}>BRASILEIRÃO</div>
-            <div style={s.logoSub}>Série A · 2024</div>
+            <div style={s.logoSub}>Série A · 2026</div>
           </div>
         </Link>
         <nav style={s.nav}>
