@@ -87,6 +87,13 @@ h1,h2,h3,h4,h5 { font-family: 'Bebas Neue', sans-serif; letter-spacing: .05em; l
 ::-webkit-scrollbar-track { background: var(--surface); }
 ::-webkit-scrollbar-thumb { background: var(--verde-escuro); border-radius: 3px; }
 
+/* Card hover */
+.card-partida-link:hover {
+  border-color: #444 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+
 /* Responsive grid helpers */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
