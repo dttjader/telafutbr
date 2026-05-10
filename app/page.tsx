@@ -3,11 +3,10 @@ import { CardPartida } from '@/components/CardPartida';
 
 export const dynamic = 'force-dynamic';
 
-export default function Home() {
-  const partidas = getPartidas().sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
-  const times = getTimes();
-  const estadios = getEstadios();
-  const rodadas = [...new Set(partidas.map(p => p.rodada))].sort((a, b) => a - b);
+export default async function Home() {
+  const [partidas, times, estadios] = await Promise.all([getPartidas(), getTimes(), getEstadios()]);
+  const sorted = [...partidas].sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
+  const rodadas = [...new Set(sorted.map(p => p.rodada))].sort((a, b) => a - b);
 
   return (
     <div style={{ paddingBottom: '3rem' }}>
@@ -17,7 +16,6 @@ export default function Home() {
           <h1 style={{ fontSize: 'clamp(2.5rem,6vw,4rem)', color: 'var(--text)' }}>Rodadas</h1>
         </div>
       </div>
-
       <div className="container">
         {rodadas.length === 0 && (
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '3rem' }}>
@@ -26,11 +24,9 @@ export default function Home() {
         )}
         {rodadas.map(rod => (
           <section key={rod} style={{ marginBottom: '2.5rem' }}>
-            <h2 style={{ fontSize: '1.8rem', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
-              {rod}ª Rodada
-            </h2>
+            <h2 style={{ fontSize: '1.8rem', marginBottom: '.75rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>{rod}ª Rodada</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '1rem' }}>
-              {partidas.filter(p => p.rodada === rod).map(p => (
+              {sorted.filter(p => p.rodada === rod).map(p => (
                 <CardPartida key={p.id} partida={p} times={times} estadios={estadios} />
               ))}
             </div>
