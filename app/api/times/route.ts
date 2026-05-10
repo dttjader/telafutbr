@@ -2,5 +2,10 @@ import { NextResponse } from 'next/server';
 import { getTimes } from '@/lib/data';
 
 export async function GET() {
-  return NextResponse.json(getTimes());
+  try {
+    const data = await getTimes();
+    return NextResponse.json(data);
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
 }
