@@ -1,68 +1,96 @@
-import fs from 'fs';
-import path from 'path';
+import { supabase } from './supabase';
 import { Estadio, Time, Jogador, Partida } from './types';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-
-function readJson<T>(file: string): T {
-  const filePath = path.join(DATA_DIR, file);
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  return JSON.parse(raw) as T;
-}
-
-function writeJson<T>(file: string, data: T): void {
-  const filePath = path.join(DATA_DIR, file);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-}
-
 // ── Estádios ──────────────────────────────────────────────
-export function getEstadios(): Estadio[] {
-  return readJson<Estadio[]>('estadios.json');
+export async function getEstadios(): Promise<Estadio[]> {
+  const { data, error } = await supabase.from('estadios').select('*').order('nome');
+  if (error) throw error;
+  return data as Estadio[];
 }
-export function saveEstadios(data: Estadio[]) {
-  writeJson('estadios.json', data);
+
+export async function getEstadio(id: string): Promise<Estadio | null> {
+  const { data, error } = await supabase.from('estadios').select('*').eq('id', id).single();
+  if (error) return null;
+  return data as Estadio;
 }
-export function getEstadio(id: string) {
-  return getEstadios().find(e => e.id === id);
+
+export async function upsertEstadio(estadio: Estadio): Promise<Estadio> {
+  const { data, error } = await supabase.from('estadios').upsert(estadio).select().single();
+  if (error) throw error;
+  return data as Estadio;
+}
+
+export async function deleteEstadio(id: string): Promise<void> {
+  const { error } = await supabase.from('estadios').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ── Times ─────────────────────────────────────────────────
-export function getTimes(): Time[] {
-  return readJson<Time[]>('times.json');
+export async function getTimes(): Promise<Time[]> {
+  const { data, error } = await supabase.from('times').select('*').order('nome');
+  if (error) throw error;
+  return data as Time[];
 }
-export function getTime(id: string) {
-  return getTimes().find(t => t.id === id);
+
+export async function getTime(id: string): Promise<Time | null> {
+  const { data, error } = await supabase.from('times').select('*').eq('id', id).single();
+  if (error) return null;
+  return data as Time;
 }
 
 // ── Jogadores ─────────────────────────────────────────────
-export function getJogadores(): Jogador[] {
-  return readJson<Jogador[]>('jogadores.json');
+export async function getJogadores(): Promise<Jogador[]> {
+  const { data, error } = await supabase.from('jogadores').select('*').order('nome');
+  if (error) throw error;
+  return data as Jogador[];
 }
-export function saveJogadores(data: Jogador[]) {
-  writeJson('jogadores.json', data);
+
+export async function getJogador(id: string): Promise<Jogador | null> {
+  const { data, error } = await supabase.from('jogadores').select('*').eq('id', id).single();
+  if (error) return null;
+  return data as Jogador;
 }
-export function getJogador(id: string) {
-  return getJogadores().find(j => j.id === id);
+
+export async function upsertJogador(jogador: Jogador): Promise<Jogador> {
+  const { data, error } = await supabase.from('jogadores').upsert(jogador).select().single();
+  if (error) throw error;
+  return data as Jogador;
 }
-export function getJogadoresDoTime(timeId: string) {
-  return getJogadores().filter(j => j.time_atual === timeId);
+
+export async function deleteJogador(id: string): Promise<void> {
+  const { error } = await supabase.from('jogadores').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ── Partidas ──────────────────────────────────────────────
-export function getPartidas(): Partida[] {
-  return readJson<Partida[]>('partidas.json');
+export async function getPartidas(): Promise<Partida[]> {
+  const { data, error } = await supabase.from('partidas').select('*').order('rodada').order('data');
+  if (error) throw error;
+  return data as Partida[];
 }
-export function savePartidas(data: Partida[]) {
-  writeJson('partidas.json', data);
+
+export async function getPartida(id: string): Promise<Partida | null> {
+  const { data, error } = await supabase.from('partidas').select('*').eq('id', id).single();
+  if (error) return null;
+  return data as Partida;
 }
-export function getPartida(id: string) {
-  return getPartidas().find(p => p.id === id);
+
+export async function upsertPartida(partida: Partida): Promise<Partida> {
+  const { data, error } = await supabase.from('partidas').upsert(partida).select().single();
+  if (error) throw error;
+  return data as Partida;
+}
+
+export async function deletePartida(id: string): Promise<void> {
+  const { error } = await supabase.from('partidas').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ── Tabela ────────────────────────────────────────────────
-export function calcularTabela() {
-  const partidas = getPartidas().filter(p => p.status === 'encerrada');
-  const times = getTimes();
+export async function calcularTabela() {
+  const [partidas, times] = await Promise.all([getPartidas(), getTimes()]);
+  const encerradas = partidas.filter(p => p.status === 'encerrada');
+
   const map: Record<string, {
     time_id: string; pontos: number; jogos: number; vitorias: number;
     empates: number; derrotas: number; gols_pro: number; gols_contra: number;
@@ -72,7 +100,7 @@ export function calcularTabela() {
     map[t.id] = { time_id: t.id, pontos: 0, jogos: 0, vitorias: 0, empates: 0, derrotas: 0, gols_pro: 0, gols_contra: 0 };
   });
 
-  for (const p of partidas) {
+  for (const p of encerradas) {
     const c = map[p.time_casa_id];
     const v = map[p.time_visitante_id];
     if (!c || !v) continue;
@@ -91,15 +119,16 @@ export function calcularTabela() {
 }
 
 // ── Artilharia ────────────────────────────────────────────
-export function calcularArtilharia() {
-  const partidas = getPartidas().filter(p => p.status === 'encerrada');
+export async function calcularArtilharia() {
+  const partidas = await getPartidas();
+  const encerradas = partidas.filter(p => p.status === 'encerrada');
   const map: Record<string, { jogador_id: string; time_id: string; quantidade: number }> = {};
-  for (const p of partidas) {
+
+  for (const p of encerradas) {
     for (const g of p.gols) {
       if (g.tipo === 'contra') continue;
-      const key = g.jogador_id;
-      if (!map[key]) map[key] = { jogador_id: g.jogador_id, time_id: g.time_id, quantidade: 0 };
-      map[key].quantidade++;
+      if (!map[g.jogador_id]) map[g.jogador_id] = { jogador_id: g.jogador_id, time_id: g.time_id, quantidade: 0 };
+      map[g.jogador_id].quantidade++;
     }
   }
   return Object.values(map).sort((a, b) => b.quantidade - a.quantidade);
@@ -116,20 +145,9 @@ export function formatDate(d: string) {
   return `${day}/${m}/${y}`;
 }
 
-export function posicaoLabel(p: string) {
-  const l: Record<string, string> = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meia', ATA: 'Atacante' };
-  return l[p] ?? p;
-}
-
 export function zonaClassificacao(pos: number) {
-  if (pos <= 4) return 'libertadores';
-  if (pos <= 6) return 'sulamericana';
-  if (pos >= 18) return 'rebaixamento';
+  if (pos <= 5) return 'libertadores';
+  if (pos <= 11) return 'sulamericana';
+  if (pos >= 17) return 'rebaixamento';
   return 'neutro';
 }
-
-export const ESTADOS_BR = [
-  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA',
-  'MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN',
-  'RS','RO','RR','SC','SP','SE','TO'
-];
