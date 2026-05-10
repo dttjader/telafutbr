@@ -26,7 +26,7 @@
     ],
     "escalacao_visitante": [
       { "jogador_id": "641458", "numero": 1, "posicao": "GOL", "titular": true },
-      { "jogador_id": "653348", "numero": 12, "posicao": "LD", "titular": true },
+      { "jogador_id": "653348", "numero": 12, "posicao": "LAT", "titular": true },
       { "jogador_id": "844797", "numero": 42, "posicao": "ATA", "titular": true },
       { "jogador_id": "943837", "numero": 9, "posicao": "ATA", "titular": false }
     ],
