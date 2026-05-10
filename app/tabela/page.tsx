@@ -1,14 +1,13 @@
-import { calcularTabela, getTimes, getEstadios } from '@/lib/data';
+import { calcularTabela, getTimes } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 
 export const dynamic = 'force-dynamic';
 
-export default function TabelaPage() {
-  const tabela = calcularTabela();
-  const times = getTimes();
+export default async function TabelaPage() {
+  const [tabela, times] = await Promise.all([calcularTabela(), getTimes()]);
 
-  const zona = (pos: number) => pos<=4?'libertadores':pos<=6?'sulamericana':pos>=18?'rebaixamento':'neutro';
   const zonaColor: Record<string,string> = { libertadores:'var(--libertadores)', sulamericana:'var(--sulamericana)', rebaixamento:'var(--rebaixamento)', neutro:'transparent' };
+  const zona = (pos: number) => pos<=5?'libertadores':pos<=11?'sulamericana':pos>=17?'rebaixamento':'neutro';
 
   return (
     <div style={{paddingBottom:'4rem'}}>
@@ -20,14 +19,14 @@ export default function TabelaPage() {
       </div>
       <div className="container">
         <div style={{display:'flex',gap:'1.25rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
-          {[['libertadores','Libertadores'],['sulamericana','Sul-Americana'],['rebaixamento','Rebaixamento']].map(([z,l])=>(
+          {[['libertadores','Libertadores (Top 5)'],['sulamericana','Sul-Americana (6º–11º)'],['rebaixamento','Rebaixamento (17º–20º)']].map(([z,l])=>(
             <span key={z} style={{display:'flex',alignItems:'center',gap:'.4rem',fontSize:'.75rem',color:'var(--text-muted)'}}>
               <span style={{width:10,height:10,borderRadius:'50%',background:zonaColor[z],display:'inline-block'}} />{l}
             </span>
           ))}
         </div>
         <div style={{overflowX:'auto',borderRadius:12,border:'1px solid var(--border)'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontFamily:"'Barlow',sans-serif",fontSize:'.875rem'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'.875rem'}}>
             <thead style={{background:'var(--surface2)',borderBottom:'2px solid var(--verde)'}}>
               <tr>
                 {['#','Time','P','J','V','E','D','GP','GC','SG'].map(h=>(
@@ -40,7 +39,7 @@ export default function TabelaPage() {
                 const z=zona(row.posicao);
                 const t=times.find(t=>t.id===row.time_id);
                 return (
-                  <tr key={row.time_id} style={{borderBottom:'1px solid #1e1e1e',background:z==='libertadores'?'rgba(34,197,94,.02)':z==='rebaixamento'?'rgba(239,68,68,.03)':'transparent'}}>
+                  <tr key={row.time_id} style={{borderBottom:'1px solid #1e1e1e'}}>
                     <td style={{padding:'.6rem .9rem'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'.4rem'}}>
                         <span style={{width:3,height:22,borderRadius:2,background:zonaColor[z],display:'inline-block'}} />
@@ -49,7 +48,7 @@ export default function TabelaPage() {
                     </td>
                     <td style={{padding:'.6rem .9rem'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'.6rem',whiteSpace:'nowrap'}}>
-                        <EscudoTime time={t} size={30} />
+                        <EscudoTime time={t ?? undefined} size={30} />
                         <span style={{fontWeight:600}}>{t?.nome}</span>
                       </div>
                     </td>
@@ -66,9 +65,7 @@ export default function TabelaPage() {
                   </tr>
                 );
               })}
-              {tabela.length===0&&(
-                <tr><td colSpan={10} style={{textAlign:'center',padding:'3rem',color:'var(--text-muted)'}}>Nenhuma partida encerrada ainda.</td></tr>
-              )}
+              {tabela.length===0&&<tr><td colSpan={10} style={{textAlign:'center',padding:'3rem',color:'var(--text-muted)'}}>Nenhuma partida encerrada ainda.</td></tr>}
             </tbody>
           </table>
         </div>
