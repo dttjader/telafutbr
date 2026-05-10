@@ -1,22 +1,22 @@
 [
-  { "id": "FLA", "nome": "Flamengo", "sigla": "FLA", "cor_primaria": "#CC0000", "cor_secundaria": "#000000", "estadio_id": "estadio-1" },
-  { "id": "PAL", "nome": "Palmeiras", "sigla": "PAL", "cor_primaria": "#006437", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-2" },
-  { "id": "ATL", "nome": "Atlético-MG", "sigla": "CAM", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-3" },
-  { "id": "FOR", "nome": "Fortaleza", "sigla": "FOR", "cor_primaria": "#0A2C6E", "cor_secundaria": "#CC0000", "estadio_id": "estadio-4" },
+  { "id": "CAP", "nome": "Athletico-PR", "sigla": "CAP", "cor_primaria": "#CC0000", "cor_secundaria": "#000000" },
+  { "id": "CAM", "nome": "Atlético-MG", "sigla": "CAM", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-3" },
+  { "id": "BAH", "nome": "Bahia", "sigla": "BAH", "cor_primaria": "#0A2C6E", "cor_secundaria": "#CC0000" },
   { "id": "BOT", "nome": "Botafogo", "sigla": "BOT", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-5" },
-  { "id": "SAO", "nome": "São Paulo", "sigla": "SPF", "cor_primaria": "#CC0000", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-6" },
+  { "id": "CHA", "nome": "Chapecoense", "sigla": "CHA", "cor_primaria": "#2D8C2D", "cor_secundaria": "#FFFFFF" }
   { "id": "COR", "nome": "Corinthians", "sigla": "COR", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-7" },
+  { "id": "CFC", "nome": "Coritiba", "sigla": "CFC", "cor_primaria": "#006633", "cor_secundaria": "#FFFFFF" }
+  { "id": "CRU", "nome": "Cruzeiro", "sigla": "CRU", "cor_primaria": "#0A2C6E", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-10" },
+  { "id": "FLA", "nome": "Flamengo", "sigla": "FLA", "cor_primaria": "#CC0000", "cor_secundaria": "#000000", "estadio_id": "estadio-1" },
+  { "id": "FLU", "nome": "Fluminense", "sigla": "FLU", "cor_primaria": "#6B0A0A", "cor_secundaria": "#228B22", "estadio_id": "estadio-1" },
   { "id": "GRE", "nome": "Grêmio", "sigla": "GRE", "cor_primaria": "#0B3D91", "cor_secundaria": "#000000", "estadio_id": "estadio-8" },
   { "id": "INT", "nome": "Internacional", "sigla": "INT", "cor_primaria": "#CC0000", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-9" },
-  { "id": "CRU", "nome": "Cruzeiro", "sigla": "CRU", "cor_primaria": "#0A2C6E", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-10" },
-  { "id": "BAH", "nome": "Bahia", "sigla": "BAH", "cor_primaria": "#0A2C6E", "cor_secundaria": "#CC0000" },
-  { "id": "ATG", "nome": "Athletico-PR", "sigla": "CAP", "cor_primaria": "#CC0000", "cor_secundaria": "#000000" },
-  { "id": "FLU", "nome": "Fluminense", "sigla": "FLU", "cor_primaria": "#6B0A0A", "cor_secundaria": "#228B22", "estadio_id": "estadio-1" },
-  { "id": "VAS", "nome": "Vasco", "sigla": "VAS", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF" },
+  { "id": "MIR", "nome": "Mirassol", "sigla": "MIR", "cor_primaria": "#FFD700", "cor_secundaria": "#000000" }
+  { "id": "PAL", "nome": "Palmeiras", "sigla": "PAL", "cor_primaria": "#006437", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-2" },
   { "id": "RBB", "nome": "RB Bragantino", "sigla": "RBB", "cor_primaria": "#CC0000", "cor_secundaria": "#FFFFFF" },
-  { "id": "CUI", "nome": "Cuiabá", "sigla": "CUI", "cor_primaria": "#DAA520", "cor_secundaria": "#228B22" },
-  { "id": "JUV", "nome": "Juventude", "sigla": "JUV", "cor_primaria": "#228B22", "cor_secundaria": "#FFFFFF" },
+  { "id": "REM", "nome": "Remo", "sigla": "REM", "cor_primaria": "#003DA5", "cor_secundaria": "#FFFFFF" }
+  { "id": "SAO", "nome": "São Paulo", "sigla": "SAO", "cor_primaria": "#CC0000", "cor_secundaria": "#FFFFFF", "estadio_id": "estadio-6" },
+  { "id": "SAN", "nome": "Santos", "sigla": "SAN", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF" }
+  { "id": "VAS", "nome": "Vasco", "sigla": "VAS", "cor_primaria": "#000000", "cor_secundaria": "#FFFFFF" },
   { "id": "VIT", "nome": "Vitória", "sigla": "VIT", "cor_primaria": "#CC0000", "cor_secundaria": "#000000" },
-  { "id": "CRB", "nome": "CRB", "sigla": "CRB", "cor_primaria": "#000000", "cor_secundaria": "#CC0000" },
-  { "id": "CFC", "nome": "Criciúma", "sigla": "CFC", "cor_primaria": "#DAA520", "cor_secundaria": "#000000" }
 ]
