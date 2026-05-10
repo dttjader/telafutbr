@@ -1,24 +1,24 @@
 [
   {
     "id": "p001",
-    "rodada": 19,
-    "data": "2024-08-10",
-    "hora": "16:00",
+    "rodada": 1,
+    "data": "2026-01-26",
+    "hora": "19:00",
     "status": "encerrada",
-    "time_casa_id": "FLA",
+    "time_casa_id": "CAM",
     "time_visitante_id": "PAL",
     "placar_casa": 2,
-    "placar_visitante": 1,
-    "estadio_id": "estadio-1",
-    "publico": 68420,
-    "acrescimo_primeiro": 3,
-    "acrescimo_segundo": 5,
+    "placar_visitante": 2,
+    "estadio_id": "mg-1",
+    "publico": 25770,
+    "acrescimo_primeiro": 0,
+    "acrescimo_segundo": 0,
     "arbitragem": {
-      "principal": "Anderson Daronco",
-      "assistente1": "Bruno Raphael Pires",
-      "assistente2": "Fabricio Vilarinho",
-      "quarto": "Rodrigo Guarizo",
-      "var": "Rodrigo Nunes de Sá"
+      "principal": "Bruno Arleu de Araújo",
+      "assistente1": "",
+      "assistente2": "",
+      "quarto": "",
+      "var": ""
     },
     "escalacao_casa": [
       { "jogador_id": "j003", "numero": 1, "posicao": "GOL", "titular": true },
