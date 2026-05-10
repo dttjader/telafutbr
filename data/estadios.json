@@ -18,6 +18,5 @@
   { "id": "sp-3", "nome": "Neo Química Arena", "cidade": "São Paulo", "estado": "SP", "capacidade": 48905 },
   { "id": "sp-4", "nome": "Maião", "cidade": "Mirassol", "estado": "SP", "capacidade": 15000 },
   { "id": "sp-5", "nome": "Cícero de Souza Marques", "cidade": "Bragança Paulista", "estado": "SP", "capacidade": 12000 },
-  { "id": "sp-6", "nome": "Vila Belmiro", "cidade": "Santos", "estado": "SP", "capacidade": 16795 },
-
+  { "id": "sp-6", "nome": "Vila Belmiro", "cidade": "Santos", "estado": "SP", "capacidade": 16795 }
 ]
