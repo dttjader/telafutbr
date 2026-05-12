@@ -11,6 +11,7 @@ const publicLinks = [
 const adminLinks = [
   { href: '/admin/estadios', label: 'Estádios' },
   { href: '/admin/jogadores', label: 'Jogadores' },
+  { href: '/admin/tecnicos', label: 'Técnicos' },
   { href: '/admin/partidas', label: 'Partidas' },
 ];
 
