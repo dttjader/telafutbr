@@ -1,0 +1,16 @@
+{
+  "libertadores": {
+    "vagas_tabela": 4,
+    "vagas_diretas": [
+      { "time_id": "FLA", "motivo": "Campeão Copa do Brasil 2024" },
+      { "time_id": "PAL", "motivo": "Campeão Libertadores 2024" }
+    ]
+  },
+  "sulamericana": {
+    "vagas_tabela": 4,
+    "vagas_diretas": []
+  },
+  "rebaixamento": {
+    "vagas": 4
+  }
+}
