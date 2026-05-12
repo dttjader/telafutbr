@@ -13,6 +13,7 @@ const adminLinks = [
   { href: '/admin/jogadores', label: 'Jogadores' },
   { href: '/admin/tecnicos', label: 'Técnicos' },
   { href: '/admin/partidas', label: 'Partidas' },
+  { href: '/admin/config', label: 'Config' },
 ];
 
 export function Nav() {
@@ -49,7 +50,7 @@ export function Nav() {
           <span style={s.logoIcon}>🇧🇷</span>
           <div>
             <div style={s.logoTitle}>BRASILEIRÃO</div>
-            <div style={s.logoSub}>Série A · 2026</div>
+            <div style={s.logoSub}>Série A · 2024</div>
           </div>
         </Link>
         <nav style={s.nav}>
