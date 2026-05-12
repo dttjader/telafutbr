@@ -1,3 +1,19 @@
+export interface HistoricoTecnico {
+  time_id: string | null; // null = inativo (desempregado)
+  data_inicio: string;
+  data_fim: string | null;
+  inativo: boolean;
+}
+
+export interface Tecnico {
+  id: string;
+  nome: string;
+  nacionalidade?: string;
+  time_atual: string | null; // null = desempregado
+  ativo: boolean;
+  historico: HistoricoTecnico[];
+}
+
 export interface Estadio {
   id: string;
   nome: string;
@@ -92,6 +108,8 @@ export interface Partida {
   acrescimo_primeiro: number;
   acrescimo_segundo: number;
   arbitragem: Arbitragem;
+  tecnico_casa_id: string | null;
+  tecnico_visitante_id: string | null;
   escalacao_casa: EscalacaoJogador[];
   escalacao_visitante: EscalacaoJogador[];
   gols: Gol[];

@@ -118,6 +118,37 @@ export async function calcularTabela() {
     .map((t, i) => ({ ...t, posicao: i + 1, saldo: t.gols_pro - t.gols_contra }));
 }
 
+// ── Técnicos ──────────────────────────────────────────────
+export async function getTecnicos(): Promise<import('./types').Tecnico[]> {
+  const { data, error } = await supabase.from('tecnicos').select('*').order('nome');
+  if (error) throw error;
+  return data as import('./types').Tecnico[];
+}
+
+export async function calcularRankingTecnicos() {
+  const [partidas, tecnicos, times] = await Promise.all([getPartidas(), getTecnicos(), getTimes()]);
+  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const map: Record<string, { tecnico_id: string; j: number; v: number; e: number; d: number; gp: number; gc: number }> = {};
+
+  for (const p of encerradas) {
+    const processar = (tecnicoId: string | null, isCasa: boolean) => {
+      if (!tecnicoId) return;
+      if (!map[tecnicoId]) map[tecnicoId] = { tecnico_id: tecnicoId, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0 };
+      const r = map[tecnicoId];
+      const gf = isCasa ? p.placar_casa : p.placar_visitante;
+      const gc = isCasa ? p.placar_visitante : p.placar_casa;
+      r.j++; r.gp += gf; r.gc += gc;
+      if (gf > gc) r.v++; else if (gf < gc) r.d++; else r.e++;
+    };
+    processar(p.tecnico_casa_id, true);
+    processar(p.tecnico_visitante_id, false);
+  }
+
+  return Object.values(map)
+    .map(r => ({ ...r, pts: r.v * 3 + r.e, aproveitamento: r.j > 0 ? Math.round((r.v * 3 + r.e) / (r.j * 3) * 100) : 0 }))
+    .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v);
+}
+
 // ── Artilharia ────────────────────────────────────────────
 export async function calcularArtilharia() {
   const partidas = await getPartidas();
