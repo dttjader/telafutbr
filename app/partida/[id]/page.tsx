@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getPartida, getTimes, getJogadores, getEstadios, formatDate } from '@/lib/data';
+import { getPartida, getTimes, getJogadores, getEstadios, getTecnicos, formatDate } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 
 export const dynamic = 'force-dynamic';
@@ -8,8 +8,8 @@ const TIPO_GOL: Record<string,string> = {normal:'Gol',penalti:'Pênalti',falta:'
 
 export default async function PartidaPage({params}:{params:Promise<{id:string}>}) {
   const {id} = await params;
-  const [partida, times, jogadores, estadios] = await Promise.all([
-    getPartida(id), getTimes(), getJogadores(), getEstadios()
+  const [partida, times, jogadores, estadios, tecnicos] = await Promise.all([
+    getPartida(id), getTimes(), getJogadores(), getEstadios(), (await import('@/lib/data')).getTecnicos()
   ]);
   if(!partida) notFound();
 
@@ -18,6 +18,7 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
   const estadio=estadios.find(e=>e.id===partida.estadio_id);
   const nomeJog=(jid:string)=>jogadores.find(j=>j.id===jid)?.nome??jid;
   const enc=partida.status==='encerrada';
+  const nomeTecnico=(tid:string|null)=>tid?(tecnicos.find(t=>t.id===tid)?.nome??tid):'Não informado';
 
   const sS={background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'1.5rem',marginBottom:'1rem'};
   const sT={fontSize:'1.1rem',color:'var(--amarelo)',marginBottom:'1rem',paddingBottom:'.75rem',borderBottom:'1px solid var(--border)'};
@@ -137,6 +138,13 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
           </div>
         )}
 
+        <div style={sS}><h3 style={sT}>🧑‍💼 Técnicos</h3>
+          {[['Mandante',partida.tecnico_casa_id],['Visitante',partida.tecnico_visitante_id]].map(([lado,tid]:any)=>(
+            <div key={lado} style={{display:'flex',justifyContent:'space-between',padding:'.45rem .75rem',background:'var(--surface2)',borderRadius:6,marginBottom:'.3rem',fontSize:'.875rem'}}>
+              <span style={{color:'var(--text-muted)'}}>{lado}</span><strong>{nomeTecnico(tid)}</strong>
+            </div>
+          ))}
+        </div>
         <div style={sS}><h3 style={sT}>🟢 Arbitragem</h3>
           {[['Árbitro principal',partida.arbitragem.principal],['Assistente 1',partida.arbitragem.assistente1],['Assistente 2',partida.arbitragem.assistente2],['4º árbitro',partida.arbitragem.quarto],['VAR',partida.arbitragem.var]].map(([label,nome]:any)=>nome?(
             <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'.45rem .75rem',background:'var(--surface2)',borderRadius:6,marginBottom:'.3rem',fontSize:'.875rem'}}>
