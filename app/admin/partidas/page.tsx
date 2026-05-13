@@ -45,6 +45,8 @@ export default function AdminPartidas() {
         estadio_id:form.estadio_id, publico:+form.publico||0,
         placar_casa:+form.placar_casa, placar_visitante:+form.placar_visitante,
         acrescimo_primeiro:+form.acrescimo_primeiro, acrescimo_segundo:+form.acrescimo_segundo,
+        tecnico_casa_id: form.tecnico_casa_id || null,
+        tecnico_visitante_id: form.tecnico_visitante_id || null,
         arbitragem:{principal:form.arb_principal,assistente1:form.arb_ass1,assistente2:form.arb_ass2,quarto:form.arb_quarto,var:form.arb_var},
         escalacao_casa: existente?.escalacao_casa ?? [],
         escalacao_visitante: existente?.escalacao_visitante ?? [],
