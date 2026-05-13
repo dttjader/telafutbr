@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { supabase } from './supabase';
 
 export interface VagaDireta {
   time_id: string;
@@ -20,15 +19,26 @@ export interface Config {
   };
 }
 
-const CONFIG_PATH = path.join(process.cwd(), 'data', 'config.json');
+const DEFAULT_CONFIG: Config = {
+  libertadores: { vagas_tabela: 5, vagas_diretas: [] },
+  sulamericana: { vagas_tabela: 6, vagas_diretas: [] },
+  rebaixamento: { vagas: 4 },
+};
 
-export function getConfig(): Config {
-  const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
-  return JSON.parse(raw) as Config;
+export async function getConfig(): Promise<Config> {
+  const { data, error } = await supabase
+    .from('configuracoes')
+    .select('valor')
+    .eq('chave', 'classificacao')
+    .single();
+  if (error || !data) return DEFAULT_CONFIG;
+  return data.valor as Config;
 }
 
-export function saveConfig(config: Config): void {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+export async function saveConfig(config: Config): Promise<void> {
+  await supabase
+    .from('configuracoes')
+    .upsert({ chave: 'classificacao', valor: config });
 }
 
 export function zonaClassificacao(
@@ -41,7 +51,6 @@ export function zonaClassificacao(
   const vagasSul = vagasLib + config.sulamericana.vagas_tabela;
   const vagasReb = totalTimes - config.rebaixamento.vagas + 1;
 
-  // Vagas diretas têm badge especial mas não mudam a zona visual
   if (config.libertadores.vagas_diretas.some(v => v.time_id === timeId)) return 'libertadores-direta';
   if (config.sulamericana.vagas_diretas.some(v => v.time_id === timeId)) return 'sulamericana-direta';
   if (posicao <= vagasLib) return 'libertadores';
