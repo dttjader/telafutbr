@@ -5,8 +5,8 @@ import { clientGetTimes } from '@/lib/client';
 import { Time } from '@/lib/types';
 
 const defaultConfig = (): Config => ({
-  libertadores: { vagas_tabela: 5, vagas_diretas: [] },
-  sulamericana: { vagas_tabela: 6, vagas_diretas: [] },
+  libertadores: { vagas_tabela: 4, vagas_diretas: [] },
+  sulamericana: { vagas_tabela: 4, vagas_diretas: [] },
   rebaixamento: { vagas: 4 },
 });
 
