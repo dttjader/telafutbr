@@ -3,7 +3,7 @@ import { getConfig, saveConfig } from '@/lib/config';
 
 export async function GET() {
   try {
-    return NextResponse.json(getConfig());
+    return NextResponse.json(await getConfig());
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
@@ -12,7 +12,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    saveConfig(body);
+    await saveConfig(body);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
