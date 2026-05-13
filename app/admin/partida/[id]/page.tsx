@@ -44,11 +44,36 @@ export default function AdminPartidaEventos() {
   const EscalacaoTab=()=>{
     const addJog=(isCasa:boolean)=>{
       const lista=isCasa?jogCasa:jogVis;
+      const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
       if(!lista.length) return flash(false,'Nenhum jogador cadastrado para este time.');
-      const novo:EscalacaoJogador={jogador_id:lista[0].id,numero:1,posicao:'ATA',titular:true};
+      // Pick first player not already in escalacao
+      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
+      const disponivel=lista.find(j=>!jaAdicionados.has(j.id));
+      if(!disponivel) return flash(false,'Todos os jogadores deste time já foram adicionados.');
+      // Pre-fill number and position from player registry
+      const novo:EscalacaoJogador={
+        jogador_id: disponivel.id,
+        numero: disponivel.numero ?? 0,
+        posicao: disponivel.posicao ?? 'ATA',
+        titular: true,
+      };
       const u={...partida};
       if(isCasa) u.escalacao_casa=[...u.escalacao_casa,novo];
       else u.escalacao_visitante=[...u.escalacao_visitante,novo];
+      save(u as Partida);
+    };
+    const updJogador=(isCasa:boolean,idx:number,novoJogadorId:string)=>{
+      // When player changes, auto-fill number and position from registry
+      const jog=jogadores.find(j=>j.id===novoJogadorId);
+      const u={...partida};
+      const esc=isCasa?[...u.escalacao_casa]:[...u.escalacao_visitante];
+      esc[idx]={
+        ...esc[idx],
+        jogador_id: novoJogadorId,
+        numero: jog?.numero ?? esc[idx].numero,
+        posicao: jog?.posicao ?? esc[idx].posicao,
+      };
+      if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
       save(u as Partida);
     };
     const upd=(isCasa:boolean,idx:number,field:string,value:string|boolean)=>{
@@ -68,28 +93,36 @@ export default function AdminPartidaEventos() {
       const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
       const time=isCasa?timeCasa:timeVis;
       const lista=isCasa?jogCasa:jogVis;
+      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
       return (
         <div style={{flex:1}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.75rem'}}>
             <h3 style={{fontSize:'1.2rem'}}>{time?.nome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>{isCasa?'(Mandante)':'(Visitante)'}</span></h3>
-            <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
+            <div style={{display:'flex',alignItems:'center',gap:'.5rem'}}>
+              <span style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{esc.length}/23</span>
+              <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
+            </div>
           </div>
           {esc.length===0&&<p style={{color:'var(--text-muted)',fontSize:'.85rem'}}>Nenhum jogador adicionado.</p>}
-          {esc.map((e,i)=>(
-            <div key={i} style={{display:'flex',gap:'.5rem',marginBottom:'.4rem',background:'var(--surface2)',borderRadius:6,padding:'.5rem'}}>
-              <input type="number" min={1} max={99} value={e.numero} onChange={ev=>upd(isCasa,i,'numero',ev.target.value)} style={{width:52,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem',textAlign:'center'}} />
-              <select value={e.jogador_id} onChange={ev=>upd(isCasa,i,'jogador_id',ev.target.value)} style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
-                {lista.map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
-              </select>
-              <select value={e.posicao} onChange={ev=>upd(isCasa,i,'posicao',ev.target.value)} style={{width:60,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
-                {POSICOES.map(p=><option key={p} value={p}>{p}</option>)}
-              </select>
-              <label style={{display:'flex',alignItems:'center',gap:4,fontSize:'.8rem',color:'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap'}}>
-                <input type="checkbox" checked={e.titular} onChange={ev=>upd(isCasa,i,'titular',ev.target.checked)} /> Titular
-              </label>
-              <button className="btn btn-danger btn-sm" onClick={()=>rem(isCasa,i)}>✕</button>
-            </div>
-          ))}
+          {esc.map((e,i)=>{
+            // Options: current player + players not yet added
+            const opcoes=lista.filter(j=>j.id===e.jogador_id||!jaAdicionados.has(j.id));
+            return (
+              <div key={i} style={{display:'flex',gap:'.5rem',marginBottom:'.4rem',background:'var(--surface2)',borderRadius:6,padding:'.5rem'}}>
+                <input type="number" min={0} max={99} value={e.numero} onChange={ev=>upd(isCasa,i,'numero',ev.target.value)} style={{width:52,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem',textAlign:'center'}} />
+                <select value={e.jogador_id} onChange={ev=>updJogador(isCasa,i,ev.target.value)} style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
+                  {opcoes.map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                </select>
+                <select value={e.posicao} onChange={ev=>upd(isCasa,i,'posicao',ev.target.value)} style={{width:60,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
+                  {POSICOES.map(p=><option key={p} value={p}>{p}</option>)}
+                </select>
+                <label style={{display:'flex',alignItems:'center',gap:4,fontSize:'.8rem',color:'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap'}}>
+                  <input type="checkbox" checked={e.titular} onChange={ev=>upd(isCasa,i,'titular',ev.target.checked)} /> Titular
+                </label>
+                <button className="btn btn-danger btn-sm" onClick={()=>rem(isCasa,i)}>✕</button>
+              </div>
+            );
+          })}
         </div>
       );
     };
