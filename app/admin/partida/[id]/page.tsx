@@ -135,6 +135,24 @@ export default function AdminPartidaEventos() {
     const jogDoTime=(tid:string)=>jogadores.filter(j=>j.time_atual===tid);
     const goleiros=jogadores.filter(j=>j.posicao==='GOL');
     const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>)=>setForm(v=>({...v,[k]:e.target.value}));
+
+    // Para gol contra: jogador e goleiro vêm do time ADVERSÁRIO ao time_id selecionado
+    const isContra = form.tipo === 'contra';
+    const timeMarcador = form.time_id; // time que "marcou" (quem registra o gol na tabela)
+    const timeAdversario = timeMarcador === partida.time_casa_id ? partida.time_visitante_id : partida.time_casa_id;
+    // Quem cometeu o gol contra é do time adversário
+    const jogadoresContra = jogDoTime(timeAdversario);
+    // Goleiro prejudicado é do time marcador
+    const goleiroDoTimeMarcador = goleiros.filter(j => j.time_atual === timeMarcador);
+
+    const handleTipoChange = (novoTipo: string) => {
+      setForm(v => ({ ...v, tipo: novoTipo, jogador_id: '', assistencia_id: '', goleiro_id: '' }));
+    };
+
+    const handleTimeMarcadorChange = (novoTime: string) => {
+      setForm(v => ({ ...v, time_id: novoTime, jogador_id: '', assistencia_id: '', goleiro_id: '' }));
+    };
+
     const add=()=>{
       if(!form.minuto||!form.jogador_id) return flash(false,'Preencha o minuto e o jogador.');
       const novo:Gol={id:`g${uid()}`,minuto:+form.minuto,acrescimo:+form.acrescimo,time_id:form.time_id,jogador_id:form.jogador_id,assistencia_id:form.assistencia_id||null,tipo:form.tipo as Gol['tipo'],goleiro_id:form.goleiro_id,descricao:form.descricao};
@@ -146,32 +164,46 @@ export default function AdminPartidaEventos() {
       <div>
         <div className="card" style={{marginBottom:'1.5rem'}}>
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:'var(--amarelo)'}}>+ Registrar Gol</h3>
+          {isContra && (
+            <div style={{padding:'.6rem .9rem',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',borderRadius:6,marginBottom:'1rem',fontSize:'.82rem',color:'#f87171'}}>
+              ⚠️ <strong>Gol Contra:</strong> o jogador que marcou contra é do time adversário, e o goleiro é do time que recebeu o gol.
+            </div>
+          )}
           <div className="grid-3">
             <div className="form-group"><label>Minuto *</label><input type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
             <div className="form-group"><label>Acréscimo</label><input type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
-            <div className="form-group"><label>Tipo</label><select value={form.tipo} onChange={f('tipo')}>{TIPO_GOL.map(t=><option key={t} value={t}>{TIPO_GOL_LABEL[t]}</option>)}</select></div>
-            <div className="form-group"><label>Time marcador</label>
-              <select value={form.time_id} onChange={e=>{setForm(v=>({...v,time_id:e.target.value,jogador_id:'',assistencia_id:''}))}}>
+            <div className="form-group"><label>Tipo</label>
+              <select value={form.tipo} onChange={e => handleTipoChange(e.target.value)}>
+                {TIPO_GOL.map(t=><option key={t} value={t}>{TIPO_GOL_LABEL[t]}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Time que marca o gol</label>
+              <select value={form.time_id} onChange={e => handleTimeMarcadorChange(e.target.value)}>
                 <option value={partida.time_casa_id}>{timeCasa?.nome}</option>
                 <option value={partida.time_visitante_id}>{timeVis?.nome}</option>
               </select>
             </div>
-            <div className="form-group"><label>Jogador *</label>
+            <div className="form-group">
+              <label>{isContra ? 'Jogador que marcou contra (adversário) *' : 'Jogador *'}</label>
               <select value={form.jogador_id} onChange={f('jogador_id')}>
                 <option value="">Selecione...</option>
-                {jogDoTime(form.time_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                {(isContra ? jogadoresContra : jogDoTime(timeMarcador)).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
               </select>
             </div>
-            <div className="form-group"><label>Assistência</label>
-              <select value={form.assistencia_id} onChange={f('assistencia_id')}>
-                <option value="">Sem assistência</option>
-                {jogDoTime(form.time_id).filter(j=>j.id!==form.jogador_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
-              </select>
-            </div>
-            <div className="form-group"><label>Goleiro adversário</label>
+            {!isContra && (
+              <div className="form-group"><label>Assistência</label>
+                <select value={form.assistencia_id} onChange={f('assistencia_id')}>
+                  <option value="">Sem assistência</option>
+                  {jogDoTime(timeMarcador).filter(j=>j.id!==form.jogador_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="form-group">
+              <label>{isContra ? 'Goleiro prejudicado (time marcador)' : 'Goleiro adversário'}</label>
               <select value={form.goleiro_id} onChange={f('goleiro_id')}>
                 <option value="">Selecione...</option>
-                {goleiros.filter(j=>j.time_atual!==form.time_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                {(isContra ? goleiroDoTimeMarcador : goleiros.filter(j=>j.time_atual!==timeMarcador)).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
               </select>
             </div>
             <div className="form-group" style={{gridColumn:'1/-1'}}><label>Descrição</label><input value={form.descricao} onChange={f('descricao')} /></div>
@@ -183,9 +215,10 @@ export default function AdminPartidaEventos() {
           {partida.gols.map(g=>(
             <div key={g.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:`3px solid ${g.time_id===partida.time_casa_id?'var(--verde)':'var(--amarelo)'}`}}>
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--verde)',minWidth:40}}>{g.minuto}{g.acrescimo>0?`+${g.acrescimo}`:''}&apos;</span>
-              <span>⚽</span>
+              <span>{g.tipo==='contra'?'🔴':'⚽'}</span>
               <div style={{flex:1}}>
                 <strong>{nomeJog(g.jogador_id)}</strong>
+                {g.tipo==='contra'&&<span style={{fontSize:'.78rem',color:'var(--rebaixamento)',marginLeft:'.4rem'}}>(contra)</span>}
                 {g.assistencia_id&&<span style={{color:'var(--text-muted)',fontSize:'.85rem'}}> · assist. {nomeJog(g.assistencia_id)}</span>}
                 <div style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{TIPO_GOL_LABEL[g.tipo]} · {nomeTime(g.time_id)}{g.goleiro_id?' · Goleiro: '+nomeJog(g.goleiro_id):''}</div>
                 {g.descricao&&<div style={{fontSize:'.75rem',color:'var(--text-muted)',fontStyle:'italic'}}>{g.descricao}</div>}
