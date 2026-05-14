@@ -41,8 +41,10 @@ export interface Jogador {
   nome: string;
   posicao: 'GOL' | 'ZAG' | 'LAT' | 'VOL' | 'MEI' | 'ATA';
   numero?: number;
-  time_atual: string; // time_id
-  transferencias: Transferencia[]; // histórico
+  idade?: number;
+  nacionalidade?: 'Brasileiro' | 'Estrangeiro';
+  time_atual: string;
+  transferencias: Transferencia[];
 }
 
 export interface Arbitragem {
