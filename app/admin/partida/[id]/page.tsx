@@ -288,18 +288,30 @@ export default function AdminPartidaEventos() {
     const [form,setForm]=useState({minuto:'',time_id:partida.time_casa_id,sai_id:'',entra_id:''});
     const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
     const jogDoTime=(tid:string)=>jogadores.filter(j=>j.time_atual===tid);
+
+    const jaSairam=new Set(partida.substituicoes.filter(s=>s.time_id===form.time_id).map(s=>s.sai_id));
+    const jaEntraram=new Set(partida.substituicoes.filter(s=>s.time_id===form.time_id).map(s=>s.entra_id));
+    const escDoTime=form.time_id===partida.time_casa_id?partida.escalacao_casa:partida.escalacao_visitante;
+    const titulares=new Set(escDoTime.filter(e=>e.titular).map(e=>e.jogador_id));
+    const podeSair=jogDoTime(form.time_id).filter(j=>(titulares.has(j.id)||jaEntraram.has(j.id))&&!jaSairam.has(j.id));
+    const podeEntrar=jogDoTime(form.time_id).filter(j=>!titulares.has(j.id)&&!jaEntraram.has(j.id)&&!jaSairam.has(j.id)&&j.id!==form.sai_id);
+    const subsDoTime=partida.substituicoes.filter(s=>s.time_id===form.time_id);
+    const maxSubs=5;
+
     const add=()=>{
       if(!form.minuto||!form.sai_id||!form.entra_id) return flash(false,'Preencha todos os campos.');
       if(form.sai_id===form.entra_id) return flash(false,'Jogadores devem ser diferentes.');
       const novo={id:`s${uid()}`,minuto:+form.minuto,time_id:form.time_id,sai_id:form.sai_id,entra_id:form.entra_id};
       save({...partida,substituicoes:[...partida.substituicoes,novo].sort((a,b)=>a.minuto-b.minuto)});
-      setForm({minuto:'',time_id:partida.time_casa_id,sai_id:'',entra_id:''});
+      setForm({minuto:'',time_id:form.time_id,sai_id:'',entra_id:''});
     };
     const del=(sid:string)=>save({...partida,substituicoes:partida.substituicoes.filter(s=>s.id!==sid)});
     return (
       <div>
         <div className="card" style={{marginBottom:'1.5rem'}}>
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:'var(--amarelo)'}}>+ Registrar Substituição</h3>
+          {subsDoTime.length>=maxSubs&&<div style={{padding:'.6rem .9rem',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',borderRadius:6,marginBottom:'1rem',fontSize:'.82rem',color:'#f87171'}}>⚠️ Limite de {maxSubs} substituições atingido para este time.</div>}
+          {escDoTime.length===0&&<div style={{padding:'.6rem .9rem',background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.25)',borderRadius:6,marginBottom:'1rem',fontSize:'.82rem',color:'#fbbf24'}}>⚠️ Escalação não preenchida — os filtros de quem pode entrar/sair ficam desativados.</div>}
           <div className="grid-2" style={{maxWidth:600}}>
             <div className="form-group"><label>Minuto *</label><input type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
             <div className="form-group"><label>Time</label>
@@ -308,20 +320,22 @@ export default function AdminPartidaEventos() {
                 <option value={partida.time_visitante_id}>{timeVis?.nome}</option>
               </select>
             </div>
-            <div className="form-group"><label>↓ Sai</label>
+            <div className="form-group">
+              <label>↓ Sai {escDoTime.length>0?`(${podeSair.length} disponíveis)`:''}</label>
               <select value={form.sai_id} onChange={f('sai_id')}>
                 <option value="">Selecione...</option>
-                {jogDoTime(form.time_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                {(escDoTime.length>0?podeSair:jogDoTime(form.time_id).filter(j=>!jaSairam.has(j.id))).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
               </select>
             </div>
-            <div className="form-group"><label>↑ Entra</label>
+            <div className="form-group">
+              <label>↑ Entra {escDoTime.length>0?`(${podeEntrar.length} disponíveis)`:''}</label>
               <select value={form.entra_id} onChange={f('entra_id')}>
                 <option value="">Selecione...</option>
-                {jogDoTime(form.time_id).filter(j=>j.id!==form.sai_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                {(escDoTime.length>0?podeEntrar:jogDoTime(form.time_id).filter(j=>!jaEntraram.has(j.id)&&j.id!==form.sai_id)).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
               </select>
             </div>
           </div>
-          <button className="btn btn-primary" onClick={add}>🔄 Adicionar Substituição</button>
+          <button className="btn btn-primary" onClick={add} disabled={subsDoTime.length>=maxSubs}>🔄 Adicionar Substituição</button>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'.5rem'}}>
           {partida.substituicoes.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Nenhuma substituição registrada.</p>}
