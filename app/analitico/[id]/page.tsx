@@ -14,14 +14,20 @@ function calcularMinutos(jogadorId: string, partida: any, ehTitular: boolean): n
   const acr1 = partida.acrescimo_primeiro ?? 0;
   const acr2 = partida.acrescimo_segundo ?? 0;
   const totalPartida = 45 + acr1 + 45 + acr2;
+
+  const vermelho = partida.cartoes.find((c: any) => c.jogador_id === jogadorId && c.tipo === 'vermelho');
+  const minutoVermelho = vermelho?.minuto ?? Infinity;
+
   if (ehTitular) {
     const sub = partida.substituicoes.find((s: any) => s.sai_id === jogadorId);
-    return sub ? sub.minuto : totalPartida;
+    const minutoSaida = sub ? Math.min(sub.minuto, minutoVermelho) : minutoVermelho;
+    return Math.min(minutoSaida, totalPartida);
   } else {
     const entrada = partida.substituicoes.find((s: any) => s.entra_id === jogadorId);
     if (!entrada) return 0;
     const saida = partida.substituicoes.find((s: any) => s.sai_id === jogadorId);
-    return saida ? saida.minuto - entrada.minuto : totalPartida - entrada.minuto;
+    const minutoSaida = saida ? Math.min(saida.minuto, minutoVermelho) : minutoVermelho;
+    return Math.min(minutoSaida, totalPartida) - entrada.minuto;
   }
 }
 
@@ -75,8 +81,14 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
 
     const subEntrada = p.substituicoes.find((s: any) => s.entra_id === id);
     const subSaida = p.substituicoes.find((s: any) => s.sai_id === id);
+    const vermelhoPartida = p.cartoes.find((c: any) => c.jogador_id === id && c.tipo === 'vermelho');
     const minutoEntrada = esc.titular ? 0 : (subEntrada?.minuto ?? 0);
-    const minutoSaida = subSaida?.minuto ?? null;
+    // Minuto de saída: o menor entre substituição e cartão vermelho
+    const minutoSaidaSub = subSaida?.minuto ?? null;
+    const minutoSaidaVerm = vermelhoPartida?.minuto ?? null;
+    const minutoSaida = minutoSaidaSub !== null && minutoSaidaVerm !== null
+      ? Math.min(minutoSaidaSub, minutoSaidaVerm)
+      : minutoSaidaSub ?? minutoSaidaVerm;
     const mins = calcularMinutos(id, p, esc.titular);
 
     const eventos: EventoTimeline[] = [];
@@ -85,7 +97,7 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
     if (!esc.titular && subEntrada) {
       eventos.push({ tipo: 'entrada', minuto: subEntrada.minuto, descricao: 'Entrou em campo' });
     }
-    if (subSaida) {
+    if (subSaida && (!minutoSaidaVerm || subSaida.minuto <= (minutoSaidaVerm ?? Infinity))) {
       eventos.push({ tipo: 'saida', minuto: subSaida.minuto, descricao: 'Substituído' });
     }
 
