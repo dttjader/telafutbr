@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { StatJogador } from './page';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time } from '@/lib/types';
@@ -77,7 +78,9 @@ export function AnaliticoClient({ lista, totalPartidas }: Props) {
         return (
           <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
             <td style={{ padding: '.5rem .7rem' }}>
-              <div style={{ fontWeight: 600 }}>{s.jogador.nome}</div>
+              <Link href={`/analitico/${s.jogador.id}`} style={{ fontWeight: 600, color: 'var(--text)', textDecoration: 'none', borderBottom: '1px solid var(--verde)', paddingBottom: 1 }}>
+                {s.jogador.nome}
+              </Link>
               {s.jogador.numero && <div style={{ fontSize: '.68rem', color: 'var(--verde)' }}>#{s.jogador.numero}</div>}
             </td>
             <td style={{ padding: '.5rem .5rem' }}>
