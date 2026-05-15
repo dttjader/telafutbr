@@ -34,14 +34,21 @@ function calcularMinutos(jogadorId: string, partida: Partida, ehTitular: boolean
   const acr2 = partida.acrescimo_segundo ?? 0;
   const totalPartida = 45 + acr1 + 45 + acr2;
   const subs = partida.substituicoes;
+
+  // Cartão vermelho encerra imediatamente a participação
+  const vermelho = partida.cartoes.find(c => c.jogador_id === jogadorId && c.tipo === 'vermelho');
+  const minutoVermelho = vermelho?.minuto ?? Infinity;
+
   if (ehTitular) {
     const sub = subs.find(s => s.sai_id === jogadorId);
-    return sub ? sub.minuto : totalPartida;
+    const minutoSaida = sub ? Math.min(sub.minuto, minutoVermelho) : minutoVermelho;
+    return Math.min(minutoSaida, totalPartida);
   } else {
     const entrada = subs.find(s => s.entra_id === jogadorId);
     if (!entrada) return 0;
-    const saida = subs.find(s => s.sai_id === jogadorId);
-    return saida ? saida.minuto - entrada.minuto : totalPartida - entrada.minuto;
+    const sub = subs.find(s => s.sai_id === jogadorId);
+    const minutoSaida = sub ? Math.min(sub.minuto, minutoVermelho) : minutoVermelho;
+    return Math.min(minutoSaida, totalPartida) - entrada.minuto;
   }
 }
 
