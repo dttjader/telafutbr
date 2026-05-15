@@ -11,16 +11,17 @@ export default async function ConfrontosPage() {
   const idx: Record<string, number> = {};
   times.forEach((t, i) => { idx[t.id] = i; });
 
-  // Últimas 5 datas com partidas encerradas
-  const ultimas5Datas = new Set(
-    [...new Set(encerradas.map(p => p.data))].slice(0, 5)
-  );
-  // Times que jogaram nas últimas 5 datas
-  const timesRecentes = new Set(
-    encerradas
-      .filter(p => ultimas5Datas.has(p.data))
-      .flatMap(p => [p.time_casa_id, p.time_visitante_id])
-  );
+  // Para cada par (i,j), registrar a ordem da partida (mais recente = índice 0)
+  // encerradas já está ordenado por data desc
+  const ordemPartida: Record<string, number> = {};
+  let contador = 0;
+  for (const p of encerradas) {
+    const i = idx[p.time_casa_id], j = idx[p.time_visitante_id];
+    if (i === undefined || j === undefined) continue;
+    ordemPartida[`${i}-${j}`] = contador++;
+  }
+  // As últimas 5 partidas = as primeiras 5 no array encerradas (mais recentes)
+  const ultimas5PartidasIds = new Set(encerradas.slice(0, 5).map(p => `${idx[p.time_casa_id]}-${idx[p.time_visitante_id]}`));
 
   const placar: ({ gc: number; gv: number; data: string } | null)[][] =
     Array.from({ length: n }, () => Array(n).fill(null));
@@ -139,8 +140,8 @@ export default async function ConfrontosPage() {
           <span><span style={{ color: '#a81a1a', fontWeight: 700 }}>0×2</span> Vitória visitante</span>
           <span><span style={{ color: 'var(--text-muted)' }}>1×1</span> Empate</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 12, height: 12, background: 'rgba(255,223,0,.12)', border: '1px solid rgba(255,223,0,.3)', borderRadius: 2, display: 'inline-block' }} />
-            Jogou nas últimas 5 datas
+            <span style={{ width: 12, height: 12, background: 'rgba(255,223,0,.18)', border: '1px solid rgba(255,223,0,.4)', borderRadius: 2, display: 'inline-block' }} />
+            Últimas 5 partidas disputadas
           </span>
           <span style={{ marginLeft: 'auto' }}>Mandante (linha) × Visitante (coluna)</span>
         </div>
@@ -167,15 +168,24 @@ export default async function ConfrontosPage() {
             <tbody>
               {times.map((time, i) => {
                 const r = resumo[i];
-                const isRecente = timesRecentes.has(time.id);
                 return (
-                  <tr key={time.id} style={{ background: isRecente ? 'rgba(255,223,0,.06)' : i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                    <td style={{ ...td, background: isRecente ? 'rgba(255,223,0,.12)' : 'var(--surface2)', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, color: isRecente ? 'var(--amarelo)' : 'var(--text)' }}>{time.id}</td>
+                  <tr key={time.id} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                    <td style={{ ...td, background: 'var(--surface2)', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, color: 'var(--text)' }}>{time.id}</td>
                     {times.map((_, j) => {
                       if (i === j) return <td key={j} style={{ ...td, background: '#1a1a1a' }}>—</td>;
                       const p = placar[i][j];
                       if (!p) return <td key={j} style={{ ...td, color: '#333' }}></td>;
-                      return <td key={j} style={{ ...td, ...cellStyle(p.gc, p.gv) }}>{p.gc}×{p.gv}</td>;
+                      const isUltima5 = ultimas5PartidasIds.has(`${i}-${j}`);
+                      return (
+                        <td key={j} style={{
+                          ...td,
+                          ...cellStyle(p.gc, p.gv),
+                          background: isUltima5 ? 'rgba(255,223,0,.18)' : 'transparent',
+                          outline: isUltima5 ? '1px solid rgba(255,223,0,.4)' : 'none',
+                        }}>
+                          {p.gc}×{p.gv}
+                        </td>
+                      );
                     })}
                     <td style={{ ...td, background: '#111', color: 'var(--text-muted)' }}>{r.j}</td>
                     <td style={{ ...td, background: '#111', color: '#22c55e', fontWeight: 600 }}>{r.v}</td>
