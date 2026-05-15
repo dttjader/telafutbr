@@ -11,6 +11,17 @@ export default async function ConfrontosPage() {
   const idx: Record<string, number> = {};
   times.forEach((t, i) => { idx[t.id] = i; });
 
+  // Últimas 5 datas com partidas encerradas
+  const ultimas5Datas = new Set(
+    [...new Set(encerradas.map(p => p.data))].slice(0, 5)
+  );
+  // Times que jogaram nas últimas 5 datas
+  const timesRecentes = new Set(
+    encerradas
+      .filter(p => ultimas5Datas.has(p.data))
+      .flatMap(p => [p.time_casa_id, p.time_visitante_id])
+  );
+
   const placar: ({ gc: number; gv: number; data: string } | null)[][] =
     Array.from({ length: n }, () => Array(n).fill(null));
 
@@ -99,8 +110,8 @@ export default async function ConfrontosPage() {
   const awayShadeBg = ['rgba(59,130,246,.35)', 'rgba(59,130,246,.25)', 'rgba(59,130,246,.16)', 'rgba(59,130,246,.09)', 'rgba(59,130,246,.04)'];
   const resColor: Record<string, string> = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' };
 
-  const th: React.CSSProperties = { border: '1px solid #2a2a2a', textAlign: 'center', padding: '2px 1px', fontSize: 9, background: 'var(--surface2)', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: '.05em' };
-  const td: React.CSSProperties = { border: '1px solid #222', textAlign: 'center', padding: '2px 0', fontSize: 10, lineHeight: 1.3 };
+  const th: React.CSSProperties = { border: '1px solid #2a2a2a', textAlign: 'center', padding: '3px 2px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: '.05em' };
+  const td: React.CSSProperties = { border: '1px solid #222', textAlign: 'center', padding: '3px 1px', fontSize: 12, lineHeight: 1.4 };
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -123,10 +134,14 @@ export default async function ConfrontosPage() {
         </div>
 
         {/* Legend */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: '.72rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: '.78rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
           <span><span style={{ color: '#1a5fa8', fontWeight: 700 }}>2×0</span> Vitória mandante</span>
           <span><span style={{ color: '#a81a1a', fontWeight: 700 }}>0×2</span> Vitória visitante</span>
           <span><span style={{ color: 'var(--text-muted)' }}>1×1</span> Empate</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 12, height: 12, background: 'rgba(255,223,0,.12)', border: '1px solid rgba(255,223,0,.3)', borderRadius: 2, display: 'inline-block' }} />
+            Jogou nas últimas 5 datas
+          </span>
           <span style={{ marginLeft: 'auto' }}>Mandante (linha) × Visitante (coluna)</span>
         </div>
 
@@ -152,9 +167,10 @@ export default async function ConfrontosPage() {
             <tbody>
               {times.map((time, i) => {
                 const r = resumo[i];
+                const isRecente = timesRecentes.has(time.id);
                 return (
-                  <tr key={time.id} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                    <td style={{ ...td, background: 'var(--surface2)', fontFamily: "'Bebas Neue',sans-serif", fontSize: 10, fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, color: 'var(--text)' }}>{time.id}</td>
+                  <tr key={time.id} style={{ background: isRecente ? 'rgba(255,223,0,.06)' : i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                    <td style={{ ...td, background: isRecente ? 'rgba(255,223,0,.12)' : 'var(--surface2)', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, color: isRecente ? 'var(--amarelo)' : 'var(--text)' }}>{time.id}</td>
                     {times.map((_, j) => {
                       if (i === j) return <td key={j} style={{ ...td, background: '#1a1a1a' }}>—</td>;
                       const p = placar[i][j];
@@ -197,11 +213,11 @@ export default async function ConfrontosPage() {
                 ))}
               </div>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.78rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--surface2)' }}>
                     {['#', 'Time', 'J', 'V', 'E', 'D', 'GM', 'GS', 'Pts', 'Últ. 5'].map(h => (
-                      <th key={h} style={{ padding: '4px 6px', textAlign: h === 'Time' ? 'left' : 'center', color: 'var(--text-muted)', fontWeight: 600, fontSize: '.72rem', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                      <th key={h} style={{ padding: '5px 7px', textAlign: h === 'Time' ? 'left' : 'center', color: 'var(--text-muted)', fontWeight: 600, fontSize: '.78rem', borderBottom: '1px solid var(--border)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -214,15 +230,15 @@ export default async function ConfrontosPage() {
                     // find if this team appears in last 5 dates as home/away
                     return (
                       <tr key={times[i].id} style={{ borderBottom: '1px solid #1a1a1a' }}>
-                        <td style={{ padding: '4px 6px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: "'Bebas Neue',sans-serif" }}>{pos + 1}</td>
-                        <td style={{ padding: '4px 6px', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: '.04em', color: 'var(--text)' }}>{times[i].id}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 4px', color: 'var(--text-muted)' }}>{r.j}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 4px', color: 'var(--libertadores)', fontWeight: 600 }}>{r.v}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 4px', color: 'var(--text-muted)' }}>{r.e}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 4px', color: 'var(--rebaixamento)', fontWeight: 600 }}>{r.d}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 4px', color: 'var(--text-muted)' }}>{r.gm}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 4px', color: 'var(--text-muted)' }}>{r.gs}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 4px', fontFamily: "'Bebas Neue',sans-serif", fontSize: 13, color: 'var(--amarelo)' }}>{r.pts}</td>
+                        <td style={{ padding: '5px 7px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{pos + 1}</td>
+                        <td style={{ padding: '5px 7px', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: '.04em', color: 'var(--text)', fontSize: '.9rem' }}>{times[i].id}</td>
+                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.j}</td>
+                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--libertadores)', fontWeight: 600, fontSize: '.85rem' }}>{r.v}</td>
+                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.e}</td>
+                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--rebaixamento)', fontWeight: 600, fontSize: '.85rem' }}>{r.d}</td>
+                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.gm}</td>
+                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.gs}</td>
+                        <td style={{ textAlign: 'center', padding: '5px 5px', fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, color: 'var(--amarelo)' }}>{r.pts}</td>
                         {/* Últimos 5 como quadradinhos coloridos */}
                         <td style={{ padding: '4px 6px' }}>
                           <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
