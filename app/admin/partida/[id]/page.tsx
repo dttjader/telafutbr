@@ -138,12 +138,12 @@ export default function AdminPartidaEventos() {
 
     // Para gol contra: jogador e goleiro vêm do time ADVERSÁRIO ao time_id selecionado
     const isContra = form.tipo === 'contra';
-    const timeMarcador = form.time_id; // time que "marcou" (quem registra o gol na tabela)
+    const timeMarcador = form.time_id; // time que recebe o gol na tabela
     const timeAdversario = timeMarcador === partida.time_casa_id ? partida.time_visitante_id : partida.time_casa_id;
-    // Quem cometeu o gol contra é do time adversário
+    // No gol contra: quem marcou contra é do time adversário
     const jogadoresContra = jogDoTime(timeAdversario);
-    // Goleiro prejudicado é do time marcador
-    const goleiroDoTimeMarcador = goleiros.filter(j => j.time_atual === timeMarcador);
+    // O goleiro que "sofreu" é do mesmo time do jogador que marcou contra (time adversário)
+    const goleiroDoTimeAdversario = goleiros.filter(j => j.time_atual === timeAdversario);
 
     const handleTipoChange = (novoTipo: string) => {
       setForm(v => ({ ...v, tipo: novoTipo, jogador_id: '', assistencia_id: '', goleiro_id: '' }));
@@ -166,7 +166,7 @@ export default function AdminPartidaEventos() {
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:'var(--amarelo)'}}>+ Registrar Gol</h3>
           {isContra && (
             <div style={{padding:'.6rem .9rem',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',borderRadius:6,marginBottom:'1rem',fontSize:'.82rem',color:'#f87171'}}>
-              ⚠️ <strong>Gol Contra:</strong> o jogador que marcou contra é do time adversário, e o goleiro é do time que recebeu o gol.
+              ⚠️ <strong>Gol Contra:</strong> o jogador que marcou contra e o goleiro são ambos do time adversário (oposto ao time marcador).
             </div>
           )}
           <div className="grid-3">
@@ -200,10 +200,10 @@ export default function AdminPartidaEventos() {
               </div>
             )}
             <div className="form-group">
-              <label>{isContra ? 'Goleiro prejudicado (time marcador)' : 'Goleiro adversário'}</label>
+              <label>{isContra ? 'Goleiro do time adversário' : 'Goleiro adversário'}</label>
               <select value={form.goleiro_id} onChange={f('goleiro_id')}>
                 <option value="">Selecione...</option>
-                {(isContra ? goleiroDoTimeMarcador : goleiros.filter(j=>j.time_atual!==timeMarcador)).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                {(isContra ? goleiroDoTimeAdversario : goleiros.filter(j=>j.time_atual!==timeMarcador)).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
               </select>
             </div>
             <div className="form-group" style={{gridColumn:'1/-1'}}><label>Descrição</label><input value={form.descricao} onChange={f('descricao')} /></div>
