@@ -110,14 +110,29 @@ export default function AdminTecnicos() {
   );
 
   return (
+    <div style={{position: 'relative'}}>
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(400px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(400px); opacity: 0; }
+        }
+        .toast { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; border-radius: 8px; font-size: .9rem; z-index: 9999; animation: slideIn .3s ease-out; }
+        .toast.hide { animation: slideOut .3s ease-out forwards; }
+        .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
+        .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
+      `}</style>
     <div className="container" style={{ paddingTop: '2rem' }}>
       <h1 style={{ fontSize: '2.5rem', marginBottom: '.25rem' }}>🧑‍💼 Técnicos</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
         Cadastre técnicos, registre transferências e períodos de inatividade.
       </p>
 
-      {msg && <div className="alert alert-success">{msg}</div>}
-      {error && <div className="alert alert-error">{error}</div>}
+      {msg && <div className="toast toast-success">{msg}</div>}
+      {error && <div className="toast toast-error">{error}</div>}
 
       {/* FORMULÁRIO */}
       <div className="card" style={{ marginBottom: '2rem' }}>
@@ -282,6 +297,7 @@ export default function AdminTecnicos() {
           </div>
         ))}
       </div>
+    </div>
     </div>
   );
 }
