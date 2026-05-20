@@ -11,17 +11,19 @@ export default async function ConfrontosPage() {
   const idx: Record<string, number> = {};
   times.forEach((t, i) => { idx[t.id] = i; });
 
-  // Para cada par (i,j), registrar a ordem da partida (mais recente = índice 0)
-  // encerradas já está ordenado por data desc
-  const ordemPartida: Record<string, number> = {};
-  let contador = 0;
-  for (const p of encerradas) {
-    const i = idx[p.time_casa_id], j = idx[p.time_visitante_id];
-    if (i === undefined || j === undefined) continue;
-    ordemPartida[`${i}-${j}`] = contador++;
-  }
-  // As últimas 5 partidas = as primeiras 5 no array encerradas (mais recentes)
-  const ultimas5PartidasIds = new Set(encerradas.slice(0, 5).map(p => `${idx[p.time_casa_id]}-${idx[p.time_visitante_id]}`));
+  // Para cada time, registrar seus últimos 5 jogos como mandante
+  const ultimas5Casa: Record<number, Set<string>> = {};
+  times.forEach((_, i) => {
+    const jogosTime = encerradas.filter(p => idx[p.time_casa_id] === i).slice(0, 5);
+    ultimas5Casa[i] = new Set(jogosTime.map(p => `${idx[p.time_casa_id]}-${idx[p.time_visitante_id]}`));
+  });
+
+  // Para cada time, registrar seus últimos 5 jogos como visitante
+  const ultimas5Fora: Record<number, Set<string>> = {};
+  times.forEach((_, i) => {
+    const jogosTime = encerradas.filter(p => idx[p.time_visitante_id] === i).slice(0, 5);
+    ultimas5Fora[i] = new Set(jogosTime.map(p => `${idx[p.time_casa_id]}-${idx[p.time_visitante_id]}`));
+  });
 
   const placar: ({ gc: number; gv: number; data: string } | null)[][] =
     Array.from({ length: n }, () => Array(n).fill(null));
@@ -141,7 +143,7 @@ export default async function ConfrontosPage() {
           <span><span style={{ color: 'var(--text-muted)' }}>1×1</span> Empate</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 12, height: 12, background: 'rgba(255,223,0,.18)', border: '1px solid rgba(255,223,0,.4)', borderRadius: 2, display: 'inline-block' }} />
-            Últimas 5 partidas disputadas
+            Últimos 5 jogos de cada time
           </span>
           <span style={{ marginLeft: 'auto' }}>Mandante (linha) × Visitante (coluna)</span>
         </div>
@@ -175,7 +177,9 @@ export default async function ConfrontosPage() {
                       if (i === j) return <td key={j} style={{ ...td, background: '#1a1a1a' }}>—</td>;
                       const p = placar[i][j];
                       if (!p) return <td key={j} style={{ ...td, color: '#333' }}></td>;
-                      const isUltima5 = ultimas5PartidasIds.has(`${i}-${j}`);
+                      const isUltima5Casa = ultimas5Casa[i].has(`${i}-${j}`);
+                      const isUltima5Fora = ultimas5Fora[j].has(`${i}-${j}`);
+                      const isUltima5 = isUltima5Casa || isUltima5Fora;
                       // Find the actual partida id for the link
                       const partidaId = encerradas.find(ep =>
                         ep.time_casa_id === times[i].id && ep.time_visitante_id === colTime.id
@@ -245,9 +249,6 @@ export default async function ConfrontosPage() {
                   {sortedIdx.map((i, pos) => {
                     const r = resumoArr[i];
                     const u5 = r.ultimos5;
-                    // Background based on recency rank
-                    const recentIdx = sortedIdx.indexOf(i); // position in sorted list
-                    // find if this team appears in last 5 dates as home/away
                     return (
                       <tr key={times[i].id} style={{ borderBottom: '1px solid #1a1a1a' }}>
                         <td style={{ padding: '5px 7px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{pos + 1}</td>
@@ -258,19 +259,17 @@ export default async function ConfrontosPage() {
                         <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--rebaixamento)', fontWeight: 600, fontSize: '.85rem' }}>{r.d}</td>
                         <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.gm}</td>
                         <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.gs}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, color: 'var(--amarelo)' }}>{r.pts}</td>
-                        {/* Últimos 5 como quadradinhos coloridos */}
-                        <td style={{ padding: '4px 6px' }}>
-                          <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                            {u5.length === 0
-                              ? <span style={{ color: '#444', fontSize: '.7rem' }}>—</span>
-                              : u5.map((jogo, ji) => (
-                                <span key={ji} title={jogo.resultado === 'V' ? 'Vitória' : jogo.resultado === 'E' ? 'Empate' : 'Derrota'}
-                                  style={{ width: 14, height: 14, borderRadius: 2, background: shades[ji], display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: resColor[jogo.resultado], border: '1px solid rgba(255,255,255,.08)' }}>
-                                  {jogo.resultado}
-                                </span>
-                              ))
-                            }
+                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--amarelo)', fontFamily: "'Bebas Neue',sans-serif", fontWeight: 600, fontSize: '.85rem' }}>{r.pts}</td>
+                        <td style={{ padding: '5px 5px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                            {u5.map((jogo, idx) => (
+                              <span key={idx} style={{
+                                width: 16, height: 16, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: shades[idx], fontSize: '.65rem', fontWeight: 700, color: resColor[jogo.resultado]
+                              }}>
+                                {jogo.resultado}
+                              </span>
+                            ))}
                           </div>
                         </td>
                       </tr>
