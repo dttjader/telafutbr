@@ -76,34 +76,30 @@ export default function AdminPartidas() {
   const statusLabel:Record<string,string>={agendada:'Agendada',ao_vivo:'🔴 Ao Vivo',encerrada:'Encerrada',adiada:'Adiada'};
   const rodadas=[...new Set(partidas.map(p=>p.rodada))].sort((a,b)=>a-b);
   const PARTIDAS_POR_RODADA = 10;
-  const rodadaAtual = rodadas.reduce((atual, rod) => {
-    const count = partidas.filter(p => p.rodada === rod).length;
-    if (count < PARTIDAS_POR_RODADA) return rod;
-    return atual;
-  }, rodadas[rodadas.length - 1] ?? 1);
-  const [openRodadas, setOpenRodadas] = useState<Record<number, boolean>>(() => {
-    const init: Record<number, boolean> = {};
-    rodadas.forEach(rod => {
-      const count = partidas.filter(p => p.rodada === rod).length;
-      init[rod] = count < PARTIDAS_POR_RODADA || rod === rodadaAtual;
-    });
-    return init;
-  });
+
+  // Lógica de colapso: rodadas completas (10 jogos) iniciam fechadas.
+  // Apenas rodadas incompletas iniciam abertas.
+  const [openRodadas, setOpenRodadas] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    if (partidas.length > 0 && Object.keys(openRodadas).length === 0) {
+      const init: Record<number, boolean> = {};
+      rodadas.forEach(rod => {
+        const count = partidas.filter(p => p.rodada === rod).length;
+        init[rod] = count < PARTIDAS_POR_RODADA;
+      });
+      setOpenRodadas(init);
+    }
+  }, [partidas, rodadas]);
+
   const toggleRodada = (rod: number) => setOpenRodadas(o => ({ ...o, [rod]: !o[rod] }));
 
   return (
     <div className="container" style={{paddingTop:'2rem'}}>
       <style>{`
-        @keyframes slideIn {
-          from { transform: translateX(400px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(400px); opacity: 0; }
-        }
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }
         .toast { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; border-radius: 8px; font-size: .9rem; z-index: 9999; animation: slideIn .3s ease-out; }
-        .toast.hide { animation: slideOut .3s ease-out forwards; }
         .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
         .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
       `}</style>
@@ -190,7 +186,7 @@ export default function AdminPartidas() {
       {rodadas.map(rod=>{
         const ps=partidas.filter(p=>p.rodada===rod);
         const completa=ps.length>=PARTIDAS_POR_RODADA;
-        const isOpen=openRodadas[rod]??true;
+        const isOpen=openRodadas[rod]??false;
         return (
           <section key={rod} style={{marginBottom:'1rem'}}>
             <button onClick={()=>toggleRodada(rod)} style={{width:'100%',display:'flex',alignItems:'center',gap:'1rem',background:isOpen?'var(--surface)':'var(--surface2)',border:'1px solid var(--border)',borderRadius:isOpen?'10px 10px 0 0':10,padding:'.8rem 1.25rem',cursor:'pointer',textAlign:'left'}}>
