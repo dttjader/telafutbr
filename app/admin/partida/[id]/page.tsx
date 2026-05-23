@@ -128,15 +128,19 @@ export default function AdminPartidaEventos() {
   // ── GOLS ──
   const GolsTab=()=>{
     const [form,setForm]=useState({minuto:'',acrescimo:'0',time_id:partida.time_casa_id,jogador_id:'',assistencia_id:'',tipo:'normal',goleiro_id:'',descricao:''});
-    const jogDoTime=(tid:string)=>jogadores.filter(j=>j.time_atual===tid);
     const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>)=>setForm(v=>({...v,[k]:e.target.value}));
+    
     const isContra = form.tipo === 'contra';
     const timeMarcador = form.time_id;
     const timeAdversario = timeMarcador === partida.time_casa_id ? partida.time_visitante_id : partida.time_casa_id;
-    const jogadoresContra = jogDoTime(timeAdversario);
+    
+    // Listas baseadas na escalação da partida
+    const escCasa = partida.escalacao_casa;
+    const escVis = partida.escalacao_visitante;
+    const escMarcadora = timeMarcador === partida.time_casa_id ? escCasa : escVis;
+    const escAdversaria = timeMarcador === partida.time_casa_id ? escVis : escCasa;
 
     // Goleiros adversários automáticos
-    const escAdversaria = timeMarcador === partida.time_casa_id ? partida.escalacao_visitante : partida.escalacao_casa;
     const goleirosAdversarios = escAdversaria.filter(e => e.posicao === 'GOL');
 
     useEffect(() => {
@@ -186,14 +190,14 @@ export default function AdminPartidaEventos() {
               <label>{isContra ? 'Jogador que marcou contra (adversário) *' : 'Jogador *'}</label>
               <select value={form.jogador_id} onChange={f('jogador_id')}>
                 <option value="">Selecione...</option>
-                {(isContra ? jogadoresContra : jogDoTime(timeMarcador)).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                {(isContra ? escAdversaria : escMarcadora).map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
             {!isContra && (
               <div className="form-group"><label>Assistência</label>
                 <select value={form.assistencia_id} onChange={f('assistencia_id')}>
                   <option value="">Sem assistência</option>
-                  {jogDoTime(timeMarcador).filter(j=>j.id!==form.jogador_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                  {escMarcadora.filter(e=>e.jogador_id!==form.jogador_id).map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
                 </select>
               </div>
             )}
@@ -233,7 +237,11 @@ export default function AdminPartidaEventos() {
   const CartoesTab=()=>{
     const [form,setForm]=useState({minuto:'',tipo:'amarelo',jogador_id:'',time_id:partida.time_casa_id,motivo:''});
     const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
-    const jogDoTime=(tid:string)=>jogadores.filter(j=>j.time_atual===tid);
+    
+    const escCasa = partida.escalacao_casa;
+    const escVis = partida.escalacao_visitante;
+    const escTime = form.time_id === partida.time_casa_id ? escCasa : escVis;
+
     const add=()=>{
       if(!form.minuto||!form.jogador_id) return flash(false,'Preencha minuto e jogador.');
       const novo:Cartao={id:`c${uid()}`,minuto:+form.minuto,tipo:form.tipo as Cartao['tipo'],jogador_id:form.jogador_id,time_id:form.time_id,motivo:form.motivo};
@@ -262,7 +270,7 @@ export default function AdminPartidaEventos() {
             <div className="form-group"><label>Jogador *</label>
               <select value={form.jogador_id} onChange={f('jogador_id')}>
                 <option value="">Selecione...</option>
-                {jogDoTime(form.time_id).map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+                {escTime.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
             <div className="form-group" style={{gridColumn:'span 2'}}><label>Motivo</label><input value={form.motivo} onChange={f('motivo')} /></div>
@@ -292,12 +300,10 @@ export default function AdminPartidaEventos() {
     const [form,setForm]=useState({minuto:'',time_id:partida.time_casa_id,sai_id:'',entra_id:''});
     const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
 
-    // Lógica avançada de filtros de substituição
     const min = +form.minuto || 0;
     const esc = form.time_id === partida.time_casa_id ? partida.escalacao_casa : partida.escalacao_visitante;
     const subs = partida.substituicoes.filter(s => s.time_id === form.time_id);
 
-    // Quem pode sair: quem é titular OU já entrou, e ainda não saiu
     const quemPodeSair = esc.filter(e => {
       const entrou = subs.find(s => s.entra_id === e.jogador_id);
       const saiu = subs.find(s => s.sai_id === e.jogador_id);
@@ -307,7 +313,6 @@ export default function AdminPartidaEventos() {
       return false;
     });
 
-    // Quem pode entrar: quem está na escalação, não é titular, e ainda não entrou
     const quemPodeEntrar = esc.filter(e => {
       if (e.titular) return false;
       const entrou = subs.find(s => s.entra_id === e.jogador_id);
