@@ -45,6 +45,7 @@ export interface Jogador {
   nacionalidade?: 'Brasileiro' | 'Estrangeiro';
   time_atual: string;
   transferencias: Transferencia[];
+  registro?: number; // Código numérico único
 }
 
 export interface Arbitragem {
