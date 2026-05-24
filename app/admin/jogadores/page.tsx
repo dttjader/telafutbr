@@ -5,7 +5,7 @@ import { clientGetJogadores, clientGetTimes, clientUpsertJogador, clientDeleteJo
 
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
 const POS_LABEL: Record<string,string> = {GOL:'Goleiro',ZAG:'Zagueiro',LAT:'Lateral',VOL:'Volante',MEI:'Meia',ATA:'Atacante'};
-const emptyForm = () => ({ nome:'', posicao:'ATA', numero:'', idade:'', nacionalidade:'Brasileiro', time_atual:'', novoTime:'', dataTransferencia: new Date().toISOString().slice(0,10) });
+const emptyForm = () => ({ nome:'', posicao:'ATA', numero:'', idade:'', nacionalidade:'Brasileiro', time_atual:'', novoTime:'', dataTransferencia: new Date().toISOString().slice(0,10), registro: '' });
 
 export default function AdminJogadores() {
   const [jogadores, setJogadores] = useState<Jogador[]>([]);
@@ -32,11 +32,14 @@ export default function AdminJogadores() {
     try {
       const jogAtual = editId ? jogadores.find(j=>j.id===editId) : null;
       let transferencias = jogAtual?.transferencias ?? [];
+      const novoTimeId = form.novoTime && editId ? form.novoTime : form.time_atual;
+      
       if(editId && form.novoTime && form.novoTime !== jogAtual?.time_atual) {
         transferencias = [...transferencias, {time_id:form.novoTime, data:form.dataTransferencia}];
       } else if(!editId) {
         transferencias = [{time_id:form.time_atual, data:form.dataTransferencia}];
       }
+      
       await clientUpsertJogador({
         id: editId || `j${uid()}`,
         nome: form.nome,
@@ -44,8 +47,9 @@ export default function AdminJogadores() {
         nacionalidade: form.nacionalidade as Jogador['nacionalidade'],
         posicao: form.posicao as Jogador['posicao'],
         numero: form.numero ? +form.numero : undefined,
-        time_atual: form.novoTime && editId ? form.novoTime : form.time_atual,
+        time_atual: novoTimeId,
         transferencias,
+        registro: form.registro ? +form.registro : undefined,
       });
       flash(true, editId?'Jogador atualizado!':'Jogador cadastrado!');
       setForm(emptyForm()); setEditId(null); load();
@@ -54,7 +58,17 @@ export default function AdminJogadores() {
   };
 
   const edit = (j:Jogador) => {
-    setForm({nome:j.nome,posicao:j.posicao,numero:j.numero?.toString()??'',idade:j.idade?.toString()??'',nacionalidade:j.nacionalidade??'Brasileiro',time_atual:j.time_atual,novoTime:'',dataTransferencia:new Date().toISOString().slice(0,10)});
+    setForm({
+      nome:j.nome,
+      posicao:j.posicao,
+      numero:j.numero?.toString()??'',
+      idade:j.idade?.toString()??'',
+      nacionalidade:j.nacionalidade??'Brasileiro',
+      time_atual:j.time_atual,
+      novoTime:'',
+      dataTransferencia:new Date().toISOString().slice(0,10),
+      registro: j.registro?.toString()??''
+    });
     setEditId(j.id); window.scrollTo({top:0,behavior:'smooth'});
   };
 
@@ -64,22 +78,19 @@ export default function AdminJogadores() {
     catch(e) { flash(false,'Erro: '+String(e)); }
   };
 
-  const nomeTime = (id:string) => times.find(t=>t.id===id)?.nome??id;
+  const nomeTime = (id:string) => {
+    if(id === 'outros') return 'Outros (Inativo/Transferido)';
+    return times.find(t=>t.id===id)?.nome??id;
+  };
+  
   const lista = jogadores.filter(j=>(!filtroTime||j.time_atual===filtroTime)&&(!filtroPosicao||j.posicao===filtroPosicao));
 
   return (
     <div style={{position: 'relative'}}>
       <style>{`
-        @keyframes slideIn {
-          from { transform: translateX(400px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(400px); opacity: 0; }
-        }
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }
         .toast { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; border-radius: 8px; font-size: .9rem; z-index: 9999; animation: slideIn .3s ease-out; }
-        .toast.hide { animation: slideOut .3s ease-out forwards; }
         .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
         .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
       `}</style>
@@ -94,6 +105,7 @@ export default function AdminJogadores() {
         <form onSubmit={submit}>
           <div className="grid-3">
             <div className="form-group"><label>Nome completo *</label><input value={form.nome} onChange={e=>setForm(f=>({...f,nome:e.target.value}))} /></div>
+            <div className="form-group"><label>Registro (Código Único)</label><input type="number" value={form.registro} onChange={e=>setForm(f=>({...f,registro:e.target.value}))} placeholder="Ex: 123456" /></div>
             <div className="form-group"><label>Posição *</label>
               <select value={form.posicao} onChange={e=>setForm(f=>({...f,posicao:e.target.value}))}>
                 {POSICOES.map(p=><option key={p} value={p}>{POS_LABEL[p]}</option>)}
@@ -117,6 +129,7 @@ export default function AdminJogadores() {
                     <select value={form.time_atual} onChange={e=>setForm(f=>({...f,time_atual:e.target.value}))}>
                       <option value="">Selecione...</option>
                       {times.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
+                      <option value="outros">Outros (Inativo/Transferido)</option>
                     </select>
                   </div>
                   <div className="form-group" style={{margin:0}}><label>Data de chegada</label>
@@ -130,6 +143,7 @@ export default function AdminJogadores() {
                     <select value={form.novoTime} onChange={e=>setForm(f=>({...f,novoTime:e.target.value}))}>
                       <option value="">Manter time atual</option>
                       {times.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
+                      <option value="outros">Outros (Inativo/Transferido)</option>
                     </select>
                   </div>
                   <div className="form-group" style={{margin:0}}><label>Data da transferência</label>
@@ -151,6 +165,7 @@ export default function AdminJogadores() {
           value={filtroTime} onChange={e=>setFiltroTime(e.target.value)}>
           <option value="">Todos os times</option>
           {times.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
+          <option value="outros">Outros (Inativos)</option>
         </select>
         <select style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',padding:'.4rem .7rem',fontSize:'.85rem'}}
           value={filtroPosicao} onChange={e=>setFiltroPosicao(e.target.value)}>
@@ -168,6 +183,7 @@ export default function AdminJogadores() {
                 <div style={{display:'flex',alignItems:'center',gap:'.6rem',marginBottom:'.3rem'}}>
                   {j.numero&&<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.1rem',color:'var(--verde)',minWidth:28}}>#{j.numero}</span>}
                   <strong>{j.nome}</strong>
+                  {j.registro && <span style={{fontSize:'.75rem',background:'var(--surface2)',padding:'.1rem .4rem',borderRadius:4,color:'var(--amarelo)'}}>REG: {j.registro}</span>}
                   <span className="badge badge-cinza">{POS_LABEL[j.posicao]}</span>
                   {j.nacionalidade === 'Estrangeiro' && <span className="badge badge-amarelo">🌍 Estrangeiro</span>}
                   {j.idade && <span className="badge badge-cinza">{j.idade} anos</span>}
