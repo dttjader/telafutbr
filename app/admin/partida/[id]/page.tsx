@@ -46,20 +46,46 @@ export default function AdminPartidaEventos() {
       const lista=isCasa?jogCasa:jogVis;
       const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
       if(!lista.length) return flash(false,'Nenhum jogador cadastrado para este time.');
+      
       const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
-      const disponivel=lista.find(j=>!jaAdicionados.has(j.id));
+      
+      // Regra: Primeiro jogador adicionado deve ser um goleiro se houver disponível
+      let disponivel;
+      if (esc.length === 0) {
+        disponivel = lista.find(j => j.posicao === 'GOL' && !jaAdicionados.has(j.id));
+      }
+      
+      // Se não for o primeiro ou não houver goleiro disponível, pega o próximo da lista
+      if (!disponivel) {
+        disponivel = lista.find(j => !jaAdicionados.has(j.id));
+      }
+      
       if(!disponivel) return flash(false,'Todos os jogadores deste time já foram adicionados.');
+
+      // Validações automáticas de titularidade
+      const titularesAtuais = esc.filter(e => e.titular).length;
+      const temGoleiroTitular = esc.some(e => e.titular && e.posicao === 'GOL');
+      
+      let deveSerTitular = titularesAtuais < 11;
+      
+      // Se for goleiro e já tiver um goleiro titular, entra como reserva
+      if (disponivel.posicao === 'GOL' && temGoleiroTitular) {
+        deveSerTitular = false;
+      }
+
       const novo:EscalacaoJogador={
         jogador_id: disponivel.id,
         numero: disponivel.numero ?? 0,
         posicao: disponivel.posicao ?? 'ATA',
-        titular: true,
+        titular: deveSerTitular,
       };
+      
       const u={...partida};
       if(isCasa) u.escalacao_casa=[...u.escalacao_casa,novo];
       else u.escalacao_visitante=[...u.escalacao_visitante,novo];
       save(u as Partida);
     };
+
     const updJogador=(isCasa:boolean,idx:number,novoJogadorId:string)=>{
       const jog=jogadores.find(j=>j.id===novoJogadorId);
       const u={...partida};
@@ -73,38 +99,64 @@ export default function AdminPartidaEventos() {
       if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
       save(u as Partida);
     };
+
     const upd=(isCasa:boolean,idx:number,field:string,value:string|boolean)=>{
       const u={...partida};
       const esc=isCasa?[...u.escalacao_casa]:[...u.escalacao_visitante];
+      
+      // Validação ao tentar marcar como titular manualmente
+      if (field === 'titular' && value === true) {
+        const titularesAtuais = esc.filter((e, i) => e.titular && i !== idx).length;
+        if (titularesAtuais >= 11) {
+          flash(false, 'Limite de 11 titulares atingido.');
+          return;
+        }
+        
+        const pos = esc[idx].posicao;
+        if (pos === 'GOL') {
+          const temOutroGoleiroTitular = esc.some((e, i) => e.titular && e.posicao === 'GOL' && i !== idx);
+          if (temOutroGoleiroTitular) {
+            flash(false, 'Já existe um goleiro titular definido.');
+            return;
+          }
+        }
+      }
+
       esc[idx]={...esc[idx],[field]:field==='numero'?+value:value};
       if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
       save(u as Partida);
     };
+
     const rem=(isCasa:boolean,idx:number)=>{
       const u={...partida};
       if(isCasa) u.escalacao_casa=u.escalacao_casa.filter((_,i)=>i!==idx);
       else u.escalacao_visitante=u.escalacao_visitante.filter((_,i)=>i!==idx);
       save(u as Partida);
     };
+
     const Block=({isCasa}:{isCasa:boolean})=>{
       const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
       const time=isCasa?timeCasa:timeVis;
       const lista=isCasa?jogCasa:jogVis;
       const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
+      const titularesCount = esc.filter(e => e.titular).length;
+
       return (
         <div style={{flex:1}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.75rem'}}>
-            <h3 style={{fontSize:'1.2rem'}}>{time?.nome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>{isCasa?'(Mandante)':'(Visitante)'}</span></h3>
-            <div style={{display:'flex',alignItems:'center',gap:'.5rem'}}>
-              <span style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{esc.length}/23</span>
-              <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
+            <div>
+              <h3 style={{fontSize:'1.2rem'}}>{time?.nome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>{isCasa?'(Mandante)':'(Visitante)'}</span></h3>
+              <div style={{fontSize:'.7rem',color:titularesCount === 11 ? 'var(--verde)' : 'var(--text-muted)',fontWeight:titularesCount === 11 ? 700 : 400}}>
+                {titularesCount}/11 Titulares · {esc.length}/23 Total
+              </div>
             </div>
+            <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
           </div>
           {esc.length===0&&<p style={{color:'var(--text-muted)',fontSize:'.85rem'}}>Nenhum jogador adicionado.</p>}
           {esc.map((e,i)=>{
             const opcoes=lista.filter(j=>j.id===e.jogador_id||!jaAdicionados.has(j.id));
             return (
-              <div key={i} style={{display:'flex',gap:'.5rem',marginBottom:'.4rem',background:'var(--surface2)',borderRadius:6,padding:'.5rem'}}>
+              <div key={i} style={{display:'flex',gap:'.5rem',marginBottom:'.4rem',background:'var(--surface2)',borderRadius:6,padding:'.5rem',borderLeft:e.titular?'3px solid var(--verde)':'3px solid transparent'}}>
                 <input type="number" min={0} max={99} value={e.numero} onChange={ev=>upd(isCasa,i,'numero',ev.target.value)} style={{width:52,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem',textAlign:'center'}} />
                 <select value={e.jogador_id} onChange={ev=>updJogador(isCasa,i,ev.target.value)} style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
                   {opcoes.map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
@@ -112,7 +164,7 @@ export default function AdminPartidaEventos() {
                 <select value={e.posicao} onChange={ev=>upd(isCasa,i,'posicao',ev.target.value)} style={{width:60,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
                   {POSICOES.map(p=><option key={p} value={p}>{p}</option>)}
                 </select>
-                <label style={{display:'flex',alignItems:'center',gap:4,fontSize:'.8rem',color:'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap'}}>
+                <label style={{display:'flex',alignItems:'center',gap:4,fontSize:'.8rem',color:e.titular?'var(--verde)':'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap',fontWeight:e.titular?700:400}}>
                   <input type="checkbox" checked={e.titular} onChange={ev=>upd(isCasa,i,'titular',ev.target.checked)} /> Titular
                 </label>
                 <button className="btn btn-danger btn-sm" onClick={()=>rem(isCasa,i)}>✕</button>
@@ -132,15 +184,12 @@ export default function AdminPartidaEventos() {
     
     const isContra = form.tipo === 'contra';
     const timeMarcador = form.time_id;
-    const timeAdversario = timeMarcador === partida.time_casa_id ? partida.time_visitante_id : partida.time_casa_id;
     
-    // Listas baseadas na escalação da partida
     const escCasa = partida.escalacao_casa;
     const escVis = partida.escalacao_visitante;
     const escMarcadora = timeMarcador === partida.time_casa_id ? escCasa : escVis;
     const escAdversaria = timeMarcador === partida.time_casa_id ? escVis : escCasa;
 
-    // Goleiros adversários automáticos
     const goleirosAdversarios = escAdversaria.filter(e => e.posicao === 'GOL');
 
     useEffect(() => {
