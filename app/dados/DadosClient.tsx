@@ -7,9 +7,7 @@ interface Props {
   totalGols: number;
   totalGolsCasa: number;
   totalGolsVis: number;
-  placaresFrequentes: { placar: string; count: number }[];
-  placaresFrequentesCasa: { placar: string; count: number }[];
-  placaresFrequentesVis: { placar: string; count: number }[];
+  placaresFrequentes: { placar: string; count: number; vitoriasVisitante: number; isEmpate: boolean }[];
   rankingEstadio: { nome: string; cidade: string; estado: string; gols: number; jogos: number; media: number }[];
   rankingEstado: { uf: string; gols: number; jogos: number; media: number }[];
   rankingArbitros: { nome: string; jogos: number; gols: number; amarelos: number; vermelhos: number }[];
@@ -29,7 +27,7 @@ const secTitle = (text: string) => (
 
 export function DadosClient({
   totalJogos, totalGols, totalGolsCasa, totalGolsVis,
-  placaresFrequentes, placaresFrequentesCasa, placaresFrequentesVis,
+  placaresFrequentes,
   rankingEstadio, rankingEstado, rankingArbitros, rankingG90, times,
 }: Props) {
   const mediaTotal = totalJogos > 0 ? (totalGols / totalJogos).toFixed(2) : '—';
@@ -73,33 +71,36 @@ export function DadosClient({
           ))}
         </div>
 
-        {/* Placares */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
-          {[
-            { titulo: '🏆 Placares mais frequentes (geral)', dados: placaresFrequentes, cor: 'var(--verde)' },
-            { titulo: '🏠 Placares mais frequentes (mandante)', dados: placaresFrequentesCasa, cor: '#60a5fa' },
-            { titulo: '✈️ Placares mais frequentes (visitante)', dados: placaresFrequentesVis, cor: '#f59e0b' },
-          ].map(({ titulo, dados, cor }) => (
-            card(
-              <>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--amarelo)' }}>{titulo}</h3>
-                {dados.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Sem dados.</p>}
-                {dados.map((d, i) => (
-                  <div key={d.placar} style={{ marginBottom: '.6rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.2rem', fontSize: '.85rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{d.placar}</span>
-                      <span style={{ color: 'var(--text-muted)' }}>{d.count}x</span>
-                    </div>
-                    <div style={{ background: 'var(--surface2)', borderRadius: 4, height: 8 }}>
-                      <div style={barStyle(d.count / (dados[0]?.count ?? 1), cor)} />
+        {/* Placares Frequentes - Visão Geral */}
+        {card(
+          <>
+            <h3 style={{ fontSize: '1.3rem', marginBottom: '1.25rem', color: 'var(--amarelo)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              🏆 Placares mais frequentes (Geral)
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
+              {placaresFrequentes.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Sem dados.</p>}
+              {placaresFrequentes.map((d, i) => (
+                <div key={d.placar} style={{ background: 'var(--surface2)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.5rem', color: 'var(--text)' }}>{d.placar}</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--verde)' }}>{d.count} ocorrências</div>
+                      {!d.isEmpate && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          {d.vitoriasVisitante} vitórias do visitante
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
-              </>,
-              { marginBottom: 0 }
-            )
-          ))}
-        </div>
+                  <div style={{ background: 'var(--surface)', borderRadius: 4, height: 6 }}>
+                    <div style={barStyle(d.count / maxPlacar, 'var(--verde)')} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>,
+          { marginBottom: '2rem' }
+        )}
 
         {/* Estádios e estados */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>

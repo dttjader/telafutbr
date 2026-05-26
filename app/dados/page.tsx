@@ -14,32 +14,27 @@ export default async function DadosPage() {
   const totalGolsCasa = encerradas.reduce((s, p) => s + p.placar_casa, 0);
   const totalGolsVis = encerradas.reduce((s, p) => s + p.placar_visitante, 0);
 
-  // Placares mais frequentes (ordenado, sem duplicatas)
-  const placarMap: Record<string, number> = {};
+  // Placares mais frequentes (Visão Geral)
+  // Agrupamos por placar absoluto (ex: 1x2 e 2x1 são o mesmo placar base "1x2")
+  const placarMap: Record<string, { count: number; vitoriasVisitante: number }> = {};
   for (const p of encerradas) {
     const [a, b] = [p.placar_casa, p.placar_visitante].sort((x, y) => x - y);
     const key = `${a}×${b}`;
-    placarMap[key] = (placarMap[key] ?? 0) + 1;
+    if (!placarMap[key]) placarMap[key] = { count: 0, vitoriasVisitante: 0 };
+    placarMap[key].count++;
+    if (p.placar_visitante > p.placar_casa) {
+      placarMap[key].vitoriasVisitante++;
+    }
   }
   const placaresFrequentes = Object.entries(placarMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([placar, count]) => ({ placar, count }));
-
-  // Placares mandante: como visto pelo mandante (ex: 1x2 = mandante fez 1, visitante fez 2)
-  // Placares visitante: como visto pelo visitante (ex: 1x2 = visitante fez 2, mandante fez 1, exibir como 2x1)
-  const placarCasaMap: Record<string, number> = {};
-  const placarVisMap: Record<string, number> = {};
-  for (const p of encerradas) {
-    const kc = `${p.placar_casa}×${p.placar_visitante}`;
-    const kv = `${p.placar_visitante}×${p.placar_casa}`;
-    placarCasaMap[kc] = (placarCasaMap[kc] ?? 0) + 1;
-    placarVisMap[kv] = (placarVisMap[kv] ?? 0) + 1;
-  }
-  const placaresFrequentesCasa = Object.entries(placarCasaMap)
-    .sort((a, b) => b[1] - a[1]).slice(0, 10).map(([placar, count]) => ({ placar, count }));
-  const placaresFrequentesVis = Object.entries(placarVisMap)
-    .sort((a, b) => b[1] - a[1]).slice(0, 10).map(([placar, count]) => ({ placar, count }));
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 12)
+    .map(([placar, data]) => ({ 
+      placar, 
+      count: data.count, 
+      vitoriasVisitante: data.vitoriasVisitante,
+      isEmpate: placar.split('×')[0] === placar.split('×')[1]
+    }));
 
   // Ranking por estádio
   const estadioMap: Record<string, { gols: number; jogos: number; nome: string; cidade: string; estado: string }> = {};
@@ -133,8 +128,6 @@ export default async function DadosPage() {
       totalGolsCasa={totalGolsCasa}
       totalGolsVis={totalGolsVis}
       placaresFrequentes={placaresFrequentes}
-      placaresFrequentesCasa={placaresFrequentesCasa}
-      placaresFrequentesVis={placaresFrequentesVis}
       rankingEstadio={rankingEstadio}
       rankingEstado={rankingEstado}
       rankingArbitros={rankingArbitros}
