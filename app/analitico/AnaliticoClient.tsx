@@ -14,11 +14,13 @@ const POSICOES = ['GOL', 'ZAG', 'LAT', 'VOL', 'MEI', 'ATA'];
 interface Props {
   lista: StatJogador[];
   totalPartidas: number;
+  times: Time[];
 }
 
 type OrdenarPor = 'minutos' | 'partidas' | 'gols' | 'assistencias' | 'amarelos' | 'vermelhos';
 
-export function AnaliticoClient({ lista, totalPartidas }: Props) {
+export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
+  const [filtroTime, setFiltroTime] = useState('');
   const [filtroNac, setFiltroNac] = useState('');
   const [filtroPos, setFiltroPos] = useState('');
   const [filtroIdadeMin, setFiltroIdadeMin] = useState('');
@@ -30,6 +32,7 @@ export function AnaliticoClient({ lista, totalPartidas }: Props) {
 
   const filtrada = useMemo(() => {
     return lista.filter(s => {
+      if (filtroTime && s.jogador.time_atual !== filtroTime) return false;
       if (filtroNac && s.jogador.nacionalidade !== filtroNac) return false;
       if (filtroPos && s.jogador.posicao !== filtroPos) return false;
       if (filtroIdadeMin && (s.jogador.idade ?? 0) < +filtroIdadeMin) return false;
@@ -49,10 +52,10 @@ export function AnaliticoClient({ lista, totalPartidas }: Props) {
         default: return b.minutos - a.minutos;
       }
     });
-  }, [lista, filtroNac, filtroPos, filtroIdadeMin, filtroIdadeMax, filtroJogosMin, filtroCartao, ordenarPor]);
+  }, [lista, filtroTime, filtroNac, filtroPos, filtroIdadeMin, filtroIdadeMax, filtroJogosMin, filtroCartao, ordenarPor]);
 
   const limparFiltros = () => {
-    setFiltroNac(''); setFiltroPos(''); setFiltroIdadeMin(''); setFiltroIdadeMax('');
+    setFiltroTime(''); setFiltroNac(''); setFiltroPos(''); setFiltroIdadeMin(''); setFiltroIdadeMax('');
     setFiltroJogosMin(''); setFiltroCartao('');
   };
 
@@ -67,10 +70,7 @@ export function AnaliticoClient({ lista, totalPartidas }: Props) {
   const TabelaRows = ({ dados }: { dados: StatJogador[] }) => (
     <>
       {dados.map((s, i) => {
-        const time = s.jogador.time_atual ? {
-          id: s.jogador.time_atual, nome: s.timeNome, sigla: s.timeSigla,
-          cor_primaria: s.timeCor, cor_secundaria: s.timeCorSec,
-        } as Time : undefined;
+        const time = times.find(t => t.id === s.jogador.time_atual);
         const golsMin = s.minutos > 0 ? (s.gols / s.minutos * 90).toFixed(2) : '—';
         const golsSofMin = s.jogador.posicao === 'GOL' && s.minutos > 0
           ? (s.gols_sofridos / s.minutos * 90).toFixed(2) : null;
@@ -189,6 +189,10 @@ export function AnaliticoClient({ lista, totalPartidas }: Props) {
             <button className="btn btn-ghost btn-sm" onClick={limparFiltros}>Limpar</button>
           </div>
           <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={filtroTime} onChange={e => setFiltroTime(e.target.value)} style={selectStyle}>
+              <option value="">Todos os times</option>
+              {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            </select>
             <select value={filtroNac} onChange={e => setFiltroNac(e.target.value)} style={selectStyle}>
               <option value="">Todas nac.</option>
               <option value="Brasileiro">🇧🇷 Brasileiro</option>
@@ -263,11 +267,12 @@ export function AnaliticoClient({ lista, totalPartidas }: Props) {
           <span><strong style={{ color: 'var(--text)' }}>R</strong> Reserva</span>
           <span><strong style={{ color: 'var(--amarelo)' }}>Min</strong> Minutos (45+acréscimos)</span>
           <span><strong>GC</strong> Gols Contra</span>
-          <span><strong>GS</strong> Gols Sofridos (goleiros)</span>
-          <span><strong>GS/90</strong> Gols sofridos por 90min</span>
-          <span><strong>G/90</strong> Gols marcados por 90min</span>
-          <span><strong style={{ color: '#f59e0b' }}>Min🟨</strong> Minutos após amarelo</span>
-          <span style={{ marginLeft: 'auto', fontStyle: 'italic' }}>Clique no cabeçalho para ordenar</span>
+          <span><strong>GS</strong> Gols Sofridos</span>
+          <span><strong>GS/90</strong> Gols Sofridos por 90min</span>
+          <span><strong>G/90</strong> Gols Marcados por 90min</span>
+          <span><strong>🟨</strong> Amarelos</span>
+          <span><strong>🟥</strong> Vermelhos</span>
+          <span><strong>Min🟨</strong> Minutos jogados com cartão amarelo</span>
         </div>
       </div>
     </div>

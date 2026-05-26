@@ -1,14 +1,8 @@
 import { getJogadores, getPartidas, getTimes } from '@/lib/data';
 import { Partida, Jogador } from '@/lib/types';
-import { EscudoTime } from '@/components/EscudoTime';
 import { AnaliticoClient } from './AnaliticoClient';
 
 export const dynamic = 'force-dynamic';
-
-const POSICAO_LABEL: Record<string, string> = {
-  GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral',
-  VOL: 'Volante', MEI: 'Meia', ATA: 'Atacante',
-};
 
 export interface StatJogador {
   jogador: Jogador;
@@ -101,14 +95,11 @@ export default async function AnaliticoPage() {
 
     for (const g of p.gols) {
       if (g.tipo === 'contra') {
-        // Gol contra: conta pro jogador que marcou contra
         if (statsMap[g.jogador_id]) statsMap[g.jogador_id].gols_contra++;
-        // O goleiro que sofreu é do time marcador (mesmo time_id do gol)
         if (g.goleiro_id && statsMap[g.goleiro_id]) statsMap[g.goleiro_id].gols_sofridos++;
       } else {
         if (statsMap[g.jogador_id]) statsMap[g.jogador_id].gols++;
         if (g.assistencia_id && statsMap[g.assistencia_id]) statsMap[g.assistencia_id].assistencias++;
-        // Goleiro que sofreu é do time adversário
         if (g.goleiro_id && statsMap[g.goleiro_id]) statsMap[g.goleiro_id].gols_sofridos++;
       }
     }
@@ -124,5 +115,5 @@ export default async function AnaliticoPage() {
     .filter(s => s.partidas > 0)
     .sort((a, b) => b.minutos - a.minutos || b.partidas - a.partidas);
 
-  return <AnaliticoClient lista={lista} totalPartidas={encerradas.length} />;
+  return <AnaliticoClient lista={lista} totalPartidas={encerradas.length} times={times} />;
 }
