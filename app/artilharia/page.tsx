@@ -29,10 +29,9 @@ export default async function ArtilhariaPage() {
   };
   const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
-  const RankingCol = ({ titulo, dados, valorKey, valorLabel, cor }: {
+  const RankingCol = ({ titulo, dados, valorLabel, cor }: {
     titulo: string;
     dados: { jogador_id: string; time_id: string; quantidade: number }[];
-    valorKey?: string;
     valorLabel: string;
     cor: string;
   }) => (
@@ -42,7 +41,7 @@ export default async function ArtilhariaPage() {
       </h2>
       {dados.length === 0 && <p style={{ color: 'var(--text-muted)', padding: '2rem 0' }}>Nenhum registro ainda.</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-        {dados.map((a, i) => {
+        {dados.slice(0, 30).map((a, i) => {
           const time = times.find(t => t.id === a.time_id);
           const isPrimeiro = i === 0;
           return (
@@ -66,6 +65,11 @@ export default async function ArtilhariaPage() {
             </div>
           );
         })}
+        {dados.length > 30 && (
+          <p style={{ textAlign: 'center', fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '.5rem' }}>
+            Exibindo apenas os 30 melhores.
+          </p>
+        )}
       </div>
     </div>
   );
