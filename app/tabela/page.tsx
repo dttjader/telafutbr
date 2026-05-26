@@ -1,6 +1,5 @@
 import { getPartidas, getTimes } from '@/lib/data';
-import { getConfig, zonaClassificacao } from '@/lib/config';
-import { EscudoTime } from '@/components/EscudoTime';
+import { getConfig } from '@/lib/config';
 import { TabelaClient } from './TabelaClient';
 
 export const dynamic = 'force-dynamic';
@@ -68,8 +67,13 @@ export default async function TabelaPage() {
     else if (p.placar_casa < p.placar_visitante) { add(p.time_casa_id, 'D'); add(p.time_visitante_id, 'V'); }
     else { add(p.time_casa_id, 'E'); add(p.time_visitante_id, 'E'); }
   }
+
+  // Ajuste: Mostrar Recente somente para o time que jogou na última data registrada
+  const datasUnicas = [...new Set(encerradas.map(q => q.data))].sort();
+  const ultimaData = datasUnicas[datasUnicas.length - 1];
+  
   const timesRecentes = new Set(
-    encerradas.filter(p => [...new Set(encerradas.map(q => q.data))].sort().reverse().slice(0, 5).includes(p.data))
+    encerradas.filter(p => p.data === ultimaData)
       .flatMap(p => [p.time_casa_id, p.time_visitante_id])
   );
 
