@@ -22,7 +22,8 @@ export default function AdminPartidas() {
   const load = async () => {
     const [p,t,e,tc] = await Promise.all([clientGetPartidas(),clientGetTimes(),clientGetEstadios(),clientGetTecnicos()]);
     setTecnicos(tc);
-    setPartidas([...p].sort((a,b)=>a.rodada-b.rodada||a.data.localeCompare(b.data)));
+    // Ordenação invertida: rodada maior primeiro
+    setPartidas([...p].sort((a,b)=>b.rodada-a.rodada||a.data.localeCompare(b.data)));
     setTimes(t); setEstadios(e);
   };
   useEffect(()=>{load();},[]);
@@ -32,14 +33,15 @@ export default function AdminPartidas() {
 
   const submit = async (ev:React.FormEvent) => {
     ev.preventDefault();
-    if(!form.rodada||!form.data||!form.time_casa_id||!form.time_visitante_id||!form.estadio_id) return flash(false,'Preencha rodada, data, times e estádio.');
+    // Data não é mais obrigatória
+    if(!form.rodada||!form.time_casa_id||!form.time_visitante_id||!form.estadio_id) return flash(false,'Preencha rodada, times e estádio.');
     if(form.time_casa_id===form.time_visitante_id) return flash(false,'Times não podem ser iguais.');
     setLoading(true);
     try {
       const existente = editId ? partidas.find(p=>p.id===editId) : null;
       await clientUpsertPartida({
         id: editId||`p${uid()}`,
-        rodada:+form.rodada, data:form.data, hora:form.hora, status:form.status as Partida['status'],
+        rodada:+form.rodada, data:form.data || '', hora:form.hora, status:form.status as Partida['status'],
         time_casa_id:form.time_casa_id, time_visitante_id:form.time_visitante_id,
         estadio_id:form.estadio_id, publico:+form.publico||0,
         placar_casa:+form.placar_casa, placar_visitante:+form.placar_visitante,
@@ -74,11 +76,10 @@ export default function AdminPartidas() {
   const nomeEstadio=(id:string)=>estadios.find(e=>e.id===id)?.nome??id;
   const statusBadge:Record<string,string>={agendada:'badge-cinza',ao_vivo:'badge-vermelho',encerrada:'badge-verde',adiada:'badge-amarelo'};
   const statusLabel:Record<string,string>={agendada:'Agendada',ao_vivo:'🔴 Ao Vivo',encerrada:'Encerrada',adiada:'Adiada'};
-  const rodadas=[...new Set(partidas.map(p=>p.rodada))].sort((a,b)=>a-b);
+  // Rodadas ordenadas de forma invertida
+  const rodadas=[...new Set(partidas.map(p=>p.rodada))].sort((a,b)=>b-a);
   const PARTIDAS_POR_RODADA = 10;
 
-  // Lógica de colapso: rodadas completas (10 jogos) iniciam fechadas.
-  // Apenas rodadas incompletas iniciam abertas.
   const [openRodadas, setOpenRodadas] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
@@ -121,7 +122,7 @@ export default function AdminPartidas() {
           <form onSubmit={submit}>
             <div className="grid-3">
               <div className="form-group"><label>Rodada *</label><input type="number" min={1} max={38} value={form.rodada} onChange={f('rodada')} /></div>
-              <div className="form-group"><label>Data *</label><input type="date" value={form.data} onChange={f('data')} /></div>
+              <div className="form-group"><label>Data</label><input type="date" value={form.data} onChange={f('data')} /></div>
               <div className="form-group"><label>Hora</label><input type="time" value={form.hora} onChange={f('hora')} /></div>
               <div className="form-group"><label>Mandante *</label>
                 <select value={form.time_casa_id} onChange={f('time_casa_id')}>
@@ -203,7 +204,7 @@ export default function AdminPartidas() {
                     <div style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.1rem',letterSpacing:'.05em'}}>
                       {nomeTime(p.time_casa_id)}<span style={{color:'var(--verde)',margin:'0 .5rem'}}>{p.placar_casa} × {p.placar_visitante}</span>{nomeTime(p.time_visitante_id)}
                     </div>
-                    <div style={{fontSize:'.78rem',color:'var(--text-muted)'}}>{p.data.split('-').reverse().join('/')} · {p.hora} · {nomeEstadio(p.estadio_id)}</div>
+                    <div style={{fontSize:'.78rem',color:'var(--text-muted)'}}>{p.data ? p.data.split('-').reverse().join('/') : 'A definir'} · {p.hora} · {nomeEstadio(p.estadio_id)}</div>
                     <div style={{display:'flex',gap:'.5rem'}}>
                       <button className="btn btn-ghost btn-sm" onClick={()=>router.push(`/admin/partida/${p.id}`)}>📋 Eventos</button>
                       <button className="btn btn-ghost btn-sm" onClick={()=>edit(p)}>✏️</button>
