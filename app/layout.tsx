@@ -3,8 +3,8 @@ import './globals.css';
 import { Nav } from '@/components/Nav';
 
 export const metadata: Metadata = {
-  title: 'Brasileirão Série A',
-  description: 'Acompanhe o Campeonato Brasileiro Série A',
+  title: 'Brasileirão Série A 2026',
+  description: 'Acompanhe o Campeonato Brasileiro Série A 2026',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
