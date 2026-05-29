@@ -33,7 +33,6 @@ export default function AdminPartidas() {
 
   const submit = async (ev:React.FormEvent) => {
     ev.preventDefault();
-    // Data não é mais obrigatória
     if(!form.rodada||!form.time_casa_id||!form.time_visitante_id||!form.estadio_id) return flash(false,'Preencha rodada, times e estádio.');
     if(form.time_casa_id===form.time_visitante_id) return flash(false,'Times não podem ser iguais.');
     setLoading(true);
@@ -76,7 +75,6 @@ export default function AdminPartidas() {
   const nomeEstadio=(id:string)=>estadios.find(e=>e.id===id)?.nome??id;
   const statusBadge:Record<string,string>={agendada:'badge-cinza',ao_vivo:'badge-vermelho',encerrada:'badge-verde',adiada:'badge-amarelo'};
   const statusLabel:Record<string,string>={agendada:'Agendada',ao_vivo:'🔴 Ao Vivo',encerrada:'Encerrada',adiada:'Adiada'};
-  // Rodadas ordenadas de forma invertida
   const rodadas=[...new Set(partidas.map(p=>p.rodada))].sort((a,b)=>b-a);
   const PARTIDAS_POR_RODADA = 10;
 
@@ -204,7 +202,14 @@ export default function AdminPartidas() {
                     <div style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.1rem',letterSpacing:'.05em'}}>
                       {nomeTime(p.time_casa_id)}<span style={{color:'var(--verde)',margin:'0 .5rem'}}>{p.placar_casa} × {p.placar_visitante}</span>{nomeTime(p.time_visitante_id)}
                     </div>
-                    <div style={{fontSize:'.78rem',color:'var(--text-muted)'}}>{p.data ? p.data.split('-').reverse().join('/') : 'A definir'} · {p.hora} · {nomeEstadio(p.estadio_id)}</div>
+                    <div style={{display:'flex',gap:'.8rem',alignItems:'center'}}>
+                      <div style={{fontSize:'.75rem',background:'var(--surface2)',padding:'.2rem .5rem',borderRadius:6,color:'var(--text-muted)',display:'flex',gap:'.5rem'}}>
+                        <span>G: <strong>{p.gols.length}</strong></span>
+                        <span>C: <strong>{p.cartoes.length}</strong></span>
+                        <span>S: <strong>{p.substituicoes.length}</strong></span>
+                      </div>
+                      <div style={{fontSize:'.78rem',color:'var(--text-muted)'}}>{p.data ? p.data.split('-').reverse().join('/') : 'A definir'} · {p.hora} · {nomeEstadio(p.estadio_id)}</div>
+                    </div>
                     <div style={{display:'flex',gap:'.5rem'}}>
                       <button className="btn btn-ghost btn-sm" onClick={()=>router.push(`/admin/partida/${p.id}`)}>📋 Eventos</button>
                       <button className="btn btn-ghost btn-sm" onClick={()=>edit(p)}>✏️</button>
