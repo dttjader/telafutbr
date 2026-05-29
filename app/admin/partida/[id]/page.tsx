@@ -5,8 +5,8 @@ import { Partida, Time, Jogador, Gol, Cartao, Substituicao, EscalacaoJogador } f
 import { clientGetPartida, clientGetTimes, clientGetJogadores, clientUpsertPartida, uid } from '@/lib/client';
 
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
-const TIPO_GOL = ['normal','penalti','falta','contra'];
-const TIPO_GOL_LABEL:Record<string,string>={normal:'Gol',penalti:'Pênalti',falta:'Falta',contra:'Contra'};
+const TIPO_GOL = ['normal','penalti','falta','contra','penalti_perdido','penalti_defendido'];
+const TIPO_GOL_LABEL:Record<string,string>={normal:'Gol',penalti:'Pênalti',falta:'Falta',contra:'Contra',penalti_perdido:'Pênalti Perdido',penalti_defendido:'Pênalti Defendido'};
 
 export default function AdminPartidaEventos() {
   const {id} = useParams<{id:string}>();
@@ -26,7 +26,18 @@ export default function AdminPartidaEventos() {
 
   const save = async (updated: Partida) => {
     try {
-      await clientUpsertPartida(updated);
+      // Recalcular placar apenas para gols que contam (normal, penalti, falta, contra)
+      const golsValidos = updated.gols.filter(g => !['penalti_perdido', 'penalti_defendido'].includes(g.tipo));
+      const placarCasa = golsValidos.filter(g => (g.tipo === 'contra' ? g.time_id !== updated.time_casa_id : g.time_id === updated.time_casa_id)).length;
+      const placarVis = golsValidos.filter(g => (g.tipo === 'contra' ? g.time_id !== updated.time_visitante_id : g.time_id === updated.time_visitante_id)).length;
+      
+      const finalPartida = {
+        ...updated,
+        placar_casa: placarCasa,
+        placar_visitante: placarVis
+      };
+
+      await clientUpsertPartida(finalPartida);
       flash(true,'Salvo!'); load();
     } catch(e) { flash(false,'Erro: '+String(e)); }
   };
@@ -48,27 +59,18 @@ export default function AdminPartidaEventos() {
       if(!lista.length) return flash(false,'Nenhum jogador cadastrado para este time.');
       
       const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
-      
-      // Regra: Primeiro jogador adicionado deve ser um goleiro se houver disponível
       let disponivel;
       if (esc.length === 0) {
         disponivel = lista.find(j => j.posicao === 'GOL' && !jaAdicionados.has(j.id));
       }
-      
-      // Se não for o primeiro ou não houver goleiro disponível, pega o próximo da lista
       if (!disponivel) {
         disponivel = lista.find(j => !jaAdicionados.has(j.id));
       }
-      
       if(!disponivel) return flash(false,'Todos os jogadores deste time já foram adicionados.');
 
-      // Validações automáticas de titularidade
       const titularesAtuais = esc.filter(e => e.titular).length;
       const temGoleiroTitular = esc.some(e => e.titular && e.posicao === 'GOL');
-      
       let deveSerTitular = titularesAtuais < 11;
-      
-      // Se for goleiro e já tiver um goleiro titular, entra como reserva
       if (disponivel.posicao === 'GOL' && temGoleiroTitular) {
         deveSerTitular = false;
       }
@@ -103,15 +105,12 @@ export default function AdminPartidaEventos() {
     const upd=(isCasa:boolean,idx:number,field:string,value:string|boolean)=>{
       const u={...partida};
       const esc=isCasa?[...u.escalacao_casa]:[...u.escalacao_visitante];
-      
-      // Validação ao tentar marcar como titular manualmente
       if (field === 'titular' && value === true) {
         const titularesAtuais = esc.filter((e, i) => e.titular && i !== idx).length;
         if (titularesAtuais >= 11) {
           flash(false, 'Limite de 11 titulares atingido.');
           return;
         }
-        
         const pos = esc[idx].posicao;
         if (pos === 'GOL') {
           const temOutroGoleiroTitular = esc.some((e, i) => e.titular && e.posicao === 'GOL' && i !== idx);
@@ -121,7 +120,6 @@ export default function AdminPartidaEventos() {
           }
         }
       }
-
       esc[idx]={...esc[idx],[field]:field==='numero'?+value:value};
       if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
       save(u as Partida);
@@ -184,12 +182,10 @@ export default function AdminPartidaEventos() {
     
     const isContra = form.tipo === 'contra';
     const timeMarcador = form.time_id;
-    
     const escCasa = partida.escalacao_casa;
     const escVis = partida.escalacao_visitante;
     const escMarcadora = timeMarcador === partida.time_casa_id ? escCasa : escVis;
     const escAdversaria = timeMarcador === partida.time_casa_id ? escVis : escCasa;
-
     const goleirosAdversarios = escAdversaria.filter(e => e.posicao === 'GOL');
 
     useEffect(() => {
@@ -214,12 +210,7 @@ export default function AdminPartidaEventos() {
     return (
       <div>
         <div className="card" style={{marginBottom:'1.5rem'}}>
-          <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:'var(--amarelo)'}}>+ Registrar Gol</h3>
-          {isContra && (
-            <div style={{padding:'.6rem .9rem',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',borderRadius:6,marginBottom:'1rem',fontSize:'.82rem',color:'#f87171'}}>
-              ⚠️ <strong>Gol Contra:</strong> o jogador que marcou contra e o goleiro são ambos do time adversário.
-            </div>
-          )}
+          <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:'var(--amarelo)'}}>+ Registrar Evento de Gol/Pênalti</h3>
           <div className="grid-3">
             <div className="form-group"><label>Minuto *</label><input type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
             <div className="form-group"><label>Acréscimo</label><input type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
@@ -229,7 +220,7 @@ export default function AdminPartidaEventos() {
               </select>
             </div>
             <div className="form-group">
-              <label>Time que marca o gol</label>
+              <label>Time que ataca</label>
               <select value={form.time_id} onChange={e => handleTimeMarcadorChange(e.target.value)}>
                 <option value={partida.time_casa_id}>{timeCasa?.nome}</option>
                 <option value={partida.time_visitante_id}>{timeVis?.nome}</option>
@@ -242,7 +233,7 @@ export default function AdminPartidaEventos() {
                 {(isContra ? escAdversaria : escMarcadora).map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
-            {!isContra && (
+            {!isContra && !form.tipo.includes('perdido') && !form.tipo.includes('defendido') && (
               <div className="form-group"><label>Assistência</label>
                 <select value={form.assistencia_id} onChange={f('assistencia_id')}>
                   <option value="">Sem assistência</option>
@@ -259,22 +250,21 @@ export default function AdminPartidaEventos() {
             </div>
             <div className="form-group" style={{gridColumn:'1/-1'}}><label>Descrição</label><input value={form.descricao} onChange={f('descricao')} /></div>
           </div>
-          <button className="btn btn-primary" onClick={add}>⚽ Adicionar Gol</button>
+          <button className="btn btn-primary" onClick={add}>Registrar Evento</button>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'.5rem'}}>
-          {partida.gols.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Nenhum gol registrado.</p>}
+          {partida.gols.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Nenhum evento registrado.</p>}
           {partida.gols.map(g=>(
             <div key={g.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:`3px solid ${g.time_id===partida.time_casa_id?'var(--verde)':'var(--amarelo)'}`}}>
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--verde)',minWidth:40}}>{g.minuto}{g.acrescimo>0?`+${g.acrescimo}`:''}&apos;</span>
-              <span>{g.tipo==='contra'?'🔴':'⚽'}</span>
+              <span>{g.tipo==='contra'?'🔴':(g.tipo.includes('perdido')||g.tipo.includes('defendido')?'❌':'⚽')}</span>
               <div style={{flex:1}}>
                 <strong>{nomeJog(g.jogador_id)}</strong>
-                {g.tipo==='contra'&&<span style={{fontSize:'.78rem',color:'var(--rebaixamento)',marginLeft:'.4rem'}}>(contra)</span>}
+                <span style={{fontSize:'.78rem',color:'var(--text-muted)',marginLeft:'.4rem'}}>({TIPO_GOL_LABEL[g.tipo]})</span>
                 {g.assistencia_id&&<span style={{color:'var(--text-muted)',fontSize:'.85rem'}}> · assist. {nomeJog(g.assistencia_id)}</span>}
-                <div style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{TIPO_GOL_LABEL[g.tipo]} · {nomeTime(g.time_id)}{g.goleiro_id?' · Goleiro: '+nomeJog(g.goleiro_id):''}</div>
-                {g.descricao&&<div style={{fontSize:'.75rem',color:'var(--text-muted)',fontStyle:'italic'}}>{g.descricao}</div>}
+                <div style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{nomeTime(g.time_id)} · Goleiro: {nomeJog(g.goleiro_id)}</div>
               </div>
-              <button className="btn btn-danger btn-sm" onClick={()=>del(g.id)}>✕</button>
+              <button className="btn btn-danger btn-sm" onClick={()=>del(g.id)}>🗑️</button>
             </div>
           ))}
         </div>
@@ -286,11 +276,8 @@ export default function AdminPartidaEventos() {
   const CartoesTab=()=>{
     const [form,setForm]=useState({minuto:'',tipo:'amarelo',jogador_id:'',time_id:partida.time_casa_id,motivo:''});
     const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
-    
-    const escCasa = partida.escalacao_casa;
-    const escVis = partida.escalacao_visitante;
-    const escTime = form.time_id === partida.time_casa_id ? escCasa : escVis;
-
+    const escCasa=partida.escalacao_casa;
+    const escVis=partida.escalacao_visitante;
     const add=()=>{
       if(!form.minuto||!form.jogador_id) return flash(false,'Preencha minuto e jogador.');
       const novo:Cartao={id:`c${uid()}`,minuto:+form.minuto,tipo:form.tipo as Cartao['tipo'],jogador_id:form.jogador_id,time_id:form.time_id,motivo:form.motivo};
@@ -304,22 +291,12 @@ export default function AdminPartidaEventos() {
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:'var(--amarelo)'}}>+ Registrar Cartão</h3>
           <div className="grid-3">
             <div className="form-group"><label>Minuto *</label><input type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
-            <div className="form-group"><label>Tipo</label>
-              <select value={form.tipo} onChange={f('tipo')}>
-                <option value="amarelo">Amarelo</option>
-                <option value="vermelho">Vermelho</option>
-              </select>
-            </div>
-            <div className="form-group"><label>Time</label>
-              <select value={form.time_id} onChange={f('time_id')}>
-                <option value={partida.time_casa_id}>{timeCasa?.nome}</option>
-                <option value={partida.time_visitante_id}>{timeVis?.nome}</option>
-              </select>
-            </div>
+            <div className="form-group"><label>Tipo</label><select value={form.tipo} onChange={f('tipo')}><option value="amarelo">Amarelo</option><option value="vermelho">Vermelho</option></select></div>
+            <div className="form-group"><label>Time</label><select value={form.time_id} onChange={f('time_id')}><option value={partida.time_casa_id}>{timeCasa?.nome}</option><option value={partida.time_visitante_id}>{timeVis?.nome}</option></select></div>
             <div className="form-group"><label>Jogador *</label>
               <select value={form.jogador_id} onChange={f('jogador_id')}>
                 <option value="">Selecione...</option>
-                {escTime.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
+                {(form.time_id===partida.time_casa_id?escCasa:escVis).map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
             <div className="form-group" style={{gridColumn:'span 2'}}><label>Motivo</label><input value={form.motivo} onChange={f('motivo')} /></div>
@@ -329,14 +306,11 @@ export default function AdminPartidaEventos() {
         <div style={{display:'flex',flexDirection:'column',gap:'.5rem'}}>
           {partida.cartoes.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Nenhum cartão registrado.</p>}
           {partida.cartoes.map(c=>(
-            <div key={c.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:`3px solid ${c.tipo==='amarelo'?'#facc15':'#ef4444'}`}}>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:c.tipo==='amarelo'?'#facc15':'#ef4444',minWidth:40}}>{c.minuto}&apos;</span>
+            <div key={c.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:`3px solid ${c.tipo==='amarelo'?'var(--amarelo)':'var(--rebaixamento)'}`}}>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--verde)',minWidth:40}}>{c.minuto}&apos;</span>
               <span style={{fontSize:'1.2rem'}}>{c.tipo==='amarelo'?'🟨':'🟥'}</span>
-              <div style={{flex:1}}>
-                <strong>{nomeJog(c.jogador_id)}</strong>
-                <div style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{c.tipo==='amarelo'?'Amarelo':'Vermelho'} · {nomeTime(c.time_id)}{c.motivo?' · '+c.motivo:''}</div>
-              </div>
-              <button className="btn btn-danger btn-sm" onClick={()=>del(c.id)}>✕</button>
+              <div style={{flex:1}}><strong>{nomeJog(c.jogador_id)}</strong><div style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{nomeTime(c.time_id)} {c.motivo?`· ${c.motivo}`:''}</div></div>
+              <button className="btn btn-danger btn-sm" onClick={()=>del(c.id)}>🗑️</button>
             </div>
           ))}
         </div>
@@ -344,29 +318,20 @@ export default function AdminPartidaEventos() {
     );
   };
 
-  // ── SUBSTITUIÇÕES ──
+  // ── SUBS ──
   const SubsTab=()=>{
     const [form,setForm]=useState({minuto:'',time_id:partida.time_casa_id,sai_id:'',entra_id:''});
     const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
-
-    const min = +form.minuto || 0;
-    const esc = form.time_id === partida.time_casa_id ? partida.escalacao_casa : partida.escalacao_visitante;
-    const subs = partida.substituicoes.filter(s => s.time_id === form.time_id);
-
-    const quemPodeSair = esc.filter(e => {
-      const entrou = subs.find(s => s.entra_id === e.jogador_id);
-      const saiu = subs.find(s => s.sai_id === e.jogador_id);
-      if (saiu && saiu.minuto <= min) return false;
-      if (e.titular) return true;
-      if (entrou && entrou.minuto <= min) return true;
-      return false;
-    });
-
-    const quemPodeEntrar = esc.filter(e => {
-      if (e.titular) return false;
-      const entrou = subs.find(s => s.entra_id === e.jogador_id);
-      return !entrou;
-    });
+    
+    const escCasa=partida.escalacao_casa;
+    const escVis=partida.escalacao_visitante;
+    const escAtual = form.time_id === partida.time_casa_id ? escCasa : escVis;
+    
+    const jaSairam = new Set(partida.substituicoes.filter(s => s.time_id === form.time_id).map(s => s.sai_id));
+    const jaEntraram = new Set(partida.substituicoes.filter(s => s.time_id === form.time_id).map(s => s.entra_id));
+    
+    const quemPodeSair = escAtual.filter(e => e.titular || jaEntraram.has(e.jogador_id)).filter(e => !jaSairam.has(e.jogador_id));
+    const quemPodeEntrar = escAtual.filter(e => !e.titular && !jaEntraram.has(e.jogador_id));
 
     const add=()=>{
       if(!form.minuto||!form.sai_id||!form.entra_id) return flash(false,'Preencha minuto e jogadores.');
@@ -381,19 +346,15 @@ export default function AdminPartidaEventos() {
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:'var(--amarelo)'}}>+ Registrar Substituição</h3>
           <div className="grid-3">
             <div className="form-group"><label>Minuto *</label><input type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
-            <div className="form-group"><label>Time</label>
-              <select value={form.time_id} onChange={f('time_id')}>
-                <option value={partida.time_casa_id}>{timeCasa?.nome}</option>
-                <option value={partida.time_visitante_id}>{timeVis?.nome}</option>
-              </select>
-            </div>
-            <div className="form-group"><label>Sai *</label>
+            <div className="form-group"><label>Time</label><select value={form.time_id} onChange={f('time_id')}><option value={partida.time_casa_id}>{timeCasa?.nome}</option><option value={partida.time_visitante_id}>{timeVis?.nome}</option></select></div>
+            <div className="form-group"></div>
+            <div className="form-group"><label>Sai (Em campo) *</label>
               <select value={form.sai_id} onChange={f('sai_id')}>
                 <option value="">Selecione...</option>
                 {quemPodeSair.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
-            <div className="form-group"><label>Entra *</label>
+            <div className="form-group"><label>Entra (Reserva) *</label>
               <select value={form.entra_id} onChange={f('entra_id')}>
                 <option value="">Selecione...</option>
                 {quemPodeEntrar.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
@@ -405,18 +366,15 @@ export default function AdminPartidaEventos() {
         <div style={{display:'flex',flexDirection:'column',gap:'.5rem'}}>
           {partida.substituicoes.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Nenhuma substituição registrada.</p>}
           {partida.substituicoes.map(s=>(
-            <div key={s.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:`3px solid var(--text-muted)`}}>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--text-muted)',minWidth:40}}>{s.minuto}&apos;</span>
+            <div key={s.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:'3px solid var(--border)'}}>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--verde)',minWidth:40}}>{s.minuto}&apos;</span>
               <span style={{fontSize:'1.2rem'}}>🔄</span>
               <div style={{flex:1}}>
-                <div style={{display:'flex',alignItems:'center',gap:'.5rem'}}>
-                  <span style={{color:'#ef4444'}}>▼ {nomeJog(s.sai_id)}</span>
-                  <span style={{color:'var(--text-muted)'}}>·</span>
-                  <span style={{color:'#22c55e'}}>▲ {nomeJog(s.entra_id)}</span>
-                </div>
-                <div style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{nomeTime(s.time_id)}</div>
+                <div style={{display:'flex',alignItems:'center',gap:'.5rem'}}><span style={{color:'var(--rebaixamento)'}}>▼</span> {nomeJog(s.sai_id)}</div>
+                <div style={{display:'flex',alignItems:'center',gap:'.5rem'}}><span style={{color:'var(--verde)'}}>▲</span> {nomeJog(s.entra_id)}</div>
+                <div style={{fontSize:'.75rem',color:'var(--text-muted)',marginTop:'.2rem'}}>{nomeTime(s.time_id)}</div>
               </div>
-              <button className="btn btn-danger btn-sm" onClick={()=>del(s.id)}>✕</button>
+              <button className="btn btn-danger btn-sm" onClick={()=>del(s.id)}>🗑️</button>
             </div>
           ))}
         </div>
@@ -425,7 +383,7 @@ export default function AdminPartidaEventos() {
   };
 
   return (
-    <div className="container" style={{paddingTop:'2rem',paddingBottom:'4rem'}}>
+    <div className="container" style={{paddingTop:'2rem'}}>
       <style>{`
         @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }
@@ -433,25 +391,23 @@ export default function AdminPartidaEventos() {
         .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
         .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
       `}</style>
-
       <div style={{marginBottom:'2rem'}}>
-        <a href="/admin/partidas" style={{color:'var(--verde)',fontSize:'.85rem',textDecoration:'none',display:'flex',alignItems:'center',gap:4,marginBottom:'.5rem'}}>← Voltar para Partidas</a>
-        <h1 style={{fontSize:'2rem'}}>{timeCasa?.sigla} <span style={{color:'var(--verde)'}}>{partida.placar_casa} × {partida.placar_visitante}</span> {timeVis?.sigla}</h1>
-        <p style={{color:'var(--text-muted)',fontSize:'.9rem'}}>{partida.rodada}ª Rodada · {partida.data.split('-').reverse().join('/')} · {partida.hora}</p>
+        <h1 style={{fontSize:'2.2rem',marginBottom:'.5rem'}}>📋 Eventos da Partida</h1>
+        <div style={{display:'flex',alignItems:'center',gap:'1rem',fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.5rem'}}>
+          <span>{timeCasa?.nome}</span>
+          <span style={{color:'var(--verde)'}}>{partida.placar_casa} × {partida.placar_visitante}</span>
+          <span>{timeVis?.nome}</span>
+          <span className="badge badge-cinza" style={{fontSize:'.8rem',fontFamily:'sans-serif'}}>{partida.rodada}ª Rodada</span>
+        </div>
       </div>
-
       {msg&&<div className="toast toast-success">{msg}</div>}
       {error&&<div className="toast toast-error">{error}</div>}
 
-      <div style={{display:'flex',gap:'.5rem',marginBottom:'1.5rem',borderBottom:'1px solid var(--border)',paddingBottom:'1rem',overflowX:'auto'}}>
-        {[
-          {id:'escalacao',label:`📋 Escalação (${partida.escalacao_casa.length + partida.escalacao_visitante.length})`},
-          {id:'gols',label:`⚽ Gols (${partida.gols.length})`},
-          {id:'cartoes',label:`🟨 Cartões (${partida.cartoes.length})`},
-          {id:'subs',label:`🔄 Subs (${partida.substituicoes.length})`}
-        ].map(t=>(
-          <button key={t.id} className={`btn ${tab===t.id?'btn-primary':'btn-ghost'}`} onClick={()=>setTab(t.id as any)} style={{whiteSpace:'nowrap'}}>{t.label}</button>
-        ))}
+      <div style={{display:'flex',gap:'.5rem',marginBottom:'1.5rem',borderBottom:'1px solid var(--border)',paddingBottom:'1rem'}}>
+        <button className={`btn ${tab==='escalacao'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('escalacao')}>📋 Escalação</button>
+        <button className={`btn ${tab==='gols'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('gols')}>⚽ Gols ({partida.gols.length})</button>
+        <button className={`btn ${tab==='cartoes'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('cartoes')}>🟨 Cartões ({partida.cartoes.length})</button>
+        <button className={`btn ${tab==='subs'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('subs')}>🔄 Subs ({partida.substituicoes.length})</button>
       </div>
 
       {tab==='escalacao'&&<EscalacaoTab/>}
