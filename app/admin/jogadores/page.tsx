@@ -28,11 +28,19 @@ export default function AdminJogadores() {
   const submit = async (e:React.FormEvent) => {
     e.preventDefault();
     if(!form.nome||!form.time_atual) return flash(false,'Preencha nome e time atual.');
+    
+    // Validação de Registro Único
+    if(form.registro) {
+      const regNum = +form.registro;
+      const duplicado = jogadores.find(j => j.registro === regNum && j.id !== editId);
+      if(duplicado) return flash(false, `O registro ${regNum} já pertence ao jogador ${duplicado.nome}.`);
+    }
+
     setLoading(true);
     try {
       const jogAtual = editId ? jogadores.find(j=>j.id===editId) : null;
       let transferencias = jogAtual?.transferencias ?? [];
-      const novoTimeId = form.novoTime && editId ? form.novoTime : form.time_atual;
+      const novoTimeId = (editId && form.novoTime) ? form.novoTime : form.time_atual;
       
       if(editId && form.novoTime && form.novoTime !== jogAtual?.time_atual) {
         transferencias = [...transferencias, {time_id:form.novoTime, data:form.dataTransferencia}];
