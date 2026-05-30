@@ -171,4 +171,4 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
       </div>
     </div>
   );
-}
+                  }
