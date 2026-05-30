@@ -10,6 +10,16 @@ const POS_LABEL: Record<string, string> = {
   VOL: 'Volante', MEI: 'Meia', ATA: 'Atacante',
 };
 
+const NAC_FLAG: Record<string, string> = {
+  Brasileiro:      '🇧🇷',
+  Argentino:       '🇦🇷',
+  Uruguaio:        '🇺🇾',
+  Chileno:         '🇨🇱',
+  Paraguaio:       '🇵🇾',
+  Colombiano:      '🇨🇴',
+  'Outros Países': '🌍',
+};
+
 function calcularMinutos(jogadorId: string, partida: any, ehTitular: boolean): number {
   const acr1 = partida.acrescimo_primeiro ?? 0;
   const acr2 = partida.acrescimo_segundo ?? 0;
@@ -45,7 +55,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
     .filter(p => p.status === 'encerrada')
     .sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
 
-  // Partidas em que participou
   interface EventoTimeline {
     tipo: 'entrada' | 'saida' | 'gol' | 'gol_contra' | 'assistencia' | 'amarelo' | 'vermelho';
     minuto: number;
@@ -83,7 +92,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
     const subSaida = p.substituicoes.find((s: any) => s.sai_id === id);
     const vermelhoPartida = p.cartoes.find((c: any) => c.jogador_id === id && c.tipo === 'vermelho');
     const minutoEntrada = esc.titular ? 0 : (subEntrada?.minuto ?? 0);
-    // Minuto de saída: o menor entre substituição e cartão vermelho
     const minutoSaidaSub = subSaida?.minuto ?? null;
     const minutoSaidaVerm = vermelhoPartida?.minuto ?? null;
     const minutoSaida = minutoSaidaSub !== null && minutoSaidaVerm !== null
@@ -93,7 +101,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
 
     const eventos: EventoTimeline[] = [];
 
-    // Entrada/saída
     if (!esc.titular && subEntrada) {
       eventos.push({ tipo: 'entrada', minuto: subEntrada.minuto, descricao: 'Entrou em campo' });
     }
@@ -101,7 +108,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
       eventos.push({ tipo: 'saida', minuto: subSaida.minuto, descricao: 'Substituído' });
     }
 
-    // Gols
     for (const g of p.gols) {
       if (g.jogador_id === id) {
         eventos.push({
@@ -124,7 +130,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
       }
     }
 
-    // Cartões
     for (const c of p.cartoes) {
       if (c.jogador_id === id) {
         eventos.push({
@@ -150,7 +155,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
     });
   }
 
-  // Totais
   const totalGols = historicoPartidas.reduce((acc, h) => acc + h.eventos.filter(e => e.tipo === 'gol').length, 0);
   const totalAssist = historicoPartidas.reduce((acc, h) => acc + h.eventos.filter(e => e.tipo === 'assistencia').length, 0);
   const totalAmarelos = historicoPartidas.reduce((acc, h) => acc + h.eventos.filter(e => e.tipo === 'amarelo').length, 0);
@@ -166,6 +170,11 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
     gol: '#fbbf24', gol_contra: 'var(--rebaixamento)',
     assistencia: '#60a5fa', amarelo: '#f59e0b', vermelho: 'var(--rebaixamento)',
   };
+
+  // Nacionalidade: flag e label para exibição
+  const nac = jogador.nacionalidade ?? 'Brasileiro';
+  const nacFlag = NAC_FLAG[nac] ?? '🌍';
+  const isEstrangeiro = nac !== 'Brasileiro';
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -183,7 +192,9 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
                 {jogador.numero && <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--verde)' }}>#{jogador.numero}</span>}
                 <span style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, padding: '.15rem .5rem', fontSize: '.78rem', color: 'var(--text-muted)' }}>{POS_LABEL[jogador.posicao]}</span>
                 {jogador.idade && <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>{jogador.idade} anos</span>}
-                {jogador.nacionalidade === 'Estrangeiro' && <span style={{ fontSize: '.78rem' }}>🌍 Estrangeiro</span>}
+                {isEstrangeiro && (
+                  <span style={{ fontSize: '.78rem' }}>{nacFlag} {nac}</span>
+                )}
                 <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>{time?.nome ?? '—'}</span>
               </div>
             </div>
@@ -213,7 +224,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '3rem' }}>Nenhuma partida registrada para este jogador.</p>
         )}
 
-        {/* Linha do tempo */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {historicoPartidas.map(({ partida: p, timeCasa, timeVis, estadio, titular, minutos, minutoEntrada, minutoSaida, eventos }) => {
             const acr1 = p.acrescimo_primeiro ?? 0;
@@ -229,13 +239,11 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
             const resCor = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' }[resultado];
             const resBg = { V: 'rgba(34,197,94,.1)', E: 'rgba(245,158,11,.1)', D: 'rgba(239,68,68,.1)' }[resultado];
 
-            // Barra de progresso da partida
             const barWidth = (minutos / totalPartida) * 100;
             const barStart = (minutoEntrada / totalPartida) * 100;
 
             return (
               <div key={p.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                {/* Cabeçalho da partida */}
                 <div style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ background: resBg, border: `1px solid ${resCor}`, borderRadius: 6, padding: '.2rem .6rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: resCor, minWidth: 32, textAlign: 'center' }}>
                     {resultado}
@@ -259,7 +267,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
                   </div>
                 </div>
 
-                {/* Barra de tempo jogado */}
                 <div style={{ padding: '.75rem 1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: '.3rem' }}>
                     <span>0&apos;</span>
@@ -267,9 +274,7 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
                     <span>90+{acr2}&apos;</span>
                   </div>
                   <div style={{ position: 'relative', height: 8, background: '#222', borderRadius: 4, overflow: 'visible' }}>
-                    {/* Marcador dos 45 min */}
                     <div style={{ position: 'absolute', left: '45.45%', top: -2, width: 1, height: 12, background: '#444', zIndex: 1 }} />
-                    {/* Barra de tempo jogado */}
                     <div style={{
                       position: 'absolute',
                       left: `${barStart}%`,
@@ -279,7 +284,6 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
                       borderRadius: 4,
                       minWidth: 4,
                     }} />
-                    {/* Marcadores de eventos na barra */}
                     {eventos.map((ev, ei) => {
                       const pos = (ev.minuto / totalPartida) * 100;
                       return (
@@ -296,14 +300,12 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 7,
                           cursor: 'default',
-                        }}>
-                        </div>
+                        }} />
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Eventos */}
                 {eventos.length > 0 ? (
                   <div style={{ padding: '.75rem 1.25rem', display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
                     {eventos.map((ev, ei) => (
@@ -332,4 +334,4 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
       </div>
     </div>
   );
-}
+                      }
