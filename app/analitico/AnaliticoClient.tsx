@@ -11,6 +11,45 @@ const POSICAO_LABEL: Record<string, string> = {
 };
 const POSICOES = ['GOL', 'ZAG', 'LAT', 'VOL', 'MEI', 'ATA'];
 
+// Sub-posição: abreviação exibida ao lado do nome
+const SUB_POS_LABEL: Record<string, string> = {
+  GOL: 'GOL', ZAG: 'ZAG',
+  LD: 'LD', LE: 'LE',
+  VOL: 'VOL',
+  MC: 'MC', MO: 'MO',
+  CA: 'CA', PD: 'PD', PE: 'PE',
+};
+
+// Retorna true se a sub-posição é "informativa" (diferente do código da posição principal)
+const hasSubPos = (sub?: string, pos?: string) =>
+  !!sub && sub !== pos && !!SUB_POS_LABEL[sub];
+
+// Nacionalidades
+const NAC_FLAG: Record<string, string> = {
+  Brasileiro:      '🇧🇷',
+  Argentino:       '🇦🇷',
+  Uruguaio:        '🇺🇾',
+  Chileno:         '🇨🇱',
+  Paraguaio:       '🇵🇾',
+  Colombiano:      '🇨🇴',
+  'Outros Países': '🌍',
+};
+
+// Opções do filtro de nacionalidade no Analítico
+const NAC_FILTER_OPTS: { value: string; label: string }[] = [
+  { value: '',               label: 'Todas nac.' },
+  { value: 'Brasileiro',     label: '🇧🇷 Brasileiro' },
+  { value: 'Estrangeiro',    label: '🌍 Estrangeiro (todos)' },
+  { value: 'Argentino',      label: '🇦🇷 Argentino' },
+  { value: 'Uruguaio',       label: '🇺🇾 Uruguaio' },
+  { value: 'Chileno',        label: '🇨🇱 Chileno' },
+  { value: 'Paraguaio',      label: '🇵🇾 Paraguaio' },
+  { value: 'Colombiano',     label: '🇨🇴 Colombiano' },
+  { value: 'Outros Países',  label: '🌍 Outros Países' },
+];
+
+const ESTRANGEIROS = ['Argentino','Uruguaio','Chileno','Paraguaio','Colombiano','Outros Países'];
+
 interface Props {
   lista: StatJogador[];
   totalPartidas: number;
@@ -26,14 +65,21 @@ export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
   const [filtroIdadeMin, setFiltroIdadeMin] = useState('');
   const [filtroIdadeMax, setFiltroIdadeMax] = useState('');
   const [filtroJogosMin, setFiltroJogosMin] = useState('');
-  const [filtroCartao, setFiltroCartao] = useState(''); // 'sem_amarelo' | 'com_amarelo' | 'com_vermelho'
+  const [filtroCartao, setFiltroCartao] = useState('');
   const [ordenarPor, setOrdenarPor] = useState<OrdenarPor>('minutos');
   const [porPosicao, setPorPosicao] = useState(true);
 
   const filtrada = useMemo(() => {
     return lista.filter(s => {
       if (filtroTime && s.jogador.time_atual !== filtroTime) return false;
-      if (filtroNac && s.jogador.nacionalidade !== filtroNac) return false;
+      if (filtroNac) {
+        const nac = s.jogador.nacionalidade ?? 'Brasileiro';
+        if (filtroNac === 'Estrangeiro') {
+          if (!ESTRANGEIROS.includes(nac)) return false;
+        } else {
+          if (nac !== filtroNac) return false;
+        }
+      }
       if (filtroPos && s.jogador.posicao !== filtroPos) return false;
       if (filtroIdadeMin && (s.jogador.idade ?? 0) < +filtroIdadeMin) return false;
       if (filtroIdadeMax && (s.jogador.idade ?? 999) > +filtroIdadeMax) return false;
@@ -55,7 +101,8 @@ export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
   }, [lista, filtroTime, filtroNac, filtroPos, filtroIdadeMin, filtroIdadeMax, filtroJogosMin, filtroCartao, ordenarPor]);
 
   const limparFiltros = () => {
-    setFiltroTime(''); setFiltroNac(''); setFiltroPos(''); setFiltroIdadeMin(''); setFiltroIdadeMax('');
+    setFiltroTime(''); setFiltroNac(''); setFiltroPos('');
+    setFiltroIdadeMin(''); setFiltroIdadeMax('');
     setFiltroJogosMin(''); setFiltroCartao('');
   };
 
@@ -74,14 +121,33 @@ export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
         const golsMin = s.minutos > 0 ? (s.gols / s.minutos * 90).toFixed(2) : '—';
         const golsSofMin = s.jogador.posicao === 'GOL' && s.minutos > 0
           ? (s.gols_sofridos / s.minutos * 90).toFixed(2) : null;
+        const nac = s.jogador.nacionalidade ?? 'Brasileiro';
+        const nacFlag = NAC_FLAG[nac] ?? '🌍';
+        const subPos = s.jogador.sub_posicao;
+        const showSubPos = hasSubPos(subPos, s.jogador.posicao);
 
         return (
           <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
             <td style={{ padding: '.5rem .7rem' }}>
-              <Link href={`/analitico/${s.jogador.id}`} style={{ fontWeight: 600, color: 'var(--text)', textDecoration: 'none', borderBottom: '1px solid var(--verde)', paddingBottom: 1 }}>
-                {s.jogador.nome}
-              </Link>
-              {s.jogador.numero && <div style={{ fontSize: '.68rem', color: 'var(--verde)' }}>#{s.jogador.numero}</div>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
+                <Link href={`/analitico/${s.jogador.id}`} style={{ fontWeight: 600, color: 'var(--text)', textDecoration: 'none', borderBottom: '1px solid var(--verde)', paddingBottom: 1 }}>
+                  {s.jogador.nome}
+                </Link>
+                {/* Sub-posição ao lado do nome */}
+                {showSubPos && (
+                  <span style={{
+                    fontSize: '.65rem', padding: '.05rem .3rem', borderRadius: 3,
+                    background: 'rgba(0,168,79,.14)', color: 'var(--verde)',
+                    border: '1px solid rgba(0,168,79,.25)', fontWeight: 700,
+                    letterSpacing: '.04em', lineHeight: 1.4,
+                  }}>
+                    {SUB_POS_LABEL[subPos!]}
+                  </span>
+                )}
+              </div>
+              {s.jogador.numero && (
+                <div style={{ fontSize: '.68rem', color: 'var(--verde)' }}>#{s.jogador.numero}</div>
+              )}
             </td>
             <td style={{ padding: '.5rem .5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
@@ -89,8 +155,8 @@ export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
                 <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{s.timeSigla}</span>
               </div>
             </td>
-            <td style={{ textAlign: 'center', fontSize: '.85rem' }}>
-              {s.jogador.nacionalidade === 'Estrangeiro' ? '🌍' : '🇧🇷'}
+            <td style={{ textAlign: 'center', fontSize: '.85rem' }} title={nac}>
+              {nacFlag}
             </td>
             <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>
               {s.jogador.idade ?? '—'}
@@ -193,11 +259,14 @@ export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
               <option value="">Todos os times</option>
               {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
             </select>
+
+            {/* Filtro de nacionalidade expandido */}
             <select value={filtroNac} onChange={e => setFiltroNac(e.target.value)} style={selectStyle}>
-              <option value="">Todas nac.</option>
-              <option value="Brasileiro">🇧🇷 Brasileiro</option>
-              <option value="Estrangeiro">🌍 Estrangeiro</option>
+              {NAC_FILTER_OPTS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
+
             <select value={filtroPos} onChange={e => setFiltroPos(e.target.value)} style={selectStyle}>
               <option value="">Todas posições</option>
               {POSICOES.map(p => <option key={p} value={p}>{POSICAO_LABEL[p]}</option>)}
@@ -250,7 +319,10 @@ export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
             return (
               <section key={pos} style={{ marginBottom: '2rem' }}>
                 <h2 style={{ fontSize: '1.5rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '1px solid var(--border)' }}>
-                  {POSICAO_LABEL[pos]} <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'Barlow,sans-serif', fontWeight: 400 }}>{dados.length} jogador(es)</span>
+                  {POSICAO_LABEL[pos]}{' '}
+                  <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'Barlow,sans-serif', fontWeight: 400 }}>
+                    {dados.length} jogador(es)
+                  </span>
                 </h2>
                 <Tabela dados={dados} />
               </section>
@@ -273,8 +345,13 @@ export function AnaliticoClient({ lista, totalPartidas, times }: Props) {
           <span><strong>🟨</strong> Amarelos</span>
           <span><strong>🟥</strong> Vermelhos</span>
           <span><strong>Min🟨</strong> Minutos jogados com cartão amarelo</span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            Sub-posições: <strong style={{ color: 'var(--verde)' }}>LD/LE</strong> Lateral ·{' '}
+            <strong style={{ color: 'var(--verde)' }}>MC/MO</strong> Meia ·{' '}
+            <strong style={{ color: 'var(--verde)' }}>CA/PD/PE</strong> Atacante
+          </span>
         </div>
       </div>
     </div>
   );
-}
+              }
