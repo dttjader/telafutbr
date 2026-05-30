@@ -1,11 +1,11 @@
-import { getPartidas, getTimes, getEstadios, getJogadores } from '@/lib/data';
+import { getPartidas, getTimes, getEstadios, getJogadores, getTecnicos } from '@/lib/data';
 import { DadosClient } from './DadosClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DadosPage() {
-  const [partidas, times, estadios, jogadores] = await Promise.all([
-    getPartidas(), getTimes(), getEstadios(), getJogadores(),
+  const [partidas, times, estadios, jogadores, tecnicos] = await Promise.all([
+    getPartidas(), getTimes(), getEstadios(), getJogadores(), getTecnicos(),
   ]);
 
   const encerradas = partidas.filter(p => p.status === 'encerrada');
@@ -14,24 +14,21 @@ export default async function DadosPage() {
   const totalGolsCasa = encerradas.reduce((s, p) => s + p.placar_casa, 0);
   const totalGolsVis = encerradas.reduce((s, p) => s + p.placar_visitante, 0);
 
-  // Placares mais frequentes (Visão Geral)
-  // Agrupamos por placar absoluto (ex: 1x2 e 2x1 são o mesmo placar base "1x2")
+  // Placares mais frequentes
   const placarMap: Record<string, { count: number; vitoriasVisitante: number }> = {};
   for (const p of encerradas) {
     const [a, b] = [p.placar_casa, p.placar_visitante].sort((x, y) => x - y);
     const key = `${a}×${b}`;
     if (!placarMap[key]) placarMap[key] = { count: 0, vitoriasVisitante: 0 };
     placarMap[key].count++;
-    if (p.placar_visitante > p.placar_casa) {
-      placarMap[key].vitoriasVisitante++;
-    }
+    if (p.placar_visitante > p.placar_casa) placarMap[key].vitoriasVisitante++;
   }
   const placaresFrequentes = Object.entries(placarMap)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 12)
-    .map(([placar, data]) => ({ 
-      placar, 
-      count: data.count, 
+    .map(([placar, data]) => ({
+      placar,
+      count: data.count,
       vitoriasVisitante: data.vitoriasVisitante,
       isEmpate: placar.split('×')[0] === placar.split('×')[1]
     }));
@@ -78,48 +75,39 @@ export default async function DadosPage() {
       else arbMap[arb].vermelhos++;
     }
   }
-  const rankingArbitros = Object.values(arbMap)
-    .sort((a, b) => b.jogos - a.jogos);
+  const rankingArbitros = Object.values(arbMap).sort((a, b) => b.jogos - a.jogos);
 
-  // Ranking G/90 jogadores
-  const statsJogMap: Record<string, { nome: string; time_id: string; gols: number; minutos: number }> = {};
-  for (const j of jogadores) {
-    statsJogMap[j.id] = { nome: j.nome, time_id: j.time_atual, gols: 0, minutos: 0 };
-  }
+  // Ranking técnicos com cartões (cartoes_tecnicos é array de {tecnico_id, tipo, minuto})
+  const tecnicoMap: Record<string, {
+    tecnico_id: string; j: number; v: number; e: number; d: number;
+    gp: number; gc: number; amarelos: number; vermelhos: number;
+  }> = {};
+
   for (const p of encerradas) {
-    const acr1 = p.acrescimo_primeiro ?? 0;
-    const acr2 = p.acrescimo_segundo ?? 0;
-    const totalP = 45 + acr1 + 45 + acr2;
-    const todosEsc = [
-      ...p.escalacao_casa.map((e: any) => ({ ...e })),
-      ...p.escalacao_visitante.map((e: any) => ({ ...e })),
-    ];
-    for (const esc of todosEsc) {
-      if (!statsJogMap[esc.jogador_id]) continue;
-      const vermelho = p.cartoes.find((c: any) => c.jogador_id === esc.jogador_id && c.tipo === 'vermelho');
-      const minVerm = vermelho?.minuto ?? Infinity;
-      let mins: number;
-      if (esc.titular) {
-        const sub = p.substituicoes.find((s: any) => s.sai_id === esc.jogador_id);
-        mins = Math.min(sub ? sub.minuto : totalP, minVerm, totalP);
-      } else {
-        const ent = p.substituicoes.find((s: any) => s.entra_id === esc.jogador_id);
-        if (!ent) continue;
-        const sai = p.substituicoes.find((s: any) => s.sai_id === esc.jogador_id);
-        mins = Math.min(sai ? sai.minuto : totalP, minVerm, totalP) - ent.minuto;
-      }
-      statsJogMap[esc.jogador_id].minutos += mins;
-    }
-    for (const g of p.gols) {
-      if (g.tipo === 'contra') continue;
-      if (statsJogMap[g.jogador_id]) statsJogMap[g.jogador_id].gols++;
+    const processar = (tecnicoId: string | null, isCasa: boolean) => {
+      if (!tecnicoId) return;
+      if (!tecnicoMap[tecnicoId]) tecnicoMap[tecnicoId] = { tecnico_id: tecnicoId, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, amarelos: 0, vermelhos: 0 };
+      const r = tecnicoMap[tecnicoId];
+      const gf = isCasa ? p.placar_casa : p.placar_visitante;
+      const gc = isCasa ? p.placar_visitante : p.placar_casa;
+      r.j++; r.gp += gf; r.gc += gc;
+      if (gf > gc) r.v++; else if (gf < gc) r.d++; else r.e++;
+    };
+    processar(p.tecnico_casa_id, true);
+    processar(p.tecnico_visitante_id, false);
+
+    // Cartões de técnicos (campo cartoes_tecnicos no jsonb, se existir)
+    const cartoesTec = (p as any).cartoes_tecnicos ?? [];
+    for (const ct of cartoesTec) {
+      if (!ct.tecnico_id || !tecnicoMap[ct.tecnico_id]) continue;
+      if (ct.tipo === 'amarelo') tecnicoMap[ct.tecnico_id].amarelos++;
+      else if (ct.tipo === 'vermelho') tecnicoMap[ct.tecnico_id].vermelhos++;
     }
   }
-  const rankingG90 = Object.values(statsJogMap)
-    .filter(j => j.minutos >= 90 && j.gols > 0)
-    .map(j => ({ ...j, g90: (j.gols / j.minutos) * 90 }))
-    .sort((a, b) => b.g90 - a.g90)
-    .slice(0, 15);
+
+  const rankingTecnicos = Object.values(tecnicoMap)
+    .map(r => ({ ...r, pts: r.v * 3 + r.e, aproveitamento: r.j > 0 ? Math.round((r.v * 3 + r.e) / (r.j * 3) * 100) : 0 }))
+    .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v);
 
   return (
     <DadosClient
@@ -131,8 +119,9 @@ export default async function DadosPage() {
       rankingEstadio={rankingEstadio}
       rankingEstado={rankingEstado}
       rankingArbitros={rankingArbitros}
-      rankingG90={rankingG90}
+      rankingTecnicos={rankingTecnicos}
+      tecnicos={tecnicos}
       times={times}
     />
   );
-}
+    }
