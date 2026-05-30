@@ -77,7 +77,11 @@ export default async function DadosPage() {
   }
   const rankingArbitros = Object.values(arbMap).sort((a, b) => b.jogos - a.jogos);
 
-  // Ranking técnicos com cartões (cartoes_tecnicos é array de {tecnico_id, tipo, minuto})
+  // IDs de todos os técnicos para cruzamento com cartões
+  const tecnicoIds = new Set(tecnicos.map(t => t.id));
+
+  // Ranking técnicos com cartões
+  // Cartões de técnicos foram registrados na aba Cartões da partida usando o id do técnico como jogador_id
   const tecnicoMap: Record<string, {
     tecnico_id: string; j: number; v: number; e: number; d: number;
     gp: number; gc: number; amarelos: number; vermelhos: number;
@@ -96,12 +100,12 @@ export default async function DadosPage() {
     processar(p.tecnico_casa_id, true);
     processar(p.tecnico_visitante_id, false);
 
-    // Cartões de técnicos (campo cartoes_tecnicos no jsonb, se existir)
-    const cartoesTec = (p as any).cartoes_tecnicos ?? [];
-    for (const ct of cartoesTec) {
-      if (!ct.tecnico_id || !tecnicoMap[ct.tecnico_id]) continue;
-      if (ct.tipo === 'amarelo') tecnicoMap[ct.tecnico_id].amarelos++;
-      else if (ct.tipo === 'vermelho') tecnicoMap[ct.tecnico_id].vermelhos++;
+    // Cartões de técnicos: registrados no array cartoes com jogador_id = id do técnico
+    for (const c of p.cartoes) {
+      if (!tecnicoIds.has(c.jogador_id)) continue;
+      if (!tecnicoMap[c.jogador_id]) continue;
+      if (c.tipo === 'amarelo') tecnicoMap[c.jogador_id].amarelos++;
+      else if (c.tipo === 'vermelho') tecnicoMap[c.jogador_id].vermelhos++;
     }
   }
 
@@ -124,4 +128,4 @@ export default async function DadosPage() {
       times={times}
     />
   );
-    }
+}
