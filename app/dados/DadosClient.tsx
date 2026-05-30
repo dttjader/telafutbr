@@ -2,6 +2,12 @@
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time } from '@/lib/types';
 
+interface RankingTecnico {
+  tecnico_id: string; j: number; v: number; e: number; d: number;
+  gp: number; gc: number; amarelos: number; vermelhos: number;
+  pts: number; aproveitamento: number;
+}
+
 interface Props {
   totalJogos: number;
   totalGols: number;
@@ -11,7 +17,8 @@ interface Props {
   rankingEstadio: { nome: string; cidade: string; estado: string; gols: number; jogos: number; media: number }[];
   rankingEstado: { uf: string; gols: number; jogos: number; media: number }[];
   rankingArbitros: { nome: string; jogos: number; gols: number; amarelos: number; vermelhos: number }[];
-  rankingG90: { nome: string; time_id: string; gols: number; minutos: number; g90: number }[];
+  rankingTecnicos: RankingTecnico[];
+  tecnicos: { id: string; nome: string; time_atual: string | null; ativo: boolean; historico: any[] }[];
   times: Time[];
 }
 
@@ -28,7 +35,7 @@ const secTitle = (text: string) => (
 export function DadosClient({
   totalJogos, totalGols, totalGolsCasa, totalGolsVis,
   placaresFrequentes,
-  rankingEstadio, rankingEstado, rankingArbitros, rankingG90, times,
+  rankingEstadio, rankingEstado, rankingArbitros, rankingTecnicos, tecnicos, times,
 }: Props) {
   const mediaTotal = totalJogos > 0 ? (totalGols / totalJogos).toFixed(2) : '—';
   const mediaCasa = totalJogos > 0 ? (totalGolsCasa / totalJogos).toFixed(2) : '—';
@@ -36,11 +43,17 @@ export function DadosClient({
   const maxPlacar = placaresFrequentes[0]?.count ?? 1;
   const maxEstadio = rankingEstadio[0]?.media ?? 1;
   const maxEstado = rankingEstado[0]?.media ?? 1;
-  const maxArb = rankingArbitros[0]?.jogos ?? 1;
 
   const barStyle = (pct: number, cor: string): React.CSSProperties => ({
     width: `${Math.max(pct * 100, 3)}%`, height: 8, background: cor, borderRadius: 4, transition: 'width .4s',
   });
+
+  const nomeTecnico = (id: string) => tecnicos.find(t => t.id === id)?.nome ?? id;
+  const timeDoTecnico = (id: string) => {
+    const t = tecnicos.find(t => t.id === id);
+    return t?.time_atual ? times.find(tm => tm.id === t.time_atual) : undefined;
+  };
+  const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -71,7 +84,7 @@ export function DadosClient({
           ))}
         </div>
 
-        {/* Placares Frequentes - Visão Geral */}
+        {/* Placares Frequentes */}
         {card(
           <>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '1.25rem', color: 'var(--amarelo)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -79,7 +92,7 @@ export function DadosClient({
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
               {placaresFrequentes.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Sem dados.</p>}
-              {placaresFrequentes.map((d, i) => (
+              {placaresFrequentes.map((d) => (
                 <div key={d.placar} style={{ background: 'var(--surface2)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.5rem', color: 'var(--text)' }}>{d.placar}</span>
@@ -104,7 +117,6 @@ export function DadosClient({
 
         {/* Estádios e estados */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
-          {/* Estádios */}
           {card(
             <>
               {secTitle('🏟️ Média de gols por estádio')}
@@ -126,7 +138,6 @@ export function DadosClient({
               ))}
             </>
           )}
-          {/* Estados */}
           {card(
             <>
               {secTitle('📍 Média de gols por estado')}
@@ -181,39 +192,76 @@ export function DadosClient({
               </table>
             </div>
           </>,
-          { marginBottom: '1.25rem' }
+          { marginBottom: '2rem' }
         )}
 
-        {/* Ranking G/90 */}
+        {/* Ranking Técnicos */}
         {card(
           <>
-            {secTitle('⚡ Ranking Gols por 90 minutos (mín. 90min jogados)')}
-            {rankingG90.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados suficientes.</p>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: '.5rem' }}>
-              {rankingG90.map((j, i) => {
-                const time = times.find(t => t.id === j.time_id);
-                const maxG90 = rankingG90[0]?.g90 ?? 1;
-                return (
-                  <div key={j.nome} style={{ background: 'var(--surface2)', borderRadius: 8, padding: '.75rem 1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.4rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--verde)', minWidth: 28 }}>{i + 1}.</span>
-                      <EscudoTime time={time ?? undefined} size={26} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{j.nome}</div>
-                        <div style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{j.gols} gols · {j.minutos}min</div>
-                      </div>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.4rem', color: 'var(--amarelo)' }}>{j.g90.toFixed(2)}</span>
-                    </div>
-                    <div style={{ background: '#1a1a1a', borderRadius: 3, height: 5 }}>
-                      <div style={barStyle(j.g90 / maxG90, 'var(--amarelo)')} />
-                    </div>
-                  </div>
-                );
-              })}
+            {secTitle('🧑‍💼 Ranking de Técnicos')}
+            {rankingTecnicos.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Nenhuma partida com técnico registrado.</p>}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
+                <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+                  <tr>
+                    {['#', 'Técnico', 'Time', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'Pts', 'Aprov.', '🟨', '🟥'].map(h => (
+                      <th key={h} style={{ padding: '.6rem .75rem', textAlign: h === 'Técnico' || h === 'Time' ? 'left' : 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem', letterSpacing: '.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankingTecnicos.map((r, i) => {
+                    const time = timeDoTecnico(r.tecnico_id);
+                    const saldo = r.gp - r.gc;
+                    return (
+                      <tr key={r.tecnico_id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                        <td style={{ padding: '.5rem .75rem', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)' }}>{medalha(i)}</td>
+                        <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>{nomeTecnico(r.tecnico_id)}</td>
+                        <td style={{ padding: '.5rem .75rem' }}>
+                          {time ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                              <EscudoTime time={time} size={22} />
+                              <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>{time.sigla}</span>
+                            </div>
+                          ) : <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--amarelo)' }}>{r.j}</td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--libertadores)', fontWeight: 600 }}>{r.v}</td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>{r.e}</td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--rebaixamento)', fontWeight: 600 }}>{r.d}</td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>{r.gp}</td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>{r.gc}</td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontWeight: 600, color: saldo > 0 ? 'var(--libertadores)' : saldo < 0 ? 'var(--rebaixamento)' : 'inherit' }}>
+                          {saldo > 0 ? `+${saldo}` : saldo}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem', color: 'var(--amarelo)' }}>{r.pts}</td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>
+                          <span style={{
+                            background: r.aproveitamento >= 60 ? 'rgba(34,197,94,.12)' : r.aproveitamento >= 40 ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.12)',
+                            color: r.aproveitamento >= 60 ? 'var(--libertadores)' : r.aproveitamento >= 40 ? '#f59e0b' : 'var(--rebaixamento)',
+                            padding: '.15rem .4rem', borderRadius: 4, fontSize: '.82rem', fontWeight: 700,
+                          }}>{r.aproveitamento}%</span>
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: r.amarelos > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: r.amarelos > 0 ? 600 : 400 }}>
+                          {r.amarelos > 0 ? r.amarelos : '—'}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: r.vermelhos > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)', fontWeight: r.vermelhos > 0 ? 600 : 400 }}>
+                          {r.vermelhos > 0 ? r.vermelhos : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
+            {rankingTecnicos.length > 0 && (
+              <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '.75rem' }}>
+                * Aproveitamento = (pontos / pontos possíveis) × 100 · 🟨/🟥 = cartões recebidos pelo técnico em campo
+              </p>
+            )}
           </>
         )}
       </div>
     </div>
   );
-}
+                      }
