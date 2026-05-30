@@ -307,4 +307,300 @@ export default function AdminPartidaEventos() {
               <span style={{fontSize:'1.1rem',flexShrink:0}}>{g.tipo==='contra'?'🔴':g.tipo.includes('perdido')||g.tipo.includes('defendido')?'❌':'⚽'}</span>
               <div style={{flex:1,minWidth:0}}>
                 <div>
-                  <strong>{nomeJog(g.jogador_id)}</stron
+                  <strong>{nomeJog(g.jogador_id)}</strong>
+                  <span style={{fontSize:'.78rem',color:'var(--text-muted)',marginLeft:'.4rem'}}>({TIPO_GOL_LABEL[g.tipo]})</span>
+                  {g.assistencia_id&&<span style={{color:'var(--text-muted)',fontSize:'.85rem'}}> · assist. {nomeJog(g.assistencia_id)}</span>}
+                </div>
+                <div style={{fontSize:'.75rem',color:'var(--text-muted)'}}>{nomeTime(g.time_id)} · Goleiro: {nomeJog(g.goleiro_id)}</div>
+                {g.descricao&&<div style={{fontSize:'.75rem',color:'var(--text-muted)',fontStyle:'italic',marginTop:'.2rem',background:'var(--surface2)',borderRadius:4,padding:'.15rem .4rem',display:'inline-block'}}>{g.descricao}</div>}
+              </div>
+              <div style={{display:'flex',gap:'.4rem',flexShrink:0}}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>iniciarEdicao(g)}>✏️</button>
+                <button className="btn btn-danger btn-sm" onClick={()=>del(g.id)}>🗑️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // ── CARTÕES ─────────────────────────────────────────────────────────────────
+  const CartoesTab = () => {
+    const emptyCartao = () => ({minuto:'',acrescimo:'0',tipo:'amarelo',jogador_id:'',tecnico_id:'',time_id:partida!.time_casa_id,motivo:''});
+    const [form, setForm] = useState(emptyCartao());
+    const [editId, setEditId] = useState<string|null>(null);
+    const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
+
+    const escCasa=partida!.escalacao_casa;
+    const escVis=partida!.escalacao_visitante;
+
+    const isTecnico = form.tipo==='amarelo_tecnico'||form.tipo==='vermelho_tecnico';
+    const sugestoes = MOTIVOS_CARTAO[form.tipo] ?? MOTIVOS_CARTAO['amarelo'];
+
+    const handleTipoCartaoChange=(novoTipo:string)=>{setForm(v=>({...v,tipo:novoTipo,motivo:'',jogador_id:'',tecnico_id:''}));};
+
+    const iniciarEdicao=(c:CartaoEx)=>{
+      setForm({
+        minuto:c.minuto.toString(), acrescimo:(c.acrescimo??0).toString(),
+        tipo:c.tipo, jogador_id:c.tecnico_id?'':(c.jogador_id??''),
+        tecnico_id:c.tecnico_id??'', time_id:c.time_id, motivo:c.motivo??'',
+      });
+      setEditId(c.id);
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+    const cancelarEdicao=()=>{setForm(emptyCartao());setEditId(null);};
+
+    const salvar=()=>{
+      if(!form.minuto) return flash(false,'Preencha o minuto.');
+      if(isTecnico&&!form.tecnico_id) return flash(false,'Selecione o técnico.');
+      if(!isTecnico&&!form.jogador_id) return flash(false,'Selecione o jogador.');
+      const novoCartao:CartaoEx={
+        id:editId??`c${uid()}`, minuto:+form.minuto, acrescimo:+form.acrescimo,
+        tipo:form.tipo as Cartao['tipo'], time_id:form.time_id,
+        jogador_id:isTecnico?'__tecnico__':form.jogador_id,
+        tecnico_id:isTecnico?form.tecnico_id:undefined,
+        motivo:form.motivo,
+      };
+      const lista = editId
+        ? (partida!.cartoes as CartaoEx[]).map(c=>c.id===editId?novoCartao:c)
+        : [...(partida!.cartoes as CartaoEx[]), novoCartao];
+      save({...partida!, cartoes:ordenarPorMinuto(lista) as unknown as Cartao[]});
+      cancelarEdicao();
+    };
+    const del=(cid:string)=>save({...partida!, cartoes:partida!.cartoes.filter(c=>c.id!==cid)});
+
+    const corChip  = form.tipo.includes('vermelho') ? 'var(--rebaixamento)' : 'var(--amarelo-card)';
+    const bgChip   = form.tipo.includes('vermelho') ? 'rgba(239,68,68,.15)' : 'rgba(245,158,11,.15)';
+    const bordChip = form.tipo.includes('vermelho') ? 'var(--rebaixamento)' : 'var(--amarelo-card)';
+    const isEditing = editId !== null;
+
+    const tipoIcone=(tipo:string)=>{
+      if(tipo==='amarelo'||tipo==='amarelo_tecnico') return '🟨';
+      if(tipo==='vermelho'||tipo==='vermelho_tecnico') return '🟥';
+      return '🟨';
+    };
+    const tipoLabel=(tipo:string)=>{
+      const map:Record<string,string>={amarelo:'Amarelo',vermelho:'Vermelho',amarelo_tecnico:'Amarelo (Técnico)',vermelho_tecnico:'Vermelho (Técnico)'};
+      return map[tipo]??tipo;
+    };
+
+    return (
+      <div>
+        <div className="card" style={{marginBottom:'1.5rem',borderLeft:isEditing?'4px solid var(--amarelo)':'4px solid var(--verde)'}}>
+          <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:isEditing?'var(--amarelo)':'var(--verde)'}}>
+            {isEditing?'✏️ Editando Cartão':'+ Registrar Cartão'}
+          </h3>
+          <div className="grid-3">
+            <div className="form-group"><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
+            <div className="form-group"><label>Acréscimo</label><input style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
+            <div className="form-group"><label>Tipo</label>
+              <select style={selectSt} value={form.tipo} onChange={e=>handleTipoCartaoChange(e.target.value)}>
+                <option value="amarelo">🟨 Amarelo</option>
+                <option value="vermelho">🟥 Vermelho</option>
+                <option value="amarelo_tecnico">🟨 Amarelo — Técnico</option>
+                <option value="vermelho_tecnico">🟥 Vermelho — Técnico</option>
+              </select>
+            </div>
+            <div className="form-group"><label>Time</label>
+              <select style={selectSt} value={form.time_id} onChange={f('time_id')}>
+                <option value={partida!.time_casa_id}>{timeCasa?.nome}</option>
+                <option value={partida!.time_visitante_id}>{timeVis?.nome}</option>
+              </select>
+            </div>
+            {isTecnico ? (
+              <div className="form-group"><label>Técnico *</label>
+                <select style={selectSt} value={form.tecnico_id} onChange={f('tecnico_id')}>
+                  <option value="">Selecione...</option>
+                  {tecnicosDaPartida.map(t=><option key={t.id} value={t.id}>{t.nome} ({t.id===partida!.tecnico_casa_id?timeCasa?.sigla:timeVis?.sigla})</option>)}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group"><label>Jogador *</label>
+                <select style={selectSt} value={form.jogador_id} onChange={f('jogador_id')}>
+                  <option value="">Selecione...</option>
+                  {(form.time_id===partida!.time_casa_id?escCasa:escVis).map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="form-group" style={{gridColumn:'1/-1'}}>
+              <label>Motivo</label>
+              <Chips opcoes={sugestoes} valor={form.motivo} onSelect={s=>setForm(v=>({...v,motivo:s}))} corAtivo={corChip} bgAtivo={bgChip} borderAtivo={bordChip} />
+              <input style={inputSt} value={form.motivo} onChange={f('motivo')} placeholder="Ou descreva o motivo..." />
+            </div>
+          </div>
+          <div style={{display:'flex',gap:'.6rem'}}>
+            <button className="btn btn-primary" onClick={salvar}>{isEditing?'💾 Salvar alterações':'Adicionar Cartão'}</button>
+            {isEditing&&<button className="btn btn-ghost" onClick={cancelarEdicao}>Cancelar</button>}
+          </div>
+        </div>
+
+        <div style={{display:'flex',flexDirection:'column',gap:'.5rem'}}>
+          {partida!.cartoes.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Nenhum cartão registrado.</p>}
+          {(partida!.cartoes as CartaoEx[]).map(c=>(
+            <div key={c.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:`3px solid ${c.tipo.includes('vermelho')?'var(--rebaixamento)':'var(--amarelo)'}`,opacity:editId===c.id?0.5:1}}>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--verde)',minWidth:52,flexShrink:0}}>
+                {c.minuto}{(c.acrescimo??0)>0?`+${c.acrescimo}`:''}&apos;
+              </span>
+              <span style={{fontSize:'1.2rem',flexShrink:0}}>{tipoIcone(c.tipo)}</span>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
+                  <strong>{c.tecnico_id ? `${nomeTec(c.tecnico_id)}` : nomeJog(c.jogador_id)}</strong>
+                  <span style={{fontSize:'.7rem',background:'var(--surface2)',borderRadius:4,padding:'.1rem .35rem',color:'var(--text-muted)'}}>{tipoLabel(c.tipo)}</span>
+                </div>
+                <div style={{fontSize:'.75rem',color:'var(--text-muted)',marginTop:'.1rem',display:'flex',alignItems:'center',gap:'.4rem'}}>
+                  <span>{nomeTime(c.time_id)}</span>
+                  {c.motivo&&<span style={{background:'var(--surface2)',borderRadius:4,padding:'.1rem .35rem',fontStyle:'italic'}}>{c.motivo}</span>}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:'.4rem',flexShrink:0}}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>iniciarEdicao(c)}>✏️</button>
+                <button className="btn btn-danger btn-sm" onClick={()=>del(c.id)}>🗑️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // ── SUBSTITUIÇÕES ────────────────────────────────────────────────────────────
+  const SubsTab = () => {
+    const emptySub = () => ({minuto:'',time_id:partida!.time_casa_id,sai_id:'',entra_id:''});
+    const [form, setForm] = useState(emptySub());
+    const [editId, setEditId] = useState<string|null>(null);
+    const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
+
+    const escCasa=partida!.escalacao_casa;
+    const escVis=partida!.escalacao_visitante;
+    const escAtual=form.time_id===partida!.time_casa_id?escCasa:escVis;
+
+    // Excluir os dois jogadores da substituição em edição do cálculo de "já usados"
+    const subsOutras = editId
+      ? partida!.substituicoes.filter(s=>s.time_id===form.time_id&&s.id!==editId)
+      : partida!.substituicoes.filter(s=>s.time_id===form.time_id);
+
+    const jaSairam   = new Set(subsOutras.map(s=>s.sai_id));
+    const jaEntraram = new Set(subsOutras.map(s=>s.entra_id));
+    const quemPodeSair   = escAtual.filter(e=>e.titular||jaEntraram.has(e.jogador_id)).filter(e=>!jaSairam.has(e.jogador_id));
+    const quemPodeEntrar = escAtual.filter(e=>!e.titular&&!jaEntraram.has(e.jogador_id));
+
+    const iniciarEdicao=(s:Substituicao)=>{
+      setForm({minuto:s.minuto.toString(),time_id:s.time_id,sai_id:s.sai_id,entra_id:s.entra_id});
+      setEditId(s.id);
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+    const cancelarEdicao=()=>{setForm(emptySub());setEditId(null);};
+
+    const salvar=()=>{
+      if(!form.minuto||!form.sai_id||!form.entra_id) return flash(false,'Preencha minuto e jogadores.');
+      const novaSub:Substituicao={id:editId??`s${uid()}`,minuto:+form.minuto,time_id:form.time_id,sai_id:form.sai_id,entra_id:form.entra_id};
+      const lista = editId
+        ? partida!.substituicoes.map(s=>s.id===editId?novaSub:s)
+        : [...partida!.substituicoes, novaSub];
+      save({...partida!, substituicoes:lista.sort((a,b)=>a.minuto-b.minuto)});
+      cancelarEdicao();
+    };
+    const del=(sid:string)=>save({...partida!, substituicoes:partida!.substituicoes.filter(s=>s.id!==sid)});
+
+    const isEditing = editId !== null;
+
+    return (
+      <div>
+        <div className="card" style={{marginBottom:'1.5rem',borderLeft:isEditing?'4px solid var(--amarelo)':'4px solid var(--verde)'}}>
+          <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:isEditing?'var(--amarelo)':'var(--verde)'}}>
+            {isEditing?'✏️ Editando Substituição':'+ Registrar Substituição'}
+          </h3>
+          <div className="grid-3">
+            <div className="form-group"><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
+            <div className="form-group"><label>Time</label>
+              <select style={selectSt} value={form.time_id} onChange={f('time_id')}>
+                <option value={partida!.time_casa_id}>{timeCasa?.nome}</option>
+                <option value={partida!.time_visitante_id}>{timeVis?.nome}</option>
+              </select>
+            </div>
+            <div className="form-group"></div>
+            <div className="form-group"><label>↑ Entra *</label>
+              <select style={selectSt} value={form.entra_id} onChange={f('entra_id')}>
+                <option value="">Selecione...</option>
+                {quemPodeEntrar.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
+              </select>
+            </div>
+            <div className="form-group"><label>↓ Sai *</label>
+              <select style={selectSt} value={form.sai_id} onChange={f('sai_id')}>
+                <option value="">Selecione...</option>
+                {quemPodeSair.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:'.6rem'}}>
+            <button className="btn btn-primary" onClick={salvar}>{isEditing?'💾 Salvar alterações':'🔄 Adicionar Substituição'}</button>
+            {isEditing&&<button className="btn btn-ghost" onClick={cancelarEdicao}>Cancelar</button>}
+          </div>
+        </div>
+
+        <div style={{display:'flex',flexDirection:'column',gap:'.5rem'}}>
+          {partida!.substituicoes.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Nenhuma substituição registrada.</p>}
+          {partida!.substituicoes.map(s=>{
+            const tsub=times.find(t=>t.id===s.time_id);
+            return (
+              <div key={s.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:'3px solid var(--border)',opacity:editId===s.id?0.5:1}}>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--verde)',minWidth:40,flexShrink:0}}>{s.minuto}&apos;</span>
+                <span style={{fontSize:'1.2rem',flexShrink:0}}>🔄</span>
+                {/* Nome na mesma linha com cores */}
+                <div style={{flex:1,display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
+                  <span style={{display:'flex',alignItems:'center',gap:'.3rem',color:'#22c55e',fontWeight:600}}>
+                    <span style={{fontSize:'1rem'}}>↑</span>{nomeJog(s.entra_id)}
+                  </span>
+                  <span style={{color:'var(--border)',fontWeight:300}}>/</span>
+                  <span style={{display:'flex',alignItems:'center',gap:'.3rem',color:'#ef4444',fontWeight:600}}>
+                    <span style={{fontSize:'1rem'}}>↓</span>{nomeJog(s.sai_id)}
+                  </span>
+                  <span style={{fontSize:'.72rem',color:'var(--text-muted)',marginLeft:'auto'}}>{tsub?.sigla}</span>
+                </div>
+                <div style={{display:'flex',gap:'.4rem',flexShrink:0}}>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>iniciarEdicao(s)}>✏️</button>
+                  <button className="btn btn-danger btn-sm" onClick={()=>del(s.id)}>🗑️</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="container" style={{paddingTop:'2rem'}}>
+      <style>{`
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; border-radius: 8px; font-size: .9rem; z-index: 9999; animation: slideIn .3s ease-out; }
+        .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
+        .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
+      `}</style>
+      <div style={{marginBottom:'2rem'}}>
+        <h1 style={{fontSize:'2.2rem',marginBottom:'.5rem'}}>📋 Eventos da Partida</h1>
+        <div style={{display:'flex',alignItems:'center',gap:'1rem',fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.5rem'}}>
+          <span>{timeCasa?.nome}</span>
+          <span style={{color:'var(--verde)'}}>{partida.placar_casa} × {partida.placar_visitante}</span>
+          <span>{timeVis?.nome}</span>
+          <span className="badge badge-cinza" style={{fontSize:'.8rem',fontFamily:'sans-serif'}}>{partida.rodada}ª Rodada</span>
+        </div>
+      </div>
+      {msg&&<div className="toast toast-success">{msg}</div>}
+      {error&&<div className="toast toast-error">{error}</div>}
+
+      <div style={{display:'flex',gap:'.5rem',marginBottom:'1.5rem',borderBottom:'1px solid var(--border)',paddingBottom:'1rem'}}>
+        <button className={`btn ${tab==='escalacao'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('escalacao')}>📋 Escalação</button>
+        <button className={`btn ${tab==='gols'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('gols')}>⚽ Gols ({partida.gols.length})</button>
+        <button className={`btn ${tab==='cartoes'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('cartoes')}>🟨 Cartões ({partida.cartoes.length})</button>
+        <button className={`btn ${tab==='subs'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('subs')}>🔄 Subs ({partida.substituicoes.length})</button>
+      </div>
+
+      {tab==='escalacao'&&<EscalacaoTab/>}
+      {tab==='gols'&&<GolsTab/>}
+      {tab==='cartoes'&&<CartoesTab/>}
+      {tab==='subs'&&<SubsTab/>}
+    </div>
+  );
+}
