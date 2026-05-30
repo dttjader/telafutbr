@@ -139,11 +139,12 @@ export default async function ArtilhariaPage() {
               const isPrimeiro = i === 0;
               return (
                 <div key={j.nome + i} style={{
-                  display: 'flex', alignItems: 'center', gap: '.75rem',
+                  display: 'flex', flexDirection: 'column', alignItems: 'stretch',
+                  gap: '.75rem',
                   padding: isPrimeiro ? '1rem 1.25rem' : '.75rem 1rem',
                   background: isPrimeiro ? 'rgba(255,223,0,.04)' : 'var(--surface)',
                   border: `1px solid ${isPrimeiro ? 'rgba(255,223,0,.25)' : 'var(--border)'}`,
-                  borderRadius: 10, flexDirection: 'column', alignItems: 'stretch',
+                  borderRadius: 10,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
                     <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--verde)', minWidth: 28 }}>{medalha(i)}</span>
@@ -168,4 +169,4 @@ export default async function ArtilhariaPage() {
       </div>
     </div>
   );
-                                       }
+}
