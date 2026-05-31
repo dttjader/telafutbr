@@ -80,8 +80,10 @@ export interface Cartao {
   minuto: number;
   tipo: TipoCartao;
   jogador_id: string;
+  tecnico_id?: string; // preenchido quando tipo === 'amarelo_tecnico' | 'vermelho_tecnico'
   time_id: string;
   motivo: string;
+  acrescimo?: number;
 }
 
 export interface Substituicao {
