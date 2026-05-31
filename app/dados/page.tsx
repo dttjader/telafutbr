@@ -72,7 +72,9 @@ export default async function DadosPage() {
     arbMap[arb].gols += p.placar_casa + p.placar_visitante;
     for (const c of p.cartoes) {
       if (c.tipo === 'amarelo') arbMap[arb].amarelos++;
-      else arbMap[arb].vermelhos++;
+      else if (c.tipo === 'vermelho') arbMap[arb].vermelhos++;
+      else if (c.tipo === 'amarelo_tecnico') arbMap[arb].amarelos++;
+      else if (c.tipo === 'vermelho_tecnico') arbMap[arb].vermelhos++;
     }
   }
   const rankingArbitros = Object.values(arbMap).sort((a, b) => b.jogos - a.jogos);
@@ -100,12 +102,12 @@ export default async function DadosPage() {
     processar(p.tecnico_casa_id, true);
     processar(p.tecnico_visitante_id, false);
 
-    // Cartões de técnicos: registrados no array cartoes com jogador_id = id do técnico
+    // Cartões de técnicos: tipo === 'amarelo_tecnico' ou 'vermelho_tecnico'
     for (const c of p.cartoes) {
-      if (!tecnicoIds.has(c.jogador_id)) continue;
+      if (c.tipo !== 'amarelo_tecnico' && c.tipo !== 'vermelho_tecnico') continue;
       if (!tecnicoMap[c.jogador_id]) continue;
-      if (c.tipo === 'amarelo') tecnicoMap[c.jogador_id].amarelos++;
-      else if (c.tipo === 'vermelho') tecnicoMap[c.jogador_id].vermelhos++;
+      if (c.tipo === 'amarelo_tecnico') tecnicoMap[c.jogador_id].amarelos++;
+      else tecnicoMap[c.jogador_id].vermelhos++;
     }
   }
 
