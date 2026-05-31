@@ -105,13 +105,17 @@ export default async function DadosPage() {
     // Cartões de técnicos: tipo === 'amarelo_tecnico' ou 'vermelho_tecnico'
     for (const c of p.cartoes) {
       if (c.tipo !== 'amarelo_tecnico' && c.tipo !== 'vermelho_tecnico') continue;
-      if (!tecnicoMap[c.jogador_id]) continue;
+      // Garante entrada no mapa mesmo se técnico não foi registrado na partida
+      if (!tecnicoMap[c.jogador_id]) {
+        tecnicoMap[c.jogador_id] = { tecnico_id: c.jogador_id, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, amarelos: 0, vermelhos: 0 };
+      }
       if (c.tipo === 'amarelo_tecnico') tecnicoMap[c.jogador_id].amarelos++;
       else tecnicoMap[c.jogador_id].vermelhos++;
     }
   }
 
   const rankingTecnicos = Object.values(tecnicoMap)
+    .filter(r => r.j > 0 || r.amarelos > 0 || r.vermelhos > 0)
     .map(r => ({ ...r, pts: r.v * 3 + r.e, aproveitamento: r.j > 0 ? Math.round((r.v * 3 + r.e) / (r.j * 3) * 100) : 0 }))
     .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v);
 
@@ -130,4 +134,4 @@ export default async function DadosPage() {
       times={times}
     />
   );
-      }
+}
