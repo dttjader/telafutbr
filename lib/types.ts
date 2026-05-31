@@ -40,6 +40,7 @@ export interface Jogador {
   id: string;
   nome: string;
   posicao: 'GOL' | 'ZAG' | 'LAT' | 'VOL' | 'MEI' | 'ATA';
+  sub_posicao?: SubPosicao;
   numero?: number;
   idade?: number;
   nacionalidade?: Nacionalidade;
