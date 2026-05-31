@@ -59,6 +59,8 @@ export interface Arbitragem {
 export type StatusPartida = 'agendada' | 'ao_vivo' | 'encerrada' | 'adiada';
 export type TipoGol = 'normal' | 'penalti' | 'falta' | 'contra';
 export type TipoCartao = 'amarelo' | 'vermelho' | 'amarelo_tecnico' | 'vermelho_tecnico';
+export type SubPosicao = string;
+export type Nacionalidade = 'Brasileiro' | 'Estrangeiro';
 
 export interface Gol {
   id: string;
