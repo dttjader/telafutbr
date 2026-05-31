@@ -103,14 +103,16 @@ export default async function DadosPage() {
     processar(p.tecnico_visitante_id, false);
 
     // Cartões de técnicos: tipo === 'amarelo_tecnico' ou 'vermelho_tecnico'
+    // jogador_id é sempre '__tecnico__'; o ID real fica em tecnico_id
     for (const c of p.cartoes) {
       if (c.tipo !== 'amarelo_tecnico' && c.tipo !== 'vermelho_tecnico') continue;
-      // Garante entrada no mapa mesmo se técnico não foi registrado na partida
-      if (!tecnicoMap[c.jogador_id]) {
-        tecnicoMap[c.jogador_id] = { tecnico_id: c.jogador_id, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, amarelos: 0, vermelhos: 0 };
+      const tecId = c.tecnico_id;
+      if (!tecId) continue;
+      if (!tecnicoMap[tecId]) {
+        tecnicoMap[tecId] = { tecnico_id: tecId, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, amarelos: 0, vermelhos: 0 };
       }
-      if (c.tipo === 'amarelo_tecnico') tecnicoMap[c.jogador_id].amarelos++;
-      else tecnicoMap[c.jogador_id].vermelhos++;
+      if (c.tipo === 'amarelo_tecnico') tecnicoMap[tecId].amarelos++;
+      else tecnicoMap[tecId].vermelhos++;
     }
   }
 
