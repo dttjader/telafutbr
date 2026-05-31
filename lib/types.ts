@@ -42,7 +42,7 @@ export interface Jogador {
   posicao: 'GOL' | 'ZAG' | 'LAT' | 'VOL' | 'MEI' | 'ATA';
   numero?: number;
   idade?: number;
-  nacionalidade?: 'Brasileiro' | 'Estrangeiro';
+  nacionalidade?: Nacionalidade;
   time_atual: string;
   transferencias: Transferencia[];
   registro?: number; // Código numérico único
@@ -60,7 +60,7 @@ export type StatusPartida = 'agendada' | 'ao_vivo' | 'encerrada' | 'adiada';
 export type TipoGol = 'normal' | 'penalti' | 'falta' | 'contra';
 export type TipoCartao = 'amarelo' | 'vermelho' | 'amarelo_tecnico' | 'vermelho_tecnico';
 export type SubPosicao = string;
-export type Nacionalidade = 'Brasileiro' | 'Estrangeiro';
+export type Nacionalidade = string;
 
 export interface Gol {
   id: string;
