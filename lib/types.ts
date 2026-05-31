@@ -36,38 +36,13 @@ export interface Transferencia {
   data: string; // AAAA-MM-DD
 }
 
-// Sub-posições por posição principal
-export type SubPosicao =
-  // Goleiro
-  | 'GOL'
-  // Zagueiro
-  | 'ZAG'
-  // Lateral
-  | 'LD' | 'LE'
-  // Volante
-  | 'VOL'
-  // Meia
-  | 'MC' | 'MO'
-  // Atacante
-  | 'CA' | 'PD' | 'PE';
-
-export type Nacionalidade =
-  | 'Brasileiro'
-  | 'Argentino'
-  | 'Uruguaio'
-  | 'Chileno'
-  | 'Paraguaio'
-  | 'Colombiano'
-  | 'Outros Países';
-
 export interface Jogador {
   id: string;
   nome: string;
   posicao: 'GOL' | 'ZAG' | 'LAT' | 'VOL' | 'MEI' | 'ATA';
-  sub_posicao?: SubPosicao;
   numero?: number;
   idade?: number;
-  nacionalidade?: Nacionalidade;
+  nacionalidade?: 'Brasileiro' | 'Estrangeiro';
   time_atual: string;
   transferencias: Transferencia[];
   registro?: number; // Código numérico único
@@ -83,7 +58,7 @@ export interface Arbitragem {
 
 export type StatusPartida = 'agendada' | 'ao_vivo' | 'encerrada' | 'adiada';
 export type TipoGol = 'normal' | 'penalti' | 'falta' | 'contra';
-export type TipoCartao = 'amarelo' | 'vermelho';
+export type TipoCartao = 'amarelo' | 'vermelho' | 'amarelo_tecnico' | 'vermelho_tecnico';
 
 export interface Gol {
   id: string;
