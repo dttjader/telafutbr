@@ -10,17 +10,17 @@ const TIPO_GOL_LABEL:Record<string,string>={normal:'Gol',penalti:'Pênalti',falt
 
 // ── Respostas pré-programadas ────────────────────────────────────────────────
 const DESCRICOES_GOL: Record<string, string[]> = {
-  normal: ['Chute com o pé direito','Chute com o pé esquerdo','Cabeceio após cruzamento','Cabeceio em escanteio','Chute de primeira','Chute de fora da área','Finalização em velocidade','Gol de carrinho','Toque na saída do goleiro','Rebote após defesa','Virada de jogo','Contra-ataque rápido'],
-  penalti: ['Pênalti convertido — canto direito','Pênalti convertido — canto esquerdo','Pênalti convertido — centro','Pênalti convertido — colocado','Pênalti cavado'],
+  normal: ['Chute com o pé esquerdo','Chute com o pé direito','Cabeceio após cruzamento','Cabeceio em escanteio','Chute de primeira','Chute de fora da área','Finalização em velocidade','Toque na saída do goleiro','Rebote após defesa','Contra-ataque rápido'],
+  penalti: ['Convertido — canto esquerdo','Convertido — canto direito','Convertido — centro','Convertido — colocado','Pênalti cavado'],
   falta: ['Falta cobrada diretamente','Falta cobrada sobre a barreira','Falta cobrada no canto esquerdo','Falta cobrada no canto direito','Cobrança de falta em curva'],
   contra: ['Gol contra ao tentar cortar cruzamento','Gol contra ao tentar bloquear chute','Desvio infeliz na própria meta','Gol contra ao tentar afastar escanteio'],
-  penalti_perdido: ['Pênalti defendido pelo goleiro','Pênalti na trave','Pênalti para fora','Cobrança para fora — canto direito','Cobrança para fora — canto esquerdo'],
+  penalti_perdido: ['Pênalti na trave','Pênalti para fora'],
   penalti_defendido: ['Defesa no canto direito','Defesa no canto esquerdo','Defesa no centro','Dois toques na cobrança — invalidado'],
 };
 
 const MOTIVOS_CARTAO: Record<string, string[]> = {
-  amarelo: ['Falta tática','Reclamação com o árbitro','Retardar o jogo','Falta violenta','Simulação','Impedimento de saída de goleiro','Entrada dura','Falta por trás','Comemoração excessiva','Desrespeito à distância em cobrança','Agressão verbal','Segundo amarelo'],
-  vermelho: ['Segundo cartão amarelo','Falta violenta grave','Agressão física','Cuspida','Linguagem ofensiva ou abusiva','Negação de gol com falta (DOGSO)','Negação de gol com mão','Conduta violenta','Dupla agressão'],
+  amarelo: ['Falta tática','Reclamação com o árbitro','Retardar o jogo','Falta violenta','Simulação','Impedimento de saída de goleiro','Comemoração excessiva','Desrespeito à distância em cobrança','Agressão verbal','Mão na bola'],
+  vermelho: ['Segundo cartão amarelo','Falta violenta grave','Agressão física','Cuspida','Linguagem ofensiva ou abusiva','Negação de gol com falta (DOGSO)','Negação de gol com mão','Conduta violenta'],
   amarelo_tecnico: ['Reclamação excessiva','Conduta antidesportiva','Entrada na área técnica indevida','Protesto veemente','Desrespeito ao árbitro'],
   vermelho_tecnico: ['Expulsão por reclamação reiterada','Conduta violenta','Insulto ao árbitro','Segunda advertência (técnico)','Agressão a membro da comissão'],
 };
