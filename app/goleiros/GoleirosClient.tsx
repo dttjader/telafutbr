@@ -134,7 +134,10 @@ export function GoleirosClient({ lista, times }: Props) {
           {sorted.map((s, i) => {
             const time = times.find(t => t.id === s.jogador.time_atual);
             const isAberto = goleiroBerto === s.jogador.id;
-            const maxRef = ordem === 'maior_ciclo' ? maxMaiorCiclo : maxCicloAtual;
+            const maiorCicloEAtual = s.maiorCiclo.aberto;
+            // Na aba "Maior Ciclo" a barra compara com o recorde do próprio goleiro (sempre 100%)
+            // Nas demais abas continua comparando com o melhor da lista
+            const maxRef = ordem === 'maior_ciclo' ? s.maiorCiclo.duracao : maxCicloAtual;
             const valorBarra = ordem === 'maior_ciclo' ? s.maiorCiclo.duracao : s.cicloAtualMin;
 
             return (
@@ -158,7 +161,7 @@ export function GoleirosClient({ lista, times }: Props) {
                   {/* Escudo + nome */}
                   <EscudoTime time={time} size={40} />
                   <div style={{ flex: 1, minWidth: 140 }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
                       {s.jogador.nome}
                       {s.jogador.numero && (
                         <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem', color: 'var(--verde)' }}>
@@ -195,12 +198,18 @@ export function GoleirosClient({ lista, times }: Props) {
                     <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '.1rem' }}>
                       Maior Ciclo #{s.maiorCiclo.numero}
                     </div>
-                    <div style={{ fontSize: '.65rem', color: '#555' }}>
-                      {formatData(s.maiorCiclo.dataInicio)}
-                      {s.maiorCiclo.dataFim && s.maiorCiclo.dataFim !== s.maiorCiclo.dataInicio
-                        ? ` → ${formatData(s.maiorCiclo.dataFim)}`
-                        : s.maiorCiclo.aberto ? ' → atual' : ''}
-                    </div>
+                    {maiorCicloEAtual ? (
+                      <div style={{ fontSize: '.65rem', color: 'var(--verde)', fontWeight: 700 }}>
+                        ↑ ciclo atual
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '.65rem', color: '#555' }}>
+                        {formatData(s.maiorCiclo.dataInicio)}
+                        {s.maiorCiclo.dataFim && s.maiorCiclo.dataFim !== s.maiorCiclo.dataInicio
+                          ? ` → ${formatData(s.maiorCiclo.dataFim)}`
+                          : ''}
+                      </div>
+                    )}
                   </div>
 
                   {/* Seta */}
@@ -232,6 +241,132 @@ export function GoleirosClient({ lista, times }: Props) {
                               padding: '.65rem 1rem',
                               background: isAtual
                                 ? 'rgba(0,168,79,.08)'
+                                : isMaior
+                                  ? 'rgba(255,223,0,.06)'
+                                  : 'var(--surface)',
+                              border: `1px solid ${isAtual ? 'rgba(0,168,79,.25)' : isMaior ? 'rgba(255,223,0,.2)' : 'var(--border)'}`,
+                              borderRadius: 8,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            {/* Número do ciclo */}
+                            <span style={{
+                              fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem',
+                              color: isAtual ? 'var(--verde)' : isMaior ? 'var(--amarelo)' : 'var(--text-muted)',
+                              minWidth: 28, textAlign: 'center',
+                            }}>
+                              #{ciclo.numero}
+                            </span>
+
+                            {/* Badges */}
+                            <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
+                              {isAtual && (
+                                <span style={{
+                                  fontSize: '.65rem', padding: '.1rem .45rem', borderRadius: 4,
+                                  background: 'rgba(0,168,79,.2)', color: 'var(--verde)',
+                                  border: '1px solid rgba(0,168,79,.35)', fontWeight: 700,
+                                  letterSpacing: '.05em',
+                                }}>ATUAL</span>
+                              )}
+                              {isMaior && (
+                                <span style={{
+                                  fontSize: '.65rem', padding: '.1rem .45rem', borderRadius: 4,
+                                  background: 'rgba(255,223,0,.12)', color: 'var(--amarelo)',
+                                  border: '1px solid rgba(255,223,0,.25)', fontWeight: 700,
+                                  letterSpacing: '.05em',
+                                }}>RECORDE</span>
+                              )}
+                            </div>
+
+                            {/* Datas */}
+                            <div style={{ flex: 1, minWidth: 120 }}>
+                              <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>
+                                {ciclo.dataInicio ? formatData(ciclo.dataInicio) : '—'}
+                                {' '}→{' '}
+                                {ciclo.aberto
+                                  ? <span style={{ color: 'var(--verde)', fontWeight: 700 }}>em aberto</span>
+                                  : formatData(ciclo.dataFim ?? '')}
+                              </div>
+
+                              {/* Mini barra */}
+                              <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 4, marginTop: '.3rem', overflow: 'hidden' }}>
+                                <div style={{
+                                  width: `${Math.max((ciclo.duracao / maxDuracao) * 100, 2)}%`,
+                                  height: '100%',
+                                  background: isAtual ? 'var(--verde)' : isMaior ? 'var(--amarelo)' : '#444',
+                                  borderRadius: 3,
+                                }} />
+                              </div>
+                            </div>
+
+                            {/* Duração */}
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <div style={{
+                                fontFamily: "'Bebas Neue',sans-serif",
+                                fontSize: '1.4rem',
+                                color: isAtual ? 'var(--verde)' : isMaior ? 'var(--amarelo)' : 'var(--text)',
+                                lineHeight: 1,
+                              }}>
+                                {ciclo.duracao}'
+                              </div>
+                              <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>
+                                {formatMin(ciclo.duracao)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Resumo total */}
+                    <div style={{
+                      marginTop: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap',
+                      padding: '.75rem 1rem', background: 'var(--surface)', borderRadius: 8,
+                      border: '1px solid var(--border)', fontSize: '.82rem',
+                    }}>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Total de minutos em campo: <strong style={{ color: 'var(--amarelo)' }}>{s.totalMinutos}'</strong>
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Total de ciclos: <strong style={{ color: 'var(--text)' }}>{s.ciclos.length}</strong>
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Gols sofridos: <strong style={{ color: 'var(--rebaixamento)' }}>
+                          {s.ciclos.length - 1}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Legenda */}
+        <div style={{
+          marginTop: '1.5rem', padding: '1rem 1.25rem',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 8, fontSize: '.72rem', color: 'var(--text-muted)',
+          display: 'flex', flexWrap: 'wrap', gap: '.75rem',
+        }}>
+          <span>
+            <strong style={{ color: 'var(--verde)' }}>Ciclo atual</strong> — minutos sem sofrer gol desde o último gol sofrido
+          </span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            <strong style={{ color: 'var(--amarelo)' }}>Maior ciclo</strong> — recorde pessoal de minutos invicto
+          </span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            Clique no nome do goleiro para ver o histórico completo de ciclos
+          </span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            Minutos calculados sobre o tempo efetivo em campo (90min + acréscimos de cada partida)
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+                    }                     ? 'rgba(0,168,79,.08)'
                                 : isMaior
                                   ? 'rgba(255,223,0,.06)'
                                   : 'var(--surface)',
