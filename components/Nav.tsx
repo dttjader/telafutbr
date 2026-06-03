@@ -8,6 +8,7 @@ const publicLinks = [
   { href: '/tabela', label: 'Tabela' },
   { href: '/confrontos', label: 'Confrontos' },
   { href: '/artilharia', label: 'Artilharia' },
+  { href: '/goleiros', label: 'Goleiros' },
   { href: '/analitico', label: 'Analítico' },
   { href: '/dados', label: 'Dados' },
 ];
