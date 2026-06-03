@@ -62,28 +62,52 @@ export default async function DadosPage() {
     .map(([uf, v]) => ({ uf, ...v, media: v.gols / v.jogos }))
     .sort((a, b) => b.media - a.media);
 
-  // Arbitragem
-  const arbMap: Record<string, { nome: string; jogos: number; gols: number; amarelos: number; vermelhos: number }> = {};
-  for (const p of encerradas) {
-    const arb = p.arbitragem?.principal;
-    if (!arb) continue;
-    if (!arbMap[arb]) arbMap[arb] = { nome: arb, jogos: 0, gols: 0, amarelos: 0, vermelhos: 0 };
-    arbMap[arb].jogos++;
-    arbMap[arb].gols += p.placar_casa + p.placar_visitante;
-    for (const c of p.cartoes) {
-      if (c.tipo === 'amarelo') arbMap[arb].amarelos++;
-      else if (c.tipo === 'vermelho') arbMap[arb].vermelhos++;
-      else if (c.tipo === 'amarelo_tecnico') arbMap[arb].amarelos++;
-      else if (c.tipo === 'vermelho_tecnico') arbMap[arb].vermelhos++;
+  // ── Arbitragem por cargo ────────────────────────────────────────────────────
+  // Coleta dados separados por cargo para permitir filtro no cliente
+  type CargoArbitro = 'principal' | 'assistente1' | 'assistente2' | 'quarto' | 'var';
+  type EntradaArbitro = { nome: string; cargo: CargoArbitro; jogos: number; gols: number; amarelos: number; vermelhos: number };
+
+  const arbMapPorCargo: Record<string, EntradaArbitro> = {};
+
+  const addArbitro = (nome: string, cargo: CargoArbitro, gols: number, amarelos: number, vermelhos: number) => {
+    if (!nome || !nome.trim()) return;
+    const key = `${cargo}::${nome.trim()}`;
+    if (!arbMapPorCargo[key]) {
+      arbMapPorCargo[key] = { nome: nome.trim(), cargo, jogos: 0, gols: 0, amarelos: 0, vermelhos: 0 };
     }
+    arbMapPorCargo[key].jogos++;
+    arbMapPorCargo[key].gols += gols;
+    arbMapPorCargo[key].amarelos += amarelos;
+    arbMapPorCargo[key].vermelhos += vermelhos;
+  };
+
+  for (const p of encerradas) {
+    const golsPartida = p.placar_casa + p.placar_visitante;
+    let amarelos = 0, vermelhos = 0;
+    for (const c of p.cartoes) {
+      if (c.tipo === 'amarelo' || c.tipo === 'amarelo_tecnico') amarelos++;
+      else if (c.tipo === 'vermelho' || c.tipo === 'vermelho_tecnico') vermelhos++;
+    }
+
+    const arb = p.arbitragem;
+    if (arb?.principal) addArbitro(arb.principal, 'principal', golsPartida, amarelos, vermelhos);
+    if (arb?.assistente1) addArbitro(arb.assistente1, 'assistente1', golsPartida, amarelos, vermelhos);
+    if (arb?.assistente2) addArbitro(arb.assistente2, 'assistente2', golsPartida, amarelos, vermelhos);
+    if (arb?.quarto) addArbitro(arb.quarto, 'quarto', golsPartida, amarelos, vermelhos);
+    if (arb?.var) addArbitro(arb.var, 'var', golsPartida, amarelos, vermelhos);
   }
-  const rankingArbitros = Object.values(arbMap).sort((a, b) => b.jogos - a.jogos);
 
-  // IDs de todos os técnicos para cruzamento com cartões
-  const tecnicoIds = new Set(tecnicos.map(t => t.id));
+  const rankingArbitrosPorCargo = Object.values(arbMapPorCargo).sort((a, b) => b.jogos - a.jogos);
 
-  // Ranking técnicos com cartões
-  // Cartões de técnicos foram registrados na aba Cartões da partida usando o id do técnico como jogador_id
+  // legado: ranking antigo (principal apenas) — mantido por compatibilidade
+  const rankingArbitros = rankingArbitrosPorCargo
+    .filter(a => a.cargo === 'principal')
+    .sort((a, b) => b.jogos - a.jogos);
+
+  // ── Ranking técnicos com subdivisão por rodadas ─────────────────────────────
+  // Total de rodadas distintas nas partidas encerradas
+  const totalRodadas = new Set(encerradas.map(p => p.rodada)).size;
+
   const tecnicoMap: Record<string, {
     tecnico_id: string; j: number; v: number; e: number; d: number;
     gp: number; gc: number; amarelos: number; vermelhos: number;
@@ -102,8 +126,6 @@ export default async function DadosPage() {
     processar(p.tecnico_casa_id, true);
     processar(p.tecnico_visitante_id, false);
 
-    // Cartões de técnicos: tipo === 'amarelo_tecnico' ou 'vermelho_tecnico'
-    // jogador_id é sempre '__tecnico__'; o ID real fica em tecnico_id
     for (const c of p.cartoes) {
       if (c.tipo !== 'amarelo_tecnico' && c.tipo !== 'vermelho_tecnico') continue;
       const tecId = c.tecnico_id;
@@ -131,9 +153,11 @@ export default async function DadosPage() {
       rankingEstadio={rankingEstadio}
       rankingEstado={rankingEstado}
       rankingArbitros={rankingArbitros}
+      rankingArbitrosPorCargo={rankingArbitrosPorCargo}
       rankingTecnicos={rankingTecnicos}
+      totalRodadas={totalRodadas}
       tecnicos={tecnicos}
       times={times}
     />
   );
-}
+  }
