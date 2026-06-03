@@ -135,9 +135,9 @@ export function GoleirosClient({ lista, times }: Props) {
             const time = times.find(t => t.id === s.jogador.time_atual);
             const isAberto = goleiroBerto === s.jogador.id;
             const maiorCicloEAtual = s.maiorCiclo.aberto;
-            // Na aba "Maior Ciclo" a barra compara com o recorde do próprio goleiro (sempre 100%)
-            // Nas demais abas continua comparando com o melhor da lista
-            const maxRef = ordem === 'maior_ciclo' ? s.maiorCiclo.duracao : maxCicloAtual;
+            // Na aba "Ciclo Atual" a barra compara com o recorde do próprio goleiro
+            // Na aba "Maior Ciclo" compara com o melhor goleiro da lista
+            const maxRef = ordem === 'ciclo_atual' ? s.maiorCiclo.duracao : maxMaiorCiclo;
             const valorBarra = ordem === 'maior_ciclo' ? s.maiorCiclo.duracao : s.cicloAtualMin;
 
             return (
@@ -366,4 +366,4 @@ export function GoleirosClient({ lista, times }: Props) {
       </div>
     </div>
   );
-                  }
+                                    }
