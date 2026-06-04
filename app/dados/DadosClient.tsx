@@ -351,4 +351,58 @@ export function DadosClient({
                           {CARGO_LABEL[a.cargo]}
                         </span>
                       </td>
-                      <
+                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--amarelo)' }}>{a.jogos}</td>
+                      <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>{a.gols}</td>
+                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--verde)' }}>{(a.gols / a.jogos).toFixed(2)}</td>
+                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: '#f59e0b', fontWeight: 600 }}>{a.amarelos}</td>
+                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: '#f59e0b' }}>{(a.amarelos / a.jogos).toFixed(2)}</td>
+                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--rebaixamento)', fontWeight: 600 }}>{a.vermelhos}</td>
+                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--rebaixamento)' }}>{(a.vermelhos / a.jogos).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Ranking Técnicos subdividido */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '.75rem', paddingBottom: '.75rem', borderBottom: '1px solid var(--border)' }}>
+            <h2 style={{ fontSize: '1.5rem', margin: 0 }}>🧑‍💼 Ranking de Técnicos</h2>
+            {totalRodadas > 0 && (
+              <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>
+                {totalRodadas} rodada(s) · mínimo para consolidado: {limiar50} jogos (≥50%)
+              </span>
+            )}
+          </div>
+
+          {rankingTecnicos.length === 0 && (
+            <p style={{ color: 'var(--text-muted)' }}>Nenhuma partida com técnico registrado.</p>
+          )}
+
+          {rankingTecnicos.length > 0 && (
+            <>
+              <TabelaTecnicos
+                dados={tecConsolidados}
+                subtitulo={`Consolidados — ${limiar50}+ jogos (≥ 50% das rodadas)`}
+              />
+              <TabelaTecnicos
+                dados={tecIntermediarios}
+                subtitulo={`Em construção — 4 a ${Math.max(limiar50 - 1, 4)} jogos`}
+              />
+              <TabelaTecnicos
+                dados={tecEstrantes}
+                subtitulo="Estreantes — até 3 jogos"
+              />
+              <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '.25rem' }}>
+                * Aproveitamento = (pontos / pontos possíveis) × 100 · 🟨/🟥 = cartões recebidos pelo técnico em campo
+              </p>
+            </>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
