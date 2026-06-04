@@ -426,4 +426,17 @@ export function GoleirosClient({ lista, times }: Props) {
           display: 'flex', flexWrap: 'wrap', gap: '.75rem',
         }}>
           <span><strong style={{ color: 'var(--verde)' }}>Ciclo atual</strong> — minutos sem sofrer gol desde o último gol sofrido</span>
-          <span style={{ borderLeft: 
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            <strong style={{ color: 'var(--amarelo)' }}>Maior ciclo</strong> — recorde pessoal de minutos invicto
+          </span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            <strong>▶ Início</strong> = minuto em que o ciclo começou na partida · <strong>⚽ Fim</strong> = minuto do gol sofrido
+          </span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            Minutos calculados sobre o tempo efetivo (90min + acréscimos por partida)
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
