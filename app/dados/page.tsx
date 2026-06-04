@@ -18,7 +18,7 @@ export default async function DadosPage() {
   const placarMap: Record<string, { count: number; vitoriasVisitante: number }> = {};
   for (const p of encerradas) {
     const [a, b] = [p.placar_casa, p.placar_visitante].sort((x, y) => x - y);
-    const key = `${a}×${b}`;
+    const key = `${a}x${b}`;
     if (!placarMap[key]) placarMap[key] = { count: 0, vitoriasVisitante: 0 };
     placarMap[key].count++;
     if (p.placar_visitante > p.placar_casa) placarMap[key].vitoriasVisitante++;
@@ -27,10 +27,10 @@ export default async function DadosPage() {
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 12)
     .map(([placar, data]) => ({
-      placar,
+      placar: placar.replace('x', '\u00d7'),
       count: data.count,
       vitoriasVisitante: data.vitoriasVisitante,
-      isEmpate: placar.split('×')[0] === placar.split('×')[1]
+      isEmpate: placar.split('x')[0] === placar.split('x')[1],
     }));
 
   // Ranking por estádio
@@ -62,8 +62,7 @@ export default async function DadosPage() {
     .map(([uf, v]) => ({ uf, ...v, media: v.gols / v.jogos }))
     .sort((a, b) => b.media - a.media);
 
-  // ── Arbitragem por cargo ────────────────────────────────────────────────────
-  // Coleta dados separados por cargo para permitir filtro no cliente
+  // Arbitragem por cargo
   type CargoArbitro = 'principal' | 'assistente1' | 'assistente2' | 'quarto' | 'var';
   type EntradaArbitro = { nome: string; cargo: CargoArbitro; jogos: number; gols: number; amarelos: number; vermelhos: number };
 
@@ -88,7 +87,6 @@ export default async function DadosPage() {
       if (c.tipo === 'amarelo' || c.tipo === 'amarelo_tecnico') amarelos++;
       else if (c.tipo === 'vermelho' || c.tipo === 'vermelho_tecnico') vermelhos++;
     }
-
     const arb = p.arbitragem;
     if (arb?.principal) addArbitro(arb.principal, 'principal', golsPartida, amarelos, vermelhos);
     if (arb?.assistente1) addArbitro(arb.assistente1, 'assistente1', golsPartida, amarelos, vermelhos);
@@ -97,17 +95,12 @@ export default async function DadosPage() {
     if (arb?.var) addArbitro(arb.var, 'var', golsPartida, amarelos, vermelhos);
   }
 
-  const rankingArbitrosPorCargo = Object.values(arbMapPorCargo).sort((a, b) => b.jogos - a.jogos);
+  const rankingArbitrosPorCargo: EntradaArbitro[] = Object.values(arbMapPorCargo).sort((a, b) => b.jogos - a.jogos);
 
-  // legado: ranking antigo (principal apenas) — mantido por compatibilidade
-  const rankingArbitros = rankingArbitrosPorCargo
-    .filter(a => a.cargo === 'principal')
-    .sort((a, b) => b.jogos - a.jogos);
-
-  // ── Ranking técnicos com subdivisão por rodadas ─────────────────────────────
-  // Total de rodadas distintas nas partidas encerradas
+  // Total de rodadas distintas encerradas
   const totalRodadas = new Set(encerradas.map(p => p.rodada)).size;
 
+  // Ranking técnicos
   const tecnicoMap: Record<string, {
     tecnico_id: string; j: number; v: number; e: number; d: number;
     gp: number; gc: number; amarelos: number; vermelhos: number;
@@ -152,7 +145,6 @@ export default async function DadosPage() {
       placaresFrequentes={placaresFrequentes}
       rankingEstadio={rankingEstadio}
       rankingEstado={rankingEstado}
-      rankingArbitros={rankingArbitros}
       rankingArbitrosPorCargo={rankingArbitrosPorCargo}
       rankingTecnicos={rankingTecnicos}
       totalRodadas={totalRodadas}
@@ -160,4 +152,4 @@ export default async function DadosPage() {
       times={times}
     />
   );
-  }
+    }
