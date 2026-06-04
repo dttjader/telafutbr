@@ -12,26 +12,25 @@ export default async function GoleirosPage() {
     .filter(p => p.status === 'encerrada')
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
 
-  // Todos os goleiros cadastrados
   const goleiros = jogadores.filter(j => j.posicao === 'GOL');
 
-  // Para cada goleiro, montar a timeline de eventos ordenados cronologicamente
-  // Evento = cada vez que ele jogou (titular ou entrou) com os minutos efetivos
-  // e os gols que sofreu durante sua participação
+  interface GolEvento {
+    minuto: number;
+    acrescimo: number;
+  }
 
   interface EventoPartida {
     data: string;
     rodada: number;
     hora: string;
     adversario: string;
-    minutosJogados: number; // minutos efetivos jogados pelo goleiro nesta partida
-    golsSofridos: { minuto: number; acrescimo: number; minutoAbsoluto: number }[];
-    minutoEntrada: number; // minuto absoluto da partida em que entrou (0 se titular)
-    minutoCruzamento: number; // total da partida (90 + acréscimos)
+    adversarioSigla: string;
+    minutosJogados: number;
+    golsSofridos: GolEvento[];
+    minutoEntrada: number;
+    minutoSaida: number;
+    totalPartida: number;
   }
-
-  // Minutos absolutos acumulados ao longo de todas as partidas de um goleiro
-  // Usamos para calcular ciclos contínuos
 
   const statsGoleiros: StatGoleiro[] = [];
 
@@ -52,7 +51,6 @@ export default async function GoleirosPage() {
       const acr2 = p.acrescimo_segundo ?? 0;
       const totalPartida = 45 + acr1 + 45 + acr2;
 
-      // Minuto de entrada
       const vermelho = p.cartoes.find(c => c.jogador_id === goleiro.id && c.tipo === 'vermelho');
       const minutoVermelho = vermelho?.minuto ?? Infinity;
 
@@ -73,114 +71,115 @@ export default async function GoleirosPage() {
       const minutosJogados = Math.max(0, minutoSaida - minutoEntrada);
       if (minutosJogados === 0) continue;
 
-      // Gols sofridos durante a sua participação
-      // Para um goleiro, "gols sofridos" são os gols do adversário, incluindo "contra" do próprio time
-      const timeDoGoleiro = esc.timeId;
-      const golsSofridos: EventoPartida['golsSofridos'] = [];
-
+      const golsSofridos: GolEvento[] = [];
       for (const g of p.gols) {
-        // Gol contra o time do goleiro (marcado pelo adversário) ou gol contra marcado pelo próprio time
-        const golContraTime = g.tipo === 'contra'
-          ? g.time_id === timeDoGoleiro  // gol contra marcado por jogador do próprio time → vai para o goleiro adversário
-          : g.time_id !== timeDoGoleiro; // gol normal do adversário → goleiro sofre
-
-        // Invertendo: quem sofre é o goleiro adversário ao time que marcou
-        const goleiroSofre = g.tipo === 'contra'
-          ? g.goleiro_id === goleiro.id  // campo goleiro_id guardado no evento de gol
-          : g.goleiro_id === goleiro.id;
-
-        if (!goleiroSofre) continue;
-
-        // Verificar se o goleiro estava em campo no minuto do gol
-        const minutoGol = g.minuto + (g.acrescimo ?? 0) * 0.1;
-        // Aproximação: usar minuto do gol (ignorar décimos do acréscimo para comparação simples)
+        if (g.goleiro_id !== goleiro.id) continue;
         if (g.minuto < minutoEntrada || g.minuto > minutoSaida) continue;
-
-        golsSofridos.push({
-          minuto: g.minuto,
-          acrescimo: g.acrescimo ?? 0,
-          minutoAbsoluto: g.minuto,
-        });
+        golsSofridos.push({ minuto: g.minuto, acrescimo: g.acrescimo ?? 0 });
       }
 
       const adversarioId = esc.isCasa ? p.time_visitante_id : p.time_casa_id;
-      const adversario = times.find(t => t.id === adversarioId)?.sigla ?? adversarioId;
+      const adversarioTime = times.find(t => t.id === adversarioId);
 
       eventos.push({
         data: p.data,
         rodada: p.rodada,
         hora: p.hora,
-        adversario,
+        adversario: adversarioTime?.nome ?? adversarioId,
+        adversarioSigla: adversarioTime?.sigla ?? adversarioId,
         minutosJogados,
         golsSofridos: golsSofridos.sort((a, b) => a.minuto - b.minuto),
         minutoEntrada,
-        minutoCruzamento: totalPartida,
+        minutoSaida,
+        totalPartida,
       });
     }
 
-    // Calcular ciclos: sequências de minutos entre gols sofridos
-    // Cada ciclo tem: minutosInício (dentro do fluxo de tempo), duração, data início, data fim
-    // Montamos uma timeline linear de todos os minutos jogados
+    // ── Calcular ciclos ──────────────────────────────────────────────────────
+    // Cada ponto de início/fim de ciclo carrega: partida (data + rodada) e minuto
+    // dentro dessa partida.
 
     const ciclos: CicloGoleiro[] = [];
-    let minutosAcumulados = 0; // cursor global de minutos acumulados
-    let inicioCicloMin = 0; // minuto acumulado em que o ciclo atual começou
-    let inicioCicloData = '';
+    let minutosAcumulados = 0;
+    let inicioCicloMin = 0;
+
+    // Ponto de início do ciclo atual
+    let inicioPartidaData = '';
+    let inicioPartidaRodada = 0;
+    let inicioPartidaAdversario = '';
+    let inicioMinutoNaPartida = 0; // minuto dentro da partida onde o ciclo começa
+
     let numeroCiclo = 1;
 
-    // Minutos antes do primeiro jogo (informação que não temos automaticamente,
-    // mas o campo 'minutosPreCampeonato' seria manual — não há no schema, então usaremos 0)
-    // Se quiser suportar no futuro, adicionar campo no jogador.
-
     for (const ev of eventos) {
-      const minPartidaInicio = minutosAcumulados; // onde essa partida começa no eixo global
-
-      if (!inicioCicloData) {
-        inicioCicloData = ev.data;
+      // Primeiro evento — inicializar início do primeiro ciclo
+      if (!inicioPartidaData) {
+        inicioPartidaData = ev.data;
+        inicioPartidaRodada = ev.rodada;
+        inicioPartidaAdversario = ev.adversarioSigla;
+        inicioMinutoNaPartida = ev.minutoEntrada;
         inicioCicloMin = minutosAcumulados;
       }
 
       if (ev.golsSofridos.length === 0) {
-        // Nenhum gol nesta partida: adiciona minutos ao ciclo atual
         minutosAcumulados += ev.minutosJogados;
       } else {
-        // Tem gols: fecha ciclo(s) e abre novos
-        let cursorLocal = ev.minutoEntrada; // cursor dentro da partida
+        let cursorLocal = ev.minutoEntrada;
 
         for (const gol of ev.golsSofridos) {
           const minutosAteGol = gol.minuto - cursorLocal;
           minutosAcumulados += Math.max(0, minutosAteGol);
 
-          // Fechar ciclo atual
           const duracaoCiclo = minutosAcumulados - inicioCicloMin;
+
           ciclos.push({
             numero: numeroCiclo,
             duracao: duracaoCiclo,
-            dataInicio: inicioCicloData,
+            // Início
+            dataInicio: inicioPartidaData,
+            rodadaInicio: inicioPartidaRodada,
+            adversarioInicio: inicioPartidaAdversario,
+            minutoInicio: inicioMinutoNaPartida,
+            // Fim
             dataFim: ev.data,
+            rodadaFim: ev.rodada,
+            adversarioFim: ev.adversarioSigla,
+            minutoFim: gol.minuto + (gol.acrescimo > 0 ? gol.acrescimo : 0),
+            minutoFimAcrescimo: gol.acrescimo,
             aberto: false,
           });
 
           numeroCiclo++;
           inicioCicloMin = minutosAcumulados;
-          inicioCicloData = ev.data;
+          // Novo ciclo começa logo após o gol, na mesma partida
+          inicioPartidaData = ev.data;
+          inicioPartidaRodada = ev.rodada;
+          inicioPartidaAdversario = ev.adversarioSigla;
+          inicioMinutoNaPartida = gol.minuto;
           cursorLocal = gol.minuto;
         }
 
-        // Minutos restantes da partida após o último gol
-        const minutosRestantes = (ev.minutoEntrada + ev.minutosJogados) - cursorLocal;
+        const minutosRestantes = ev.minutoSaida - cursorLocal;
         minutosAcumulados += Math.max(0, minutosRestantes);
       }
     }
 
-    // Ciclo atual (em aberto)
+    // Ciclo em aberto
     const cicloAtualMin = minutosAcumulados - inicioCicloMin;
+    const ultimoEvento = eventos[eventos.length - 1];
     if (cicloAtualMin > 0 || ciclos.length === 0) {
       ciclos.push({
         numero: numeroCiclo,
         duracao: cicloAtualMin,
-        dataInicio: inicioCicloData || '',
+        dataInicio: inicioPartidaData || '',
+        rodadaInicio: inicioPartidaRodada,
+        adversarioInicio: inicioPartidaAdversario,
+        minutoInicio: inicioMinutoNaPartida,
         dataFim: null,
+        rodadaFim: ultimoEvento?.rodada ?? null,
+        adversarioFim: ultimoEvento?.adversarioSigla ?? null,
+        minutoFim: ultimoEvento?.minutoSaida ?? null,
+        minutoFimAcrescimo: 0,
         aberto: true,
       });
     }
@@ -208,7 +207,6 @@ export default async function GoleirosPage() {
     });
   }
 
-  // Filtrar apenas goleiros que jogaram pelo menos uma partida
   const lista = statsGoleiros
     .filter(s => s.totalPartidas > 0)
     .sort((a, b) => b.cicloAtualMin - a.cicloAtualMin);
