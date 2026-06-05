@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time } from '@/lib/types';
 
@@ -60,6 +61,62 @@ const secTitle = (text: string) => (
   <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>{text}</h2>
 );
 
+// Cards de atalho para as sub-seções
+const SubSections = ({ totalJogos, totalGols }: { totalJogos: number; totalGols: number }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+    {[
+      {
+        href: '/dados/artilharia',
+        emoji: '⚽',
+        titulo: 'Artilharia',
+        desc: 'Rankings de gols, assistências e G/90',
+        cor: 'var(--amarelo)',
+        bg: 'rgba(255,223,0,.06)',
+        border: 'rgba(255,223,0,.2)',
+      },
+      {
+        href: '/dados/goleiros',
+        emoji: '🧤',
+        titulo: 'Goleiros',
+        desc: 'Ciclos de minutos sem sofrer gols',
+        cor: '#22c55e',
+        bg: 'rgba(34,197,94,.06)',
+        border: 'rgba(34,197,94,.2)',
+      },
+      {
+        href: '/dados/analitico',
+        emoji: '🔬',
+        titulo: 'Analítico',
+        desc: 'Estatísticas individuais por jogador',
+        cor: '#3b82f6',
+        bg: 'rgba(59,130,246,.06)',
+        border: 'rgba(59,130,246,.2)',
+      },
+    ].map(s => (
+      <Link key={s.href} href={s.href} style={{
+        display: 'block',
+        background: s.bg,
+        border: `1px solid ${s.border}`,
+        borderRadius: 12,
+        padding: '1.25rem',
+        textDecoration: 'none',
+        transition: 'all .2s',
+      }}
+        className="dados-sub-card"
+      >
+        <div style={{ fontSize: '2rem', marginBottom: '.5rem', lineHeight: 1 }}>{s.emoji}</div>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem', color: s.cor, letterSpacing: '.05em', marginBottom: '.25rem' }}>
+          {s.titulo}
+        </div>
+        <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{s.desc}</div>
+        <div style={{ marginTop: '.75rem', fontSize: '.72rem', color: s.cor, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+          Ver →
+        </div>
+      </Link>
+    ))}
+  </div>
+);
+
 export function DadosClient({
   totalJogos, totalGols, totalGolsCasa, totalGolsVis,
   placaresFrequentes,
@@ -74,7 +131,6 @@ export function DadosClient({
   const maxEstadio = rankingEstadio[0]?.media ?? 1;
   const maxEstado  = rankingEstado[0]?.media  ?? 1;
 
-  // ── Filtro árbitros ──────────────────────────────────────────────────────────
   const [filtroArbitro, setFiltroArbitro] = useState<CargoArbitro | ''>('');
 
   const arbFiltrados = (filtroArbitro
@@ -82,13 +138,11 @@ export function DadosClient({
     : rankingArbitrosPorCargo
   ).sort((a, b) => b.jogos - a.jogos);
 
-  // ── Subdivisão técnicos ──────────────────────────────────────────────────────
   const limiar50 = Math.ceil(totalRodadas * 0.5);
-  const tecConsolidados    = rankingTecnicos.filter(r => r.j >= limiar50);
-  const tecIntermediarios  = rankingTecnicos.filter(r => r.j > 3 && r.j < limiar50);
-  const tecEstrantes       = rankingTecnicos.filter(r => r.j <= 3);
+  const tecConsolidados   = rankingTecnicos.filter(r => r.j >= limiar50);
+  const tecIntermediarios = rankingTecnicos.filter(r => r.j > 3 && r.j < limiar50);
+  const tecEstrantes      = rankingTecnicos.filter(r => r.j <= 3);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
   const nomeTecnico   = (id: string) => tecnicos.find(t => t.id === id)?.nome ?? id;
   const timeDoTecnico = (id: string) => {
     const t = tecnicos.find(t => t.id === id);
@@ -96,15 +150,12 @@ export function DadosClient({
   };
   const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
-  // ── Sub-componente tabela técnicos ───────────────────────────────────────────
   const TabelaTecnicos = ({ dados, subtitulo }: { dados: RankingTecnico[]; subtitulo: string }) => {
-    if (dados.length === 0) {
-      return (
-        <p style={{ fontSize: '.82rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '.35rem 0 1.25rem' }}>
-          {subtitulo}: nenhum técnico nesta faixa.
-        </p>
-      );
-    }
+    if (dados.length === 0) return (
+      <p style={{ fontSize: '.82rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '.35rem 0 1.25rem' }}>
+        {subtitulo}: nenhum técnico nesta faixa.
+      </p>
+    );
     return (
       <div style={{ marginBottom: '2rem' }}>
         <div style={{
@@ -113,12 +164,8 @@ export function DadosClient({
           background: 'var(--surface2)', borderRadius: 6,
           borderLeft: '3px solid var(--verde)',
         }}>
-          <span style={{ fontSize: '.75rem', color: 'var(--verde)', textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 700 }}>
-            {subtitulo}
-          </span>
-          <span style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-            {dados.length} técnico(s)
-          </span>
+          <span style={{ fontSize: '.75rem', color: 'var(--verde)', textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 700 }}>{subtitulo}</span>
+          <span style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{dados.length} técnico(s)</span>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
@@ -140,9 +187,7 @@ export function DadosClient({
                 const saldo = r.gp - r.gc;
                 return (
                   <tr key={r.tecnico_id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                    <td style={{ padding: '.5rem .75rem', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)' }}>
-                      {medalha(i)}
-                    </td>
+                    <td style={{ padding: '.5rem .75rem', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)' }}>{medalha(i)}</td>
                     <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>{nomeTecnico(r.tecnico_id)}</td>
                     <td style={{ padding: '.5rem .75rem' }}>
                       {time
@@ -186,29 +231,38 @@ export function DadosClient({
     );
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div style={{ paddingBottom: '4rem' }}>
+      <style>{`
+        .dados-sub-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0,0,0,.35);
+        }
+      `}</style>
+
       {/* Hero */}
       <div style={{ background: 'linear-gradient(135deg,#0a0a0a 0%,#0d1f0d 50%,#0a0a0a 100%)', borderBottom: '1px solid var(--border)', padding: '2.5rem 0 2rem', marginBottom: '2rem' }}>
         <div className="container">
           <p style={{ fontSize: '.75rem', color: 'var(--verde)', textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, marginBottom: '.4rem' }}>Estatísticas Gerais</p>
-          <h1 style={{ fontSize: 'clamp(2.5rem,6vw,4rem)' }}>Dados</h1>
+          <h1 style={{ fontSize: 'clamp(2.5rem,6vw,4rem)' }}>Visão Geral</h1>
         </div>
       </div>
 
       <div className="container">
 
+        {/* Atalhos para sub-seções */}
+        <SubSections totalJogos={totalJogos} totalGols={totalGols} />
+
         {/* Cards resumo */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '1rem', marginBottom: '2rem' }}>
           {[
-            { label: 'Partidas',              valor: totalJogos,  cor: 'var(--amarelo)' },
-            { label: 'Total de gols',         valor: totalGols,   cor: 'var(--verde)'   },
-            { label: 'Média gols/jogo',       valor: mediaTotal,  cor: 'var(--verde)'   },
-            { label: 'Gols mandante',         valor: totalGolsCasa, cor: '#60a5fa'      },
-            { label: 'Média gols/jogo (casa)',valor: mediaCasa,   cor: '#60a5fa'        },
-            { label: 'Gols visitante',        valor: totalGolsVis,  cor: '#f59e0b'      },
-            { label: 'Média gols/jogo (vis.)',valor: mediaVis,    cor: '#f59e0b'        },
+            { label: 'Partidas',               valor: totalJogos,    cor: 'var(--amarelo)' },
+            { label: 'Total de gols',           valor: totalGols,     cor: 'var(--verde)'   },
+            { label: 'Média gols/jogo',         valor: mediaTotal,    cor: 'var(--verde)'   },
+            { label: 'Gols mandante',           valor: totalGolsCasa, cor: '#60a5fa'        },
+            { label: 'Média gols/jogo (casa)',  valor: mediaCasa,     cor: '#60a5fa'        },
+            { label: 'Gols visitante',          valor: totalGolsVis,  cor: '#f59e0b'        },
+            { label: 'Média gols/jogo (vis.)',  valor: mediaVis,      cor: '#f59e0b'        },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1rem', textAlign: 'center' }}>
               <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2rem', color: s.cor, lineHeight: 1 }}>{s.valor}</div>
@@ -219,9 +273,7 @@ export function DadosClient({
 
         {/* Placares frequentes */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem', marginBottom: '2rem' }}>
-          <h3 style={{ fontSize: '1.3rem', marginBottom: '1.25rem', color: 'var(--amarelo)' }}>
-            🏆 Placares mais frequentes (Geral)
-          </h3>
+          <h3 style={{ fontSize: '1.3rem', marginBottom: '1.25rem', color: 'var(--amarelo)' }}>🏆 Placares mais frequentes</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
             {placaresFrequentes.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Sem dados.</p>}
             {placaresFrequentes.map(d => (
@@ -266,7 +318,6 @@ export function DadosClient({
               </div>
             ))}
           </div>
-
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
             {secTitle('📍 Média de gols por estado')}
             {rankingEstado.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados.</p>}
@@ -288,41 +339,29 @@ export function DadosClient({
           </div>
         </div>
 
-        {/* Árbitros com filtro de cargo */}
+        {/* Árbitros */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem', marginBottom: '2rem' }}>
-          {/* Cabeçalho + botões de cargo */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem', paddingBottom: '.75rem', borderBottom: '1px solid var(--border)' }}>
             <h2 style={{ fontSize: '1.5rem', margin: 0 }}>🟢 Gols e Cartões por Árbitro</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', alignItems: 'center' }}>
               {CARGO_OPTS.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setFiltroArbitro(opt.value as CargoArbitro | '')}
-                  style={{
-                    padding: '.3rem .65rem', borderRadius: 5, cursor: 'pointer', transition: 'all .15s',
-                    border: `1px solid ${filtroArbitro === opt.value ? 'var(--verde)' : 'var(--border)'}`,
-                    background: filtroArbitro === opt.value ? 'rgba(0,168,79,.15)' : 'var(--surface2)',
-                    color: filtroArbitro === opt.value ? 'var(--verde)' : 'var(--text-muted)',
-                    fontSize: '.75rem', fontWeight: filtroArbitro === opt.value ? 700 : 400,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {opt.label}
-                </button>
+                <button key={opt.value} onClick={() => setFiltroArbitro(opt.value as CargoArbitro | '')} style={{
+                  padding: '.3rem .65rem', borderRadius: 5, cursor: 'pointer', transition: 'all .15s',
+                  border: `1px solid ${filtroArbitro === opt.value ? 'var(--verde)' : 'var(--border)'}`,
+                  background: filtroArbitro === opt.value ? 'rgba(0,168,79,.15)' : 'var(--surface2)',
+                  color: filtroArbitro === opt.value ? 'var(--verde)' : 'var(--text-muted)',
+                  fontSize: '.75rem', fontWeight: filtroArbitro === opt.value ? 700 : 400, whiteSpace: 'nowrap',
+                }}>{opt.label}</button>
               ))}
             </div>
           </div>
-
-          {/* Info do filtro ativo */}
           {filtroArbitro && (
             <p style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
               Exibindo: <strong style={{ color: 'var(--verde)' }}>{CARGO_LABEL[filtroArbitro]}</strong>
               {' · '}{arbFiltrados.length} profissional(is)
             </p>
           )}
-
           {arbFiltrados.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados.</p>}
-
           {arbFiltrados.length > 0 && (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
@@ -343,11 +382,7 @@ export function DadosClient({
                     <tr key={`${a.cargo}-${a.nome}`} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
                       <td style={{ padding: '.5rem .9rem', fontWeight: 600 }}>{a.nome}</td>
                       <td style={{ padding: '.5rem .9rem' }}>
-                        <span style={{
-                          fontSize: '.7rem', padding: '.15rem .45rem', borderRadius: 4,
-                          background: 'var(--surface2)', border: '1px solid var(--border)',
-                          color: 'var(--text-muted)', whiteSpace: 'nowrap',
-                        }}>
+                        <span style={{ fontSize: '.7rem', padding: '.15rem .45rem', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                           {CARGO_LABEL[a.cargo]}
                         </span>
                       </td>
@@ -366,7 +401,7 @@ export function DadosClient({
           )}
         </div>
 
-        {/* Ranking Técnicos subdividido */}
+        {/* Ranking técnicos */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '.75rem', paddingBottom: '.75rem', borderBottom: '1px solid var(--border)' }}>
             <h2 style={{ fontSize: '1.5rem', margin: 0 }}>🧑‍💼 Ranking de Técnicos</h2>
@@ -376,25 +411,12 @@ export function DadosClient({
               </span>
             )}
           </div>
-
-          {rankingTecnicos.length === 0 && (
-            <p style={{ color: 'var(--text-muted)' }}>Nenhuma partida com técnico registrado.</p>
-          )}
-
+          {rankingTecnicos.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Nenhuma partida com técnico registrado.</p>}
           {rankingTecnicos.length > 0 && (
             <>
-              <TabelaTecnicos
-                dados={tecConsolidados}
-                subtitulo={`Consolidados — ${limiar50}+ jogos (≥ 50% das rodadas)`}
-              />
-              <TabelaTecnicos
-                dados={tecIntermediarios}
-                subtitulo={`Em construção — 4 a ${Math.max(limiar50 - 1, 4)} jogos`}
-              />
-              <TabelaTecnicos
-                dados={tecEstrantes}
-                subtitulo="Estreantes — até 3 jogos"
-              />
+              <TabelaTecnicos dados={tecConsolidados}   subtitulo={`Consolidados — ${limiar50}+ jogos (≥ 50% das rodadas)`} />
+              <TabelaTecnicos dados={tecIntermediarios} subtitulo={`Em construção — 4 a ${Math.max(limiar50 - 1, 4)} jogos`} />
+              <TabelaTecnicos dados={tecEstrantes}      subtitulo="Estreantes — até 3 jogos" />
               <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '.25rem' }}>
                 * Aproveitamento = (pontos / pontos possíveis) × 100 · 🟨/🟥 = cartões recebidos pelo técnico em campo
               </p>
