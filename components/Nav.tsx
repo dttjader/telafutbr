@@ -1,30 +1,31 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
 
 const publicLinks = [
-  { href: '/', label: 'Rodadas' },
-  { href: '/tabela', label: 'Tabela' },
+  { href: '/',           label: 'Rodadas'    },
+  { href: '/tabela',     label: 'Tabela'     },
   { href: '/confrontos', label: 'Confrontos' },
-  { href: '/artilharia', label: 'Artilharia' },
-  { href: '/goleiros', label: 'Goleiros' },
-  { href: '/analitico', label: 'Analítico' },
-  { href: '/dados', label: 'Dados' },
+  { href: '/dados',      label: 'Dados'      },
 ];
 
 const adminLinks = [
-  { href: '/admin/estadios', label: 'Estádios' },
+  { href: '/admin/estadios',  label: 'Estádios'  },
   { href: '/admin/jogadores', label: 'Jogadores' },
-  { href: '/admin/tecnicos', label: 'Técnicos' },
-  { href: '/admin/partidas', label: 'Partidas' },
-  { href: '/admin/config', label: 'Config' },
+  { href: '/admin/tecnicos',  label: 'Técnicos'  },
+  { href: '/admin/partidas',  label: 'Partidas'  },
+  { href: '/admin/config',    label: 'Config'    },
 ];
 
 export function Nav() {
   const p = usePathname();
   const isAdmin = p.startsWith('/admin');
-  const [menuOpen, setMenuOpen] = useState(false);
+
+  // "Dados" fica ativo para qualquer rota dentro de /dados
+  const isActive = (href: string) => {
+    if (href === '/') return p === '/';
+    return p === href || p.startsWith(href + '/');
+  };
 
   const linkStyle = (href: string, admin = false): React.CSSProperties => ({
     padding: '.35rem .8rem',
@@ -33,8 +34,8 @@ export function Nav() {
     letterSpacing: '.06em',
     borderRadius: 4,
     transition: 'all .15s',
-    color: p === href ? (admin ? 'var(--amarelo-card)' : 'var(--amarelo)') : 'var(--text-muted)',
-    background: p === href ? (admin ? 'rgba(245,158,11,.1)' : 'rgba(255,223,0,.08)') : 'transparent',
+    color: isActive(href) ? (admin ? 'var(--amarelo-card)' : 'var(--amarelo)') : 'var(--text-muted)',
+    background: isActive(href) ? (admin ? 'rgba(245,158,11,.1)' : 'rgba(255,223,0,.08)') : 'transparent',
     textDecoration: 'none',
     whiteSpace: 'nowrap' as const,
   });
@@ -52,14 +53,18 @@ export function Nav() {
           </div>
         </Link>
 
-        {/* Nav pública (sempre visível, sem links admin) */}
+        {/* Nav pública */}
         {!isAdmin && (
           <nav style={{ display: 'flex', gap: '.15rem', alignItems: 'center' }}>
-            {publicLinks.map(l => <Link key={l.href} href={l.href} style={linkStyle(l.href)}>{l.label}</Link>)}
+            {publicLinks.map(l => (
+              <Link key={l.href} href={l.href} style={linkStyle(l.href)}>
+                {l.label}
+              </Link>
+            ))}
           </nav>
         )}
 
-        {/* Nav admin (só aparece em /admin/*) */}
+        {/* Nav admin */}
         {isAdmin && (
           <nav style={{ display: 'flex', gap: '.15rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <Link href="/" style={{ ...linkStyle('/'), marginRight: '.5rem', fontSize: '.8rem' }}>← Site</Link>
