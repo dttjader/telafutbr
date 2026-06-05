@@ -1,10 +1,9 @@
-// Re-exporta a página de perfil de jogador, sobrescrevendo apenas o link de volta
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getJogadores, getPartidas, getTimes, getEstadios } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 
-export { dynamic } from '@/app/analitico/[id]/page';
+export const dynamic = 'force-dynamic';
 
 const POS_LABEL: Record<string, string> = {
   GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral',
@@ -264,4 +263,4 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
       </div>
     </div>
   );
-        }
+}
