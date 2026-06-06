@@ -14,7 +14,7 @@ const ESPN_IDS: Record<string, number> = {
   PAL: 2029,
   CAM: 1063,
   BOT: 1767,
-  FLU: 822,
+  FLU: 3445,
   VAS: 1766,
   SAO: 2039,
   SPF: 2039,
