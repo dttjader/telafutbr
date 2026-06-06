@@ -22,7 +22,7 @@ const ESPN_IDS: Record<string, number> = {
   SAN: 2034,
   INT: 1955,
   GRE: 6207,
-  CRU: 2031,
+  CRU: 1954,
   BAH: 2073,
   CAP: 2049,
   ATG: 2030,
