@@ -6,7 +6,6 @@ import { clientGetJogadores, clientGetTimes, clientUpsertJogador, clientDeleteJo
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
 const POS_LABEL: Record<string,string> = {GOL:'Goleiro',ZAG:'Zagueiro',LAT:'Lateral',VOL:'Volante',MEI:'Meia',ATA:'Atacante'};
 
-// Sub-posições por posição principal
 const SUB_POSICOES: Record<string, { value: SubPosicao; label: string }[]> = {
   GOL: [{ value: 'GOL', label: 'Goleiro' }],
   ZAG: [{ value: 'ZAG', label: 'Zagueiro' }],
@@ -88,7 +87,6 @@ export default function AdminJogadores() {
     setTimeout(() => { setMsg(''); setError(''); }, 3500);
   };
 
-  // Quando posição muda, resetar sub_posicao para o primeiro valor disponível
   const handlePosicaoChange = (novaPosicao: string) => {
     setForm(f => ({ ...f, posicao: novaPosicao, sub_posicao: defaultSubPos(novaPosicao) }));
   };
@@ -156,8 +154,9 @@ export default function AdminJogadores() {
     catch (e) { flash(false, 'Erro: ' + String(e)); }
   };
 
+  // ── Fix: label amigável para jogadores inativos/transferidos
   const nomeTime = (id: string) => {
-    if (id === 'outros') return 'Outros (Inativo/Transferido)';
+    if (id === 'outros') return '⏸️ Inativo / Transferido';
     return times.find(t => t.id === id)?.nome ?? id;
   };
 
@@ -187,6 +186,7 @@ export default function AdminJogadores() {
         {msg && <div className="toast toast-success">{msg}</div>}
         {error && <div className="toast toast-error">{error}</div>}
 
+        {/* ── FORMULÁRIO ── */}
         <div className="card" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.3rem', marginBottom: '1.25rem', color: 'var(--amarelo)' }}>
             {editId ? '✏️ Editar Jogador' : '+ Novo Jogador'}
@@ -209,7 +209,7 @@ export default function AdminJogadores() {
               </div>
             </div>
 
-            {/* Sub-posição — só exibe quando há mais de uma opção */}
+            {/* Sub-posição */}
             {hasSubOpts && (
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: '.5rem' }}>
@@ -249,6 +249,7 @@ export default function AdminJogadores() {
               </div>
             </div>
 
+            {/* Time / Transferência */}
             <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '1rem', marginBottom: '1rem' }}>
               <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: '.75rem', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700 }}>
                 {editId ? '🔄 Transferência' : '🏠 Time inicial'}
@@ -261,7 +262,8 @@ export default function AdminJogadores() {
                       <select value={form.time_atual} onChange={e => setForm(f => ({ ...f, time_atual: e.target.value }))}>
                         <option value="">Selecione...</option>
                         {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                        <option value="outros">Outros (Inativo/Transferido)</option>
+                        {/* ── Fix: label claro para inativo ── */}
+                        <option value="outros">⏸️ Inativo / Transferido</option>
                       </select>
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
@@ -277,7 +279,8 @@ export default function AdminJogadores() {
                       <select value={form.novoTime} onChange={e => setForm(f => ({ ...f, novoTime: e.target.value }))}>
                         <option value="">Manter time atual</option>
                         {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                        <option value="outros">Outros (Inativo/Transferido)</option>
+                        {/* ── Fix: label claro para inativo ── */}
+                        <option value="outros">⏸️ Inativo / Transferido</option>
                       </select>
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
@@ -302,7 +305,7 @@ export default function AdminJogadores() {
           </form>
         </div>
 
-        {/* Filtros */}
+        {/* ── FILTROS ── */}
         <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <select
             style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', padding: '.4rem .7rem', fontSize: '.85rem' }}
@@ -310,7 +313,8 @@ export default function AdminJogadores() {
           >
             <option value="">Todos os times</option>
             {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-            <option value="outros">Outros (Inativos)</option>
+            {/* ── Fix: label claro para inativos no filtro ── */}
+            <option value="outros">⏸️ Inativos / Transferidos</option>
           </select>
           <select
             style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', padding: '.4rem .7rem', fontSize: '.85rem' }}
@@ -322,7 +326,7 @@ export default function AdminJogadores() {
           <span style={{ fontSize: '.85rem', color: 'var(--text-muted)', alignSelf: 'center' }}>{lista.length} jogador(es)</span>
         </div>
 
-        {/* Lista */}
+        {/* ── LISTA ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {lista.map(j => (
             <div key={j.id} className="card" style={{ padding: '1rem 1.25rem' }}>
@@ -341,7 +345,6 @@ export default function AdminJogadores() {
                       </span>
                     )}
                     <span className="badge badge-cinza">{POS_LABEL[j.posicao]}</span>
-                    {/* Badge de sub-posição */}
                     {j.sub_posicao && j.sub_posicao !== j.posicao && (
                       <span style={{
                         fontSize: '.7rem', padding: '.1rem .4rem', borderRadius: 4,
@@ -351,7 +354,6 @@ export default function AdminJogadores() {
                         {SUB_POS_LABEL[j.sub_posicao]}
                       </span>
                     )}
-                    {/* Nacionalidade */}
                     {j.nacionalidade && j.nacionalidade !== 'Brasileiro' && (
                       <span className="badge badge-amarelo">
                         {NAC_FLAG[j.nacionalidade]} {j.nacionalidade}
@@ -384,4 +386,4 @@ export default function AdminJogadores() {
       </div>
     </div>
   );
-      }
+    }
