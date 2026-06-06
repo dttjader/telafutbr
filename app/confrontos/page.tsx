@@ -2,8 +2,15 @@ import { getPartidas, getTimes } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 
+// Times reais — exclui pseudo-ids como 'outros'
+const PSEUDO_IDS = new Set(['outros']);
+
 export default async function ConfrontosPage() {
-  const [partidas, times] = await Promise.all([getPartidas(), getTimes()]);
+  const [partidas, todosOsTimes] = await Promise.all([getPartidas(), getTimes()]);
+
+  // Filtrar apenas times reais
+  const times = todosOsTimes.filter(t => !PSEUDO_IDS.has(t.id));
+
   const encerradas = partidas.filter(p => p.status === 'encerrada')
     .sort((a, b) => b.data.localeCompare(a.data) || b.hora.localeCompare(a.hora));
 
@@ -11,14 +18,12 @@ export default async function ConfrontosPage() {
   const idx: Record<string, number> = {};
   times.forEach((t, i) => { idx[t.id] = i; });
 
-  // Para cada time, registrar seus últimos 5 jogos como mandante
   const ultimas5Casa: Record<number, Set<string>> = {};
   times.forEach((_, i) => {
     const jogosTime = encerradas.filter(p => idx[p.time_casa_id] === i).slice(0, 5);
     ultimas5Casa[i] = new Set(jogosTime.map(p => `${idx[p.time_casa_id]}-${idx[p.time_visitante_id]}`));
   });
 
-  // Para cada time, registrar seus últimos 5 jogos como visitante
   const ultimas5Fora: Record<number, Set<string>> = {};
   times.forEach((_, i) => {
     const jogosTime = encerradas.filter(p => idx[p.time_visitante_id] === i).slice(0, 5);
@@ -32,6 +37,7 @@ export default async function ConfrontosPage() {
 
   for (const p of encerradas) {
     const i = idx[p.time_casa_id], j = idx[p.time_visitante_id];
+    // Ignorar partidas com times que não estão na lista (ex: time_id = 'outros')
     if (i === undefined || j === undefined) continue;
     placar[i][j] = { gc: p.placar_casa, gv: p.placar_visitante, data: p.data };
     totPart++; totGols += p.placar_casa + p.placar_visitante;
@@ -41,7 +47,6 @@ export default async function ConfrontosPage() {
     else totEmp++;
   }
 
-  // Resumo geral por time
   const resumo = times.map((_, i) => {
     let j2 = 0, v = 0, e = 0, d = 0, gm = 0, gs = 0;
     for (let j = 0; j < n; j++) {
@@ -53,7 +58,6 @@ export default async function ConfrontosPage() {
     return { j: j2, v, e, d, gm, gs, pts: v * 3 + e };
   });
 
-  // Resumo mandante/visitante por time, com últimas partidas
   const resumoCasa = times.map((time, i) => {
     let j2 = 0, v = 0, e = 0, d = 0, gm = 0, gs = 0;
     const jogos: { data: string; resultado: 'V' | 'E' | 'D' }[] = [];
@@ -84,7 +88,6 @@ export default async function ConfrontosPage() {
     return { j: j2, v, e, d, gm, gs, pts: v * 3 + e, ultimos5: jogos.slice(0, 5) };
   });
 
-  // Sort indices by pts desc for the resumo tables
   const sortedIdxCasa = [...times.map((_, i) => i)]
     .filter(i => resumoCasa[i].j > 0)
     .sort((a, b) => resumoCasa[b].pts - resumoCasa[a].pts || (resumoCasa[b].gm - resumoCasa[b].gs) - (resumoCasa[a].gm - resumoCasa[a].gs));
@@ -108,7 +111,6 @@ export default async function ConfrontosPage() {
     return { color: 'var(--text-muted)' };
   };
 
-  // 5 shades of green for last 5 home games (index 0 = most recent = darkest)
   const homeShadeBg = ['rgba(0,168,79,.35)', 'rgba(0,168,79,.25)', 'rgba(0,168,79,.16)', 'rgba(0,168,79,.09)', 'rgba(0,168,79,.04)'];
   const awayShadeBg = ['rgba(59,130,246,.35)', 'rgba(59,130,246,.25)', 'rgba(59,130,246,.16)', 'rgba(59,130,246,.09)', 'rgba(59,130,246,.04)'];
   const resColor: Record<string, string> = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' };
@@ -180,11 +182,10 @@ export default async function ConfrontosPage() {
                       const isUltima5Casa = ultimas5Casa[i].has(`${i}-${j}`);
                       const isUltima5Fora = ultimas5Fora[j].has(`${i}-${j}`);
                       const isUltima5 = isUltima5Casa || isUltima5Fora;
-                      // Find the actual partida id for the link
                       const partidaId = encerradas.find(ep =>
                         ep.time_casa_id === times[i].id && ep.time_visitante_id === colTime.id
                       )?.id;
-                      const cell = (
+                      return (
                         <td key={j} style={{
                           ...td, ...cellStyle(p.gc, p.gv),
                           background: isUltima5 ? 'rgba(255,223,0,.18)' : 'transparent',
@@ -199,7 +200,6 @@ export default async function ConfrontosPage() {
                           ) : `${p.gc}×${p.gv}`}
                         </td>
                       );
-                      return cell;
                     })}
                     <td style={{ ...td, background: '#111', color: 'var(--text-muted)' }}>{r.j}</td>
                     <td style={{ ...td, background: '#111', color: '#22c55e', fontWeight: 600 }}>{r.v}</td>
@@ -215,7 +215,7 @@ export default async function ConfrontosPage() {
           </table>
         </div>
 
-        {/* Resumo mandante/visitante — ranked by pts */}
+        {/* Resumo mandante/visitante */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           {[
             { titulo: '📋 Como Mandante', sortedIdx: sortedIdxCasa, resumoArr: resumoCasa, shades: homeShadeBg },
@@ -226,7 +226,6 @@ export default async function ConfrontosPage() {
                 {titulo}
               </div>
 
-              {/* Legenda dos últimos 5 */}
               <div style={{ padding: '6px 14px', display: 'flex', gap: 6, alignItems: 'center', fontSize: '.68rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
                 <span>Últimos 5 jogos:</span>
                 {shades.map((bg, i) => (
@@ -283,4 +282,4 @@ export default async function ConfrontosPage() {
       </div>
     </div>
   );
-}
+        }
