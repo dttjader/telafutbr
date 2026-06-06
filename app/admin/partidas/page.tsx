@@ -7,6 +7,10 @@ import { clientGetPartidas, clientGetTimes, clientUpsertPartida, clientDeletePar
 const STATUS_OPTS = [{value:'agendada',label:'Agendada'},{value:'ao_vivo',label:'Ao Vivo'},{value:'encerrada',label:'Encerrada'},{value:'adiada',label:'Adiada'}];
 const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_casa_id:'',time_visitante_id:'',estadio_id:'',placar_casa:'0',placar_visitante:'0',publico:'',acrescimo_primeiro:'0',acrescimo_segundo:'0',arb_principal:'',arb_ass1:'',arb_ass2:'',arb_quarto:'',arb_var:'',tecnico_casa_id:'',tecnico_visitante_id:''});
 
+// Times reais — exclui qualquer pseudo-id como 'outros'
+const PSEUDO_IDS = new Set(['outros']);
+const filtrarTimesReais = (times: Time[]) => times.filter(t => !PSEUDO_IDS.has(t.id));
+
 export default function AdminPartidas() {
   const router = useRouter();
   const [partidas, setPartidas] = useState<Partida[]>([]);
@@ -22,9 +26,10 @@ export default function AdminPartidas() {
   const load = async () => {
     const [p,t,e,tc] = await Promise.all([clientGetPartidas(),clientGetTimes(),clientGetEstadios(),clientGetTecnicos()]);
     setTecnicos(tc);
-    // Ordenação invertida: rodada maior primeiro
     setPartidas([...p].sort((a,b)=>b.rodada-a.rodada||a.data.localeCompare(b.data)));
-    setTimes(t); setEstadios(e);
+    // Garantir que nunca exiba pseudo-times
+    setTimes(filtrarTimesReais(t));
+    setEstadios(e);
   };
   useEffect(()=>{load();},[]);
 
