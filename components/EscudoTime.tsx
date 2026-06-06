@@ -20,7 +20,7 @@ const ESPN_IDS: Record<string, number> = {
   SPF: 2039,
   COR: 1776,
   SAN: 2034,
-  INT: 2036,
+  INT: 1955,
   GRE: 6207,
   CRU: 2031,
   BAH: 2073,
