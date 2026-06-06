@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
 import { Estadio, Time, Jogador, Partida } from './types';
 
+// IDs reservados que não são times reais
+const PSEUDO_TIME_IDS = new Set(['outros']);
+
 // ── Estádios ──────────────────────────────────────────────
 export async function getEstadios(): Promise<Estadio[]> {
   const { data, error } = await supabase.from('estadios').select('*').order('nome');
@@ -26,13 +29,15 @@ export async function deleteEstadio(id: string): Promise<void> {
 }
 
 // ── Times ─────────────────────────────────────────────────
+// Retorna apenas times reais — filtra pseudo-ids como 'outros'
 export async function getTimes(): Promise<Time[]> {
   const { data, error } = await supabase.from('times').select('*').order('nome');
   if (error) throw error;
-  return data as Time[];
+  return (data as Time[]).filter(t => !PSEUDO_TIME_IDS.has(t.id));
 }
 
 export async function getTime(id: string): Promise<Time | null> {
+  if (PSEUDO_TIME_IDS.has(id)) return null;
   const { data, error } = await supabase.from('times').select('*').eq('id', id).single();
   if (error) return null;
   return data as Time;
