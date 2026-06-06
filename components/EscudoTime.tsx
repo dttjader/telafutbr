@@ -1,4 +1,5 @@
-// Client-safe — recebe os dados via props, sem imports de Node.js
+'use client';
+import { useState } from 'react';
 import { Time } from '@/lib/types';
 
 interface Props {
@@ -7,21 +8,85 @@ interface Props {
   showNome?: boolean;
 }
 
+// IDs da ESPN CDN para times da Série A 2026
+const ESPN_IDS: Record<string, number> = {
+  FLA: 819,
+  PAL: 2029,
+  CAM: 1063,
+  BOT: 1767,
+  FLU: 822,
+  VAS: 1766,
+  SAO: 2039,
+  SPF: 2039,
+  COR: 1776,
+  SAN: 2034,
+  INT: 2036,
+  GRE: 2038,
+  CRU: 2031,
+  BAH: 2073,
+  CAP: 2030,
+  ATG: 2030,
+  RBB: 5901,
+  MIR: 9908,
+  CHA: 5765,
+  CFC: 2032,
+  COT: 2032,
+  REM: 5770,
+  FOR: 2076,
+  VIT: 5754,
+};
+
 export function EscudoTime({ time, size = 44, showNome = false }: Props) {
+  const [imgError, setImgError] = useState(false);
+
   if (!time) return null;
+
   const fontSize = Math.round(size * 0.28);
+  const espnId = ESPN_IDS[time.sigla];
+  const espnUrl = espnId && !imgError
+    ? `https://a.espncdn.com/i/teamlogos/soccer/500/${espnId}.png`
+    : null;
+
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <span style={{
-        width: size, height: size, borderRadius: '50%',
-        background: `linear-gradient(135deg, ${time.cor_primaria} 0%, ${time.cor_secundaria || '#888'} 100%)`,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'Bebas Neue', sans-serif", fontSize, color: '#fff',
-        textShadow: '0 1px 3px rgba(0,0,0,.8)', flexShrink: 0,
-        border: '2px solid rgba(255,255,255,.12)',
-        boxShadow: '0 2px 8px rgba(0,0,0,.5)',
-      }}>{time.sigla}</span>
-      {showNome && <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{time.nome}</span>}
+        width: size,
+        height: size,
+        borderRadius: espnUrl ? 4 : '50%',
+        background: espnUrl
+          ? 'rgba(255,255,255,0.04)'
+          : `linear-gradient(135deg, ${time.cor_primaria} 0%, ${time.cor_secundaria || '#888'} 100%)`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        overflow: 'hidden',
+        border: espnUrl ? 'none' : '2px solid rgba(255,255,255,.12)',
+        boxShadow: espnUrl ? 'none' : '0 2px 8px rgba(0,0,0,.5)',
+      }}>
+        {espnUrl ? (
+          <img
+            src={espnUrl}
+            alt={time.nome}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <span style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize,
+            color: '#fff',
+            textShadow: '0 1px 3px rgba(0,0,0,.8)',
+          }}>
+            {time.sigla}
+          </span>
+        )}
+      </span>
+      {showNome && (
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+          {time.nome}
+        </span>
+      )}
     </span>
   );
 }
