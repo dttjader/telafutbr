@@ -28,10 +28,11 @@ export async function clientDeleteEstadio(id: string): Promise<void> {
 }
 
 // ── Times ─────────────────────────────────────────────────
+// Retorna apenas times reais — nunca 'outros' (pseudo-id para jogadores inativos)
 export async function clientGetTimes(): Promise<Time[]> {
   const { data, error } = await getClient().from('times').select('*').order('nome');
   if (error) throw error;
-  return data as Time[];
+  return (data as Time[]).filter(t => t.id !== 'outros');
 }
 
 // ── Jogadores ─────────────────────────────────────────────
@@ -93,8 +94,6 @@ export async function clientDeleteTecnico(id: string): Promise<void> {
   const { error } = await getClient().from('tecnicos').delete().eq('id', id);
   if (error) throw error;
 }
-
-// ── Técnicos (server) ─────────────────────────────────────
 
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
