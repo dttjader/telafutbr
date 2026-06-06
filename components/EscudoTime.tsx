@@ -15,7 +15,7 @@ const ESPN_IDS: Record<string, number> = {
   CAM: 1063,
   BOT: 1767,
   FLU: 3445,
-  VAS: 1766,
+  VAS: 2052,
   SAO: 2026,
   SPF: 2026,
   COR: 1035,
@@ -33,7 +33,7 @@ const ESPN_IDS: Record<string, number> = {
   COT: 2032,
   REM: 5770,
   FOR: 2076,
-  VIT: 2053,
+  VIT: 2435,
 };
 
 export function EscudoTime({ time, size = 44, showNome = false }: Props) {
