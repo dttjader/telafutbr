@@ -18,7 +18,7 @@ const ESPN_IDS: Record<string, number> = {
   VAS: 1766,
   SAO: 2026,
   SPF: 2026,
-  COR: 1776,
+  COR: 1035,
   SAN: 2034,
   INT: 1955,
   GRE: 6207,
