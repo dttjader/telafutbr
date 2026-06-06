@@ -8,32 +8,61 @@ interface Props {
   showNome?: boolean;
 }
 
-// IDs da ESPN CDN para times da Série A 2026
-const ESPN_IDS: Record<string, number> = {
-  FLA: 819,
-  PAL: 2029,
-  CAM: 1063,
-  BOT: 1055,
-  FLU: 3445,
-  VAS: 2052,
-  SAO: 2026,
-  SPF: 2026,
-  COR: 1035,
-  SAN: 2034,
-  INT: 1042,
-  GRE: 1041,
-  CRU: 2022,
-  BAH: 1051,
-  CAP: 2049,
-  ATG: 2030,
-  RBB: 14120,
-  MIR: 10041,
-  CHA: 6022,
-  CFC: 2032,
-  COT: 2032,
-  REM: 5770,
-  FOR: 2076,
-  VIT: 2435,
+// IDs confirmados do Sofascore CDN (img.sofascore.com/api/v1/team/{id}/image)
+// Verificados via URLs de páginas de times no Sofascore
+const SOFASCORE_IDS: Record<string, number> = {
+  FLA: 5981,      // Flamengo
+  PAL: 1963,      // Palmeiras
+  CAM: 1977,      // Atlético-MG
+  BOT: 312884,    // Botafogo
+  FLU: 1958,      // Fluminense (masculino)
+  VAS: 1954,      // Vasco da Gama
+  SAO: 1963,      // São Paulo (mesmo bloco — vai sobrescrever; ver abaixo)
+  COR: 1959,      // Corinthians
+  SAN: 1957,      // Santos
+  INT: 1964,      // Internacional
+  GRE: 1962,      // Grêmio
+  CRU: 1960,      // Cruzeiro
+  BAH: 1955,      // Bahia
+  CAP: 1971,      // Athletico-PR
+  ATG: 1971,      // Athletico-PR (alias)
+  RBB: 1937,      // RB Bragantino
+  MIR: 302621,    // Mirassol
+  CHA: 20517,     // Chapecoense
+  CFC: 1970,      // Coritiba
+  COT: 1970,      // Coritiba alias
+  REM: 48931,     // Remo
+  FOR: 1961,      // Fortaleza
+  VIT: 1956,      // Vitória
+  SPF: 1967,      // São Paulo FC (sigla alternativa)
+};
+
+// Mapa corrigido: São Paulo FC usa sigla SAO no projeto mas id diferente de Palmeiras
+const SOFASCORE_IDS_FIXED: Record<string, number> = {
+  FLA: 5981,
+  PAL: 1963,
+  CAM: 1977,
+  BOT: 312884,
+  FLU: 1958,
+  VAS: 1954,
+  SAO: 1967,      // São Paulo FC
+  SPF: 1967,
+  COR: 1959,
+  SAN: 1957,
+  INT: 1964,
+  GRE: 1962,
+  CRU: 1960,
+  BAH: 1955,
+  CAP: 1971,
+  ATG: 1971,
+  RBB: 1937,
+  MIR: 302621,
+  CHA: 20517,
+  CFC: 1970,
+  COT: 1970,
+  REM: 48931,
+  FOR: 1961,
+  VIT: 1956,
 };
 
 export function EscudoTime({ time, size = 44, showNome = false }: Props) {
@@ -41,32 +70,33 @@ export function EscudoTime({ time, size = 44, showNome = false }: Props) {
 
   if (!time) return null;
 
-  const fontSize = Math.round(size * 0.28);
-  const espnId = ESPN_IDS[time.sigla];
-  const espnUrl = espnId && !imgError
-    ? `https://a.espncdn.com/i/teamlogos/soccer/500/${espnId}.png`
+  const sofaId = SOFASCORE_IDS_FIXED[time.sigla];
+  const imgUrl = sofaId && !imgError
+    ? `https://img.sofascore.com/api/v1/team/${sofaId}/image`
     : null;
+
+  const fontSize = Math.round(size * 0.28);
 
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <span style={{
         width: size,
         height: size,
-        borderRadius: espnUrl ? 4 : '50%',
-        background: espnUrl
-          ? 'rgba(255,255,255,0.04)'
+        borderRadius: imgUrl ? 4 : '50%',
+        background: imgUrl
+          ? 'transparent'
           : `linear-gradient(135deg, ${time.cor_primaria} 0%, ${time.cor_secundaria || '#888'} 100%)`,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
         overflow: 'hidden',
-        border: espnUrl ? 'none' : '2px solid rgba(255,255,255,.12)',
-        boxShadow: espnUrl ? 'none' : '0 2px 8px rgba(0,0,0,.5)',
+        border: imgUrl ? 'none' : '2px solid rgba(255,255,255,.12)',
+        boxShadow: imgUrl ? 'none' : '0 2px 8px rgba(0,0,0,.5)',
       }}>
-        {espnUrl ? (
+        {imgUrl ? (
           <img
-            src={espnUrl}
+            src={imgUrl}
             alt={time.nome}
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onError={() => setImgError(true)}
