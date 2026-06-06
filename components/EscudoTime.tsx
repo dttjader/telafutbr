@@ -28,7 +28,7 @@ const ESPN_IDS: Record<string, number> = {
   ATG: 2030,
   RBB: 5901,
   MIR: 9908,
-  CHA: 5765,
+  CHA: 6022,
   CFC: 2032,
   COT: 2032,
   REM: 5770,
