@@ -14,13 +14,14 @@ export default async function DadosPage() {
   const totalGolsCasa = encerradas.reduce((s, p) => s + p.placar_casa, 0);
   const totalGolsVis = encerradas.reduce((s, p) => s + p.placar_visitante, 0);
 
-  const placarMap: Record<string, { count: number; vitoriasVisitante: number }> = {};
+  const placarMap: Record<string, { count: number; vitCasa: number; vitVisitante: number; empates: number }> = {};
   for (const p of encerradas) {
-    const [a, b] = [p.placar_casa, p.placar_visitante].sort((x, y) => x - y);
-    const key = `${a}x${b}`;
-    if (!placarMap[key]) placarMap[key] = { count: 0, vitoriasVisitante: 0 };
+    const key = `${p.placar_casa}x${p.placar_visitante}`;
+    if (!placarMap[key]) placarMap[key] = { count: 0, vitCasa: 0, vitVisitante: 0, empates: 0 };
     placarMap[key].count++;
-    if (p.placar_visitante > p.placar_casa) placarMap[key].vitoriasVisitante++;
+    if (p.placar_casa > p.placar_visitante) placarMap[key].vitCasa++;
+    else if (p.placar_visitante > p.placar_casa) placarMap[key].vitVisitante++;
+    else placarMap[key].empates++;
   }
   const placaresFrequentes = Object.entries(placarMap)
     .sort((a, b) => b[1].count - a[1].count)
@@ -28,8 +29,9 @@ export default async function DadosPage() {
     .map(([placar, data]) => ({
       placar: placar.replace('x', '\u00d7'),
       count: data.count,
-      vitoriasVisitante: data.vitoriasVisitante,
-      isEmpate: placar.split('x')[0] === placar.split('x')[1],
+      vitCasa: data.vitCasa,
+      vitVisitante: data.vitVisitante,
+      isEmpate: data.empates === data.count,
     }));
 
   const estadioMap: Record<string, { gols: number; jogos: number; nome: string; cidade: string; estado: string }> = {};
