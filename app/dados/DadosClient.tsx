@@ -26,7 +26,7 @@ interface Props {
   totalGols: number;
   totalGolsCasa: number;
   totalGolsVis: number;
-  placaresFrequentes: { placar: string; count: number; vitoriasVisitante: number; isEmpate: boolean }[];
+  placaresFrequentes: { placar: string; count: number; vitCasa: number; vitVisitante: number; isEmpate: boolean }[];
   rankingEstadio: { nome: string; cidade: string; estado: string; gols: number; jogos: number; media: number }[];
   rankingEstado: { uf: string; gols: number; jogos: number; media: number }[];
   rankingArbitrosPorCargo: EntradaArbitro[];
@@ -281,10 +281,14 @@ export function DadosClient({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                   <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.5rem', color: 'var(--text)' }}>{d.placar}</span>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--verde)' }}>{d.count} ocorrências</div>
-                    {!d.isEmpate && (
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--verde)' }}>{d.count} ocorrência(s)</div>
+                    {d.isEmpate ? (
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        {d.vitoriasVisitante} vitórias do visitante
+                        Empate
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                        {d.vitCasa}V mandante · {d.vitVisitante}V visitante
                       </div>
                     )}
                   </div>
