@@ -80,9 +80,8 @@ export default function AdminPartidaEventos() {
   const save = async (updated: Partida) => {
     try {
       const golsValidos = updated.gols.filter(g => !['penalti_perdido','penalti_defendido'].includes(g.tipo));
-      const placarCasa = golsValidos.filter(g => g.tipo==='contra' ? g.time_id!==updated.time_casa_id : g.time_id===updated.time_casa_id).length;
-      const placarVis  = golsValidos.filter(g => g.tipo==='contra' ? g.time_id!==updated.time_visitante_id : g.time_id===updated.time_visitante_id).length;
-      await clientUpsertPartida({...updated, placar_casa:placarCasa, placar_visitante:placarVis});
+      const placarCasa = golsValidos.filter(g => g.time_id === updated.time_casa_id).length;
+      const placarVis  = golsValidos.filter(g => g.time_id === updated.time_visitante_id).length;      await clientUpsertPartida({...updated, placar_casa:placarCasa, placar_visitante:placarVis});
       flash(true,'Salvo!'); load();
     } catch(e) { flash(false,'Erro: '+String(e)); }
   };
