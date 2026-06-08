@@ -4,17 +4,6 @@ import Link from 'next/link';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time } from '@/lib/types';
 
-type CargoArbitro = 'principal' | 'assistente1' | 'assistente2' | 'quarto' | 'var';
-
-interface EntradaArbitro {
-  nome: string;
-  cargo: CargoArbitro;
-  jogos: number;
-  gols: number;
-  amarelos: number;
-  vermelhos: number;
-}
-
 interface RankingTecnico {
   tecnico_id: string; j: number; v: number; e: number; d: number;
   gp: number; gc: number; amarelos: number; vermelhos: number;
@@ -29,29 +18,14 @@ interface Props {
   placaresFrequentes: { placar: string; count: number; vitVisitante: number; isEmpate: boolean }[];
   rankingEstadio: { nome: string; cidade: string; estado: string; gols: number; jogos: number; media: number }[];
   rankingEstado: { uf: string; gols: number; jogos: number; media: number }[];
-  rankingArbitrosPorCargo: EntradaArbitro[];
   rankingTecnicos: RankingTecnico[];
   totalRodadas: number;
   tecnicos: { id: string; nome: string; time_atual: string | null; ativo: boolean; historico: any[] }[];
   times: Time[];
+  // resumo de árbitros para o card de atalho
+  totalArbitros: number;
+  totalArbitrosPrincipais: number;
 }
-
-const CARGO_LABEL: Record<CargoArbitro, string> = {
-  principal:   'Árbitro Principal',
-  assistente1: 'Assistente 1',
-  assistente2: 'Assistente 2',
-  quarto:      '4º Árbitro',
-  var:         'VAR',
-};
-
-const CARGO_OPTS: { value: CargoArbitro | ''; label: string }[] = [
-  { value: '',            label: 'Todos os cargos'     },
-  { value: 'principal',   label: '🟢 Árbitro Principal' },
-  { value: 'assistente1', label: '🚩 Assistente 1'      },
-  { value: 'assistente2', label: '🚩 Assistente 2'      },
-  { value: 'quarto',      label: '📋 4º Árbitro'        },
-  { value: 'var',         label: '📺 VAR'               },
-];
 
 const barStyle = (pct: number, cor: string): React.CSSProperties => ({
   width: `${Math.max(pct * 100, 3)}%`, height: 8, background: cor, borderRadius: 4, transition: 'width .4s',
@@ -61,8 +35,9 @@ const secTitle = (text: string) => (
   <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>{text}</h2>
 );
 
-// Cards de atalho para as sub-seções
-const SubSections = ({ totalJogos, totalGols }: { totalJogos: number; totalGols: number }) => (
+const SubSections = ({ totalJogos, totalGols, totalArbitros, totalArbitrosPrincipais }: {
+  totalJogos: number; totalGols: number; totalArbitros: number; totalArbitrosPrincipais: number;
+}) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
     {[
       {
@@ -73,6 +48,7 @@ const SubSections = ({ totalJogos, totalGols }: { totalJogos: number; totalGols:
         cor: 'var(--amarelo)',
         bg: 'rgba(255,223,0,.06)',
         border: 'rgba(255,223,0,.2)',
+        meta: `${totalGols} gols em ${totalJogos} partidas`,
       },
       {
         href: '/dados/goleiros',
@@ -82,6 +58,7 @@ const SubSections = ({ totalJogos, totalGols }: { totalJogos: number; totalGols:
         cor: '#22c55e',
         bg: 'rgba(34,197,94,.06)',
         border: 'rgba(34,197,94,.2)',
+        meta: null,
       },
       {
         href: '/dados/analitico',
@@ -91,6 +68,17 @@ const SubSections = ({ totalJogos, totalGols }: { totalJogos: number; totalGols:
         cor: '#3b82f6',
         bg: 'rgba(59,130,246,.06)',
         border: 'rgba(59,130,246,.2)',
+        meta: null,
+      },
+      {
+        href: '/dados/arbitros',
+        emoji: '🟢',
+        titulo: 'Árbitros',
+        desc: 'Corpo de arbitragem, cartões e histórico por partida',
+        cor: '#a78bfa',
+        bg: 'rgba(167,139,250,.06)',
+        border: 'rgba(167,139,250,.2)',
+        meta: totalArbitros > 0 ? `${totalArbitrosPrincipais} árbitro(s) principal(is)` : null,
       },
     ].map(s => (
       <Link key={s.href} href={s.href} style={{
@@ -109,6 +97,9 @@ const SubSections = ({ totalJogos, totalGols }: { totalJogos: number; totalGols:
           {s.titulo}
         </div>
         <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{s.desc}</div>
+        {s.meta && (
+          <div style={{ marginTop: '.5rem', fontSize: '.72rem', color: s.cor, opacity: .8 }}>{s.meta}</div>
+        )}
         <div style={{ marginTop: '.75rem', fontSize: '.72rem', color: s.cor, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>
           Ver →
         </div>
@@ -121,8 +112,8 @@ export function DadosClient({
   totalJogos, totalGols, totalGolsCasa, totalGolsVis,
   placaresFrequentes,
   rankingEstadio, rankingEstado,
-  rankingArbitrosPorCargo,
   rankingTecnicos, totalRodadas, tecnicos, times,
+  totalArbitros, totalArbitrosPrincipais,
 }: Props) {
   const mediaTotal = totalJogos > 0 ? (totalGols / totalJogos).toFixed(2) : '—';
   const mediaCasa  = totalJogos > 0 ? (totalGolsCasa / totalJogos).toFixed(2) : '—';
@@ -130,13 +121,6 @@ export function DadosClient({
   const maxPlacar  = placaresFrequentes[0]?.count ?? 1;
   const maxEstadio = rankingEstadio[0]?.media ?? 1;
   const maxEstado  = rankingEstado[0]?.media  ?? 1;
-
-  const [filtroArbitro, setFiltroArbitro] = useState<CargoArbitro | ''>('');
-
-  const arbFiltrados = (filtroArbitro
-    ? rankingArbitrosPorCargo.filter(a => a.cargo === filtroArbitro)
-    : rankingArbitrosPorCargo
-  ).sort((a, b) => b.jogos - a.jogos);
 
   const limiar50 = Math.ceil(totalRodadas * 0.5);
   const tecConsolidados   = rankingTecnicos.filter(r => r.j >= limiar50);
@@ -251,7 +235,12 @@ export function DadosClient({
       <div className="container">
 
         {/* Atalhos para sub-seções */}
-        <SubSections totalJogos={totalJogos} totalGols={totalGols} />
+        <SubSections
+          totalJogos={totalJogos}
+          totalGols={totalGols}
+          totalArbitros={totalArbitros}
+          totalArbitrosPrincipais={totalArbitrosPrincipais}
+        />
 
         {/* Cards resumo */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '1rem', marginBottom: '2rem' }}>
@@ -283,9 +272,7 @@ export function DadosClient({
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--verde)' }}>{d.count} ocorrência(s)</div>
                     {d.isEmpate ? (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        Empate
-                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Empate</div>
                     ) : (
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                         {d.vitVisitante} vitória(s) do visitante
@@ -343,68 +330,6 @@ export function DadosClient({
           </div>
         </div>
 
-        {/* Árbitros */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem', paddingBottom: '.75rem', borderBottom: '1px solid var(--border)' }}>
-            <h2 style={{ fontSize: '1.5rem', margin: 0 }}>🟢 Gols e Cartões por Árbitro</h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', alignItems: 'center' }}>
-              {CARGO_OPTS.map(opt => (
-                <button key={opt.value} onClick={() => setFiltroArbitro(opt.value as CargoArbitro | '')} style={{
-                  padding: '.3rem .65rem', borderRadius: 5, cursor: 'pointer', transition: 'all .15s',
-                  border: `1px solid ${filtroArbitro === opt.value ? 'var(--verde)' : 'var(--border)'}`,
-                  background: filtroArbitro === opt.value ? 'rgba(0,168,79,.15)' : 'var(--surface2)',
-                  color: filtroArbitro === opt.value ? 'var(--verde)' : 'var(--text-muted)',
-                  fontSize: '.75rem', fontWeight: filtroArbitro === opt.value ? 700 : 400, whiteSpace: 'nowrap',
-                }}>{opt.label}</button>
-              ))}
-            </div>
-          </div>
-          {filtroArbitro && (
-            <p style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-              Exibindo: <strong style={{ color: 'var(--verde)' }}>{CARGO_LABEL[filtroArbitro]}</strong>
-              {' · '}{arbFiltrados.length} profissional(is)
-            </p>
-          )}
-          {arbFiltrados.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados.</p>}
-          {arbFiltrados.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
-                <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
-                  <tr>
-                    {['Árbitro', 'Cargo', 'Jogos', 'Gols', 'Gols/jogo', '🟨', '🟨/jogo', '🟥', '🟥/jogo'].map(h => (
-                      <th key={h} style={{
-                        padding: '.6rem .9rem',
-                        textAlign: h === 'Árbitro' || h === 'Cargo' ? 'left' : 'center',
-                        fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem',
-                        letterSpacing: '.06em', color: 'var(--text-muted)',
-                      }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {arbFiltrados.map((a, i) => (
-                    <tr key={`${a.cargo}-${a.nome}`} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                      <td style={{ padding: '.5rem .9rem', fontWeight: 600 }}>{a.nome}</td>
-                      <td style={{ padding: '.5rem .9rem' }}>
-                        <span style={{ fontSize: '.7rem', padding: '.15rem .45rem', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                          {CARGO_LABEL[a.cargo]}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--amarelo)' }}>{a.jogos}</td>
-                      <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>{a.gols}</td>
-                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--verde)' }}>{(a.gols / a.jogos).toFixed(2)}</td>
-                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: '#f59e0b', fontWeight: 600 }}>{a.amarelos}</td>
-                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: '#f59e0b' }}>{(a.amarelos / a.jogos).toFixed(2)}</td>
-                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--rebaixamento)', fontWeight: 600 }}>{a.vermelhos}</td>
-                      <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--rebaixamento)' }}>{(a.vermelhos / a.jogos).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
         {/* Ranking técnicos */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '.75rem', paddingBottom: '.75rem', borderBottom: '1px solid var(--border)' }}>
@@ -431,4 +356,4 @@ export function DadosClient({
       </div>
     </div>
   );
-}
+                    }
