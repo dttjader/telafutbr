@@ -14,8 +14,7 @@ export default async function DadosPage() {
   const totalGolsCasa = encerradas.reduce((s, p) => s + p.placar_casa, 0);
   const totalGolsVis = encerradas.reduce((s, p) => s + p.placar_visitante, 0);
 
-  // Agrupa por placar normalizado (maior gols × menor gols), independente de mandante/visitante
-  // 1x0 e 0x1 viram ambos "1x0"; vitVisitante conta quantas vezes o menor placar era do mandante
+  // ── Placares frequentes ───────────────────────────────────────────────────
   const placarMap: Record<string, { count: number; vitVisitante: number; empates: number }> = {};
   for (const p of encerradas) {
     const casaVenceu = p.placar_casa > p.placar_visitante;
@@ -40,6 +39,7 @@ export default async function DadosPage() {
       isEmpate: data.empates === data.count,
     }));
 
+  // ── Estádios ──────────────────────────────────────────────────────────────
   const estadioMap: Record<string, { gols: number; jogos: number; nome: string; cidade: string; estado: string }> = {};
   for (const p of encerradas) {
     if (!estadioMap[p.estadio_id]) {
@@ -54,6 +54,7 @@ export default async function DadosPage() {
     .map(e => ({ ...e, media: e.gols / e.jogos }))
     .sort((a, b) => b.media - a.media);
 
+  // ── Estados ───────────────────────────────────────────────────────────────
   const estadoMap: Record<string, { gols: number; jogos: number }> = {};
   for (const p of encerradas) {
     const e = estadios.find(e => e.id === p.estadio_id);
@@ -67,39 +68,20 @@ export default async function DadosPage() {
     .map(([uf, v]) => ({ uf, ...v, media: v.gols / v.jogos }))
     .sort((a, b) => b.media - a.media);
 
-  type CargoArbitro = 'principal' | 'assistente1' | 'assistente2' | 'quarto' | 'var';
-  type EntradaArbitro = { nome: string; cargo: CargoArbitro; jogos: number; gols: number; amarelos: number; vermelhos: number };
-
-  const arbMapPorCargo: Record<string, EntradaArbitro> = {};
-  const addArbitro = (nome: string, cargo: CargoArbitro, gols: number, amarelos: number, vermelhos: number) => {
-    if (!nome || !nome.trim()) return;
-    const key = `${cargo}::${nome.trim()}`;
-    if (!arbMapPorCargo[key]) arbMapPorCargo[key] = { nome: nome.trim(), cargo, jogos: 0, gols: 0, amarelos: 0, vermelhos: 0 };
-    arbMapPorCargo[key].jogos++;
-    arbMapPorCargo[key].gols += gols;
-    arbMapPorCargo[key].amarelos += amarelos;
-    arbMapPorCargo[key].vermelhos += vermelhos;
-  };
-
+  // ── Resumo de árbitros (só contagens para o card de atalho) ───────────────
+  const arbitrosNomes = new Set<string>();
+  const arbitrosPrincipais = new Set<string>();
   for (const p of encerradas) {
-    const golsPartida = p.placar_casa + p.placar_visitante;
-    let amarelos = 0, vermelhos = 0;
-    for (const c of p.cartoes) {
-      if (c.tipo === 'amarelo' || c.tipo === 'amarelo_tecnico') amarelos++;
-      else if (c.tipo === 'vermelho' || c.tipo === 'vermelho_tecnico') vermelhos++;
-    }
-    const arb = p.arbitragem;
-    if (arb?.principal) addArbitro(arb.principal, 'principal', golsPartida, amarelos, vermelhos);
-    if (arb?.assistente1) addArbitro(arb.assistente1, 'assistente1', golsPartida, amarelos, vermelhos);
-    if (arb?.assistente2) addArbitro(arb.assistente2, 'assistente2', golsPartida, amarelos, vermelhos);
-    if (arb?.quarto) addArbitro(arb.quarto, 'quarto', golsPartida, amarelos, vermelhos);
-    if (arb?.var) addArbitro(arb.var, 'var', golsPartida, amarelos, vermelhos);
+    const arb = p.arbitragem as Record<string, string>;
+    if (arb?.principal?.trim())   { arbitrosNomes.add(arb.principal.trim()); arbitrosPrincipais.add(arb.principal.trim()); }
+    if (arb?.assistente1?.trim()) arbitrosNomes.add(arb.assistente1.trim());
+    if (arb?.assistente2?.trim()) arbitrosNomes.add(arb.assistente2.trim());
+    if (arb?.quarto?.trim())      arbitrosNomes.add(arb.quarto.trim());
+    if (arb?.var?.trim())         arbitrosNomes.add(arb.var.trim());
   }
 
-  const rankingArbitrosPorCargo: EntradaArbitro[] = Object.values(arbMapPorCargo).sort((a, b) => b.jogos - a.jogos);
-
+  // ── Técnicos ──────────────────────────────────────────────────────────────
   const totalRodadas = new Set(encerradas.map(p => p.rodada)).size;
-
   const tecnicoMap: Record<string, {
     tecnico_id: string; j: number; v: number; e: number; d: number;
     gp: number; gc: number; amarelos: number; vermelhos: number;
@@ -120,7 +102,7 @@ export default async function DadosPage() {
 
     for (const c of p.cartoes) {
       if (c.tipo !== 'amarelo_tecnico' && c.tipo !== 'vermelho_tecnico') continue;
-      const tecId = c.tecnico_id;
+      const tecId = (c as any).tecnico_id;
       if (!tecId) continue;
       if (!tecnicoMap[tecId]) tecnicoMap[tecId] = { tecnico_id: tecId, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, amarelos: 0, vermelhos: 0 };
       if (c.tipo === 'amarelo_tecnico') tecnicoMap[tecId].amarelos++;
@@ -142,11 +124,12 @@ export default async function DadosPage() {
       placaresFrequentes={placaresFrequentes}
       rankingEstadio={rankingEstadio}
       rankingEstado={rankingEstado}
-      rankingArbitrosPorCargo={rankingArbitrosPorCargo}
       rankingTecnicos={rankingTecnicos}
       totalRodadas={totalRodadas}
       tecnicos={tecnicos}
       times={times}
+      totalArbitros={arbitrosNomes.size}
+      totalArbitrosPrincipais={arbitrosPrincipais.size}
     />
   );
-      }
+    }
