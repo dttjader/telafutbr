@@ -14,22 +14,28 @@ export default async function DadosPage() {
   const totalGolsCasa = encerradas.reduce((s, p) => s + p.placar_casa, 0);
   const totalGolsVis = encerradas.reduce((s, p) => s + p.placar_visitante, 0);
 
-  const placarMap: Record<string, { count: number; vitCasa: number; vitVisitante: number; empates: number }> = {};
+  // Agrupa por placar normalizado (maior gols × menor gols), independente de mandante/visitante
+  // 1x0 e 0x1 viram ambos "1x0"; vitVisitante conta quantas vezes o menor placar era do mandante
+  const placarMap: Record<string, { count: number; vitVisitante: number; empates: number }> = {};
   for (const p of encerradas) {
-    const key = `${p.placar_casa}x${p.placar_visitante}`;
-    if (!placarMap[key]) placarMap[key] = { count: 0, vitCasa: 0, vitVisitante: 0, empates: 0 };
+    const casaVenceu = p.placar_casa > p.placar_visitante;
+    const visVenceu  = p.placar_visitante > p.placar_casa;
+    const empate     = p.placar_casa === p.placar_visitante;
+    const [a, b] = casaVenceu
+      ? [p.placar_casa, p.placar_visitante]
+      : [p.placar_visitante, p.placar_casa];
+    const key = `${a}x${b}`;
+    if (!placarMap[key]) placarMap[key] = { count: 0, vitVisitante: 0, empates: 0 };
     placarMap[key].count++;
-    if (p.placar_casa > p.placar_visitante) placarMap[key].vitCasa++;
-    else if (p.placar_visitante > p.placar_casa) placarMap[key].vitVisitante++;
-    else placarMap[key].empates++;
+    if (visVenceu)  placarMap[key].vitVisitante++;
+    if (empate)     placarMap[key].empates++;
   }
   const placaresFrequentes = Object.entries(placarMap)
     .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 12)
+    .slice(0, 15)
     .map(([placar, data]) => ({
       placar: placar.replace('x', '\u00d7'),
       count: data.count,
-      vitCasa: data.vitCasa,
       vitVisitante: data.vitVisitante,
       isEmpate: data.empates === data.count,
     }));
@@ -126,8 +132,7 @@ export default async function DadosPage() {
     .filter(r => r.j > 0 || r.amarelos > 0 || r.vermelhos > 0)
     .map(r => ({ ...r, pts: r.v * 3 + r.e, aproveitamento: r.j > 0 ? Math.round((r.v * 3 + r.e) / (r.j * 3) * 100) : 0 }))
     .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v);
-console.log('Placares únicos:', Object.keys(placarMap));
-  
+
   return (
     <DadosClient
       totalJogos={totalJogos}
@@ -144,4 +149,4 @@ console.log('Placares únicos:', Object.keys(placarMap));
       times={times}
     />
   );
-}
+      }
