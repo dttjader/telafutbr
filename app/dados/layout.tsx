@@ -7,6 +7,7 @@ const dadosLinks = [
   { href: '/dados/artilharia', label: '⚽ Artilharia'               },
   { href: '/dados/goleiros',   label: '🧤 Goleiros'                 },
   { href: '/dados/analitico',  label: '🔬 Analítico'                },
+  { href: '/dados/arbitros',   label: '🟢 Árbitros'                 },
 ];
 
 export default function DadosLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +25,7 @@ export default function DadosLayout({ children }: { children: React.ReactNode })
         background: '#0e0e0e',
         borderBottom: '1px solid var(--border)',
         position: 'sticky',
-        top: 60, // altura do Nav principal
+        top: 60,
         zIndex: 90,
       }}>
         <div style={{
