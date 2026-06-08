@@ -26,7 +26,7 @@ interface Props {
   totalGols: number;
   totalGolsCasa: number;
   totalGolsVis: number;
-  placaresFrequentes: { placar: string; count: number; vitCasa: number; vitVisitante: number; isEmpate: boolean }[];
+  placaresFrequentes: { placar: string; count: number; vitVisitante: number; isEmpate: boolean }[];
   rankingEstadio: { nome: string; cidade: string; estado: string; gols: number; jogos: number; media: number }[];
   rankingEstado: { uf: string; gols: number; jogos: number; media: number }[];
   rankingArbitrosPorCargo: EntradaArbitro[];
@@ -288,7 +288,7 @@ export function DadosClient({
                       </div>
                     ) : (
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        {d.vitCasa}V mandante · {d.vitVisitante}V visitante
+                        {d.vitVisitante} vitória(s) do visitante
                       </div>
                     )}
                   </div>
