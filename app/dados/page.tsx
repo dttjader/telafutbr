@@ -126,7 +126,8 @@ export default async function DadosPage() {
     .filter(r => r.j > 0 || r.amarelos > 0 || r.vermelhos > 0)
     .map(r => ({ ...r, pts: r.v * 3 + r.e, aproveitamento: r.j > 0 ? Math.round((r.v * 3 + r.e) / (r.j * 3) * 100) : 0 }))
     .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v);
-
+console.log('Placares únicos:', Object.keys(placarMap));
+  
   return (
     <DadosClient
       totalJogos={totalJogos}
