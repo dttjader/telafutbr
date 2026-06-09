@@ -9,6 +9,15 @@ const emptyForm = () => ({
   dataFim: '', inativar: false, dataInativacao: new Date().toISOString().slice(0, 10),
 });
 
+// Form para edição de uma entrada específica do histórico
+interface HistoricoEditForm {
+  idx: number;
+  time_id: string | null;
+  data_inicio: string;
+  data_fim: string;
+  inativo: boolean;
+}
+
 export default function AdminTecnicos() {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [times, setTimes] = useState<Time[]>([]);
@@ -17,6 +26,10 @@ export default function AdminTecnicos() {
   const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'ativos' | 'inativos'>('todos');
   const [msg, setMsg] = useState(''); const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Estado para gerenciar edição/exclusão de entradas do histórico
+  const [historicoEditando, setHistoricoEditando] = useState<{ tecnicoId: string } & HistoricoEditForm | null>(null);
+  const [historicoExpandido, setHistoricoExpandido] = useState<string | null>(null);
 
   const load = async () => {
     const [t, tm] = await Promise.all([clientGetTecnicos(), clientGetTimes()]);
@@ -40,14 +53,11 @@ export default function AdminTecnicos() {
       let ativo = true;
 
       if (!editId) {
-        // Novo técnico
         if (form.time_atual) {
           historico = [{ time_id: form.time_atual, data_inicio: form.dataInicio, data_fim: null, inativo: false }];
         }
       } else {
-        // Editando — transferência para novo time
         if (form.novoTime && form.novoTime !== atual?.time_atual) {
-          // Fechar entrada anterior
           historico = historico.map((h, i) =>
             i === historico.length - 1 && !h.data_fim
               ? { ...h, data_fim: form.dataInicio }
@@ -56,7 +66,6 @@ export default function AdminTecnicos() {
           historico = [...historico, { time_id: form.novoTime, data_inicio: form.dataInicio, data_fim: null, inativo: false }];
           timeAtual = form.novoTime;
         }
-        // Inativar (ficou desempregado)
         if (form.inativar) {
           historico = historico.map((h, i) =>
             i === historico.length - 1 && !h.data_fim
@@ -67,7 +76,6 @@ export default function AdminTecnicos() {
           timeAtual = null;
           ativo = false;
         }
-        // Reativar
         if (!form.inativar && atual && !atual.ativo && form.novoTime) {
           ativo = true;
         }
@@ -100,6 +108,88 @@ export default function AdminTecnicos() {
     catch (e) { flash(false, 'Erro: ' + String(e)); }
   };
 
+  // ── Funções de gestão do histórico ──────────────────────────────────────────
+
+  const iniciarEdicaoHistorico = (tecnico: Tecnico, idx: number) => {
+    const entrada = tecnico.historico[idx];
+    setHistoricoEditando({
+      tecnicoId: tecnico.id,
+      idx,
+      time_id: entrada.time_id,
+      data_inicio: entrada.data_inicio,
+      data_fim: entrada.data_fim ?? '',
+      inativo: entrada.inativo,
+    });
+  };
+
+  const cancelarEdicaoHistorico = () => setHistoricoEditando(null);
+
+  const salvarEdicaoHistorico = async () => {
+    if (!historicoEditando) return;
+    const tecnico = tecnicos.find(t => t.id === historicoEditando.tecnicoId);
+    if (!tecnico) return;
+
+    if (!historicoEditando.data_inicio) return flash(false, 'Data de início é obrigatória.');
+
+    const novoHistorico = tecnico.historico.map((h, i) =>
+      i === historicoEditando.idx
+        ? {
+            time_id: historicoEditando.inativo ? null : (historicoEditando.time_id || null),
+            data_inicio: historicoEditando.data_inicio,
+            data_fim: historicoEditando.data_fim || null,
+            inativo: historicoEditando.inativo,
+          }
+        : h
+    );
+
+    // Recalcular time_atual e ativo com base na última entrada do histórico
+    const ultima = novoHistorico[novoHistorico.length - 1];
+    const novoTimeAtual = ultima?.data_fim ? null : (ultima?.time_id ?? null);
+    const novoAtivo = !ultima?.inativo && !!novoTimeAtual;
+
+    try {
+      await clientUpsertTecnico({
+        id: tecnico.id,
+        nome: tecnico.nome,
+        nacionalidade: tecnico.nacionalidade,
+        time_atual: novoTimeAtual,
+        ativo: novoAtivo,
+        historico: novoHistorico,
+      });
+      flash(true, 'Entrada do histórico atualizada!');
+      setHistoricoEditando(null);
+      load();
+    } catch (e) { flash(false, 'Erro: ' + String(e)); }
+  };
+
+  const excluirEntradaHistorico = async (tecnico: Tecnico, idx: number) => {
+    if (!confirm('Remover esta entrada do histórico?')) return;
+
+    const novoHistorico = tecnico.historico.filter((_, i) => i !== idx);
+
+    const ultima = novoHistorico[novoHistorico.length - 1];
+    const novoTimeAtual = ultima
+      ? (ultima.data_fim ? null : (ultima.time_id ?? null))
+      : null;
+    const novoAtivo = ultima ? (!ultima.inativo && !ultima.data_fim && !!ultima.time_id) : false;
+
+    try {
+      await clientUpsertTecnico({
+        id: tecnico.id,
+        nome: tecnico.nome,
+        nacionalidade: tecnico.nacionalidade,
+        time_atual: novoTimeAtual,
+        ativo: novoAtivo,
+        historico: novoHistorico,
+      });
+      flash(true, 'Entrada removida do histórico.');
+      setHistoricoEditando(null);
+      load();
+    } catch (e) { flash(false, 'Erro: ' + String(e)); }
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   const nomeTime = (id: string | null) => id ? (times.find(t => t.id === id)?.nome ?? id) : '—';
   const editando = editId ? tecnicos.find(t => t.id === editId) : null;
 
@@ -110,7 +200,7 @@ export default function AdminTecnicos() {
   );
 
   return (
-    <div style={{position: 'relative'}}>
+    <div style={{ position: 'relative' }}>
       <style>{`
         @keyframes slideIn {
           from { transform: translateX(400px); opacity: 0; }
@@ -124,180 +214,284 @@ export default function AdminTecnicos() {
         .toast.hide { animation: slideOut .3s ease-out forwards; }
         .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
         .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
+        .hist-row:hover .hist-acoes { opacity: 1 !important; }
       `}</style>
-    <div className="container" style={{ paddingTop: '2rem' }}>
-      <h1 style={{ fontSize: '2.5rem', marginBottom: '.25rem' }}>🧑‍💼 Técnicos</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-        Cadastre técnicos, registre transferências e períodos de inatividade.
-      </p>
+      <div className="container" style={{ paddingTop: '2rem' }}>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '.25rem' }}>🧑‍💼 Técnicos</h1>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+          Cadastre técnicos, registre transferências e períodos de inatividade.
+        </p>
 
-      {msg && <div className="toast toast-success">{msg}</div>}
-      {error && <div className="toast toast-error">{error}</div>}
+        {msg && <div className="toast toast-success">{msg}</div>}
+        {error && <div className="toast toast-error">{error}</div>}
 
-      {/* FORMULÁRIO */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.3rem', marginBottom: '1.25rem', color: 'var(--amarelo)' }}>
-          {editId ? '✏️ Editar Técnico' : '+ Novo Técnico'}
-        </h2>
-        <form onSubmit={submit}>
-          <div className="grid-2">
-            <div className="form-group">
-              <label>Nome completo *</label>
-              <input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Filipe Luís" />
-            </div>
-            <div className="form-group">
-              <label>Nacionalidade</label>
-              <input value={form.nacionalidade} onChange={e => setForm(f => ({ ...f, nacionalidade: e.target.value }))} placeholder="Ex: Brasileiro" />
-            </div>
-          </div>
-
-          {/* Novo técnico: time inicial */}
-          {!editId && (
-            <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '1rem', marginBottom: '1rem' }}>
-              <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: '.75rem', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700 }}>
-                🏠 Time inicial
-              </p>
-              <div className="grid-2">
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>Time atual</label>
-                  <select value={form.time_atual} onChange={e => setForm(f => ({ ...f, time_atual: e.target.value }))}>
-                    <option value="">Desempregado</option>
-                    {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                  </select>
-                </div>
-                {form.time_atual && (
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label>Data de início</label>
-                    <input type="date" value={form.dataInicio} onChange={e => setForm(f => ({ ...f, dataInicio: e.target.value }))} />
-                  </div>
-                )}
+        {/* FORMULÁRIO PRINCIPAL */}
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.3rem', marginBottom: '1.25rem', color: 'var(--amarelo)' }}>
+            {editId ? '✏️ Editar Técnico' : '+ Novo Técnico'}
+          </h2>
+          <form onSubmit={submit}>
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Nome completo *</label>
+                <input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Filipe Luís" />
+              </div>
+              <div className="form-group">
+                <label>Nacionalidade</label>
+                <input value={form.nacionalidade} onChange={e => setForm(f => ({ ...f, nacionalidade: e.target.value }))} placeholder="Ex: Brasileiro" />
               </div>
             </div>
-          )}
 
-          {/* Editando: transferência ou inativação */}
-          {editId && (
-            <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '1rem', marginBottom: '1rem' }}>
-              <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: '.75rem', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700 }}>
-                🔄 Movimentação
-              </p>
-              <div style={{ fontSize: '.82rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-                Time atual: <strong style={{ color: 'var(--text)' }}>{nomeTime(editando?.time_atual ?? null)}</strong>
-                {!editando?.ativo && <span style={{ marginLeft: '.5rem', color: 'var(--rebaixamento)' }}>· Inativo</span>}
-              </div>
-
-              {/* Transferência */}
-              {!form.inativar && (
-                <div className="grid-2" style={{ marginBottom: '.75rem' }}>
+            {!editId && (
+              <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '1rem', marginBottom: '1rem' }}>
+                <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: '.75rem', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700 }}>
+                  🏠 Time inicial
+                </p>
+                <div className="grid-2">
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label>Transferir para</label>
-                    <select value={form.novoTime} onChange={e => setForm(f => ({ ...f, novoTime: e.target.value }))}>
-                      <option value="">Manter time atual</option>
-                      {times.filter(t => t.id !== editando?.time_atual).map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                    <label>Time atual</label>
+                    <select value={form.time_atual} onChange={e => setForm(f => ({ ...f, time_atual: e.target.value }))}>
+                      <option value="">Desempregado</option>
+                      {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
                     </select>
                   </div>
-                  {form.novoTime && (
+                  {form.time_atual && (
                     <div className="form-group" style={{ margin: 0 }}>
-                      <label>Data de início no novo time</label>
+                      <label>Data de início</label>
                       <input type="date" value={form.dataInicio} onChange={e => setForm(f => ({ ...f, dataInicio: e.target.value }))} />
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* Inativação */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', fontSize: '.85rem' }}>
-                  <input type="checkbox" checked={form.inativar}
-                    onChange={e => setForm(f => ({ ...f, inativar: e.target.checked, novoTime: '' }))} />
-                  Marcar como inativo (desempregado)
-                </label>
-                {form.inativar && (
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label>Data de saída</label>
-                    <input type="date" value={form.dataInativacao} onChange={e => setForm(f => ({ ...f, dataInativacao: e.target.value }))} />
-                  </div>
-                )}
               </div>
-
-              {/* Reativar */}
-              {editando && !editando.ativo && (
-                <div style={{ marginTop: '.75rem', padding: '.6rem .75rem', background: 'rgba(0,168,79,.08)', borderRadius: 6, fontSize: '.82rem', color: 'var(--verde)' }}>
-                  ℹ️ Para reativar, selecione um novo time acima.
-                </div>
-              )}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '.75rem' }}>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Salvando...' : (editId ? 'Salvar alterações' : 'Cadastrar técnico')}
-            </button>
-            {editId && (
-              <button type="button" className="btn btn-ghost" onClick={() => { setForm(emptyForm()); setEditId(null); }}>
-                Cancelar
-              </button>
             )}
-          </div>
-        </form>
-      </div>
 
-      {/* FILTROS */}
-      <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem' }}>
-        {(['todos', 'ativos', 'inativos'] as const).map(f => (
-          <button key={f} onClick={() => setFiltroAtivo(f)}
-            className={`btn btn-sm ${filtroAtivo === f ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ textTransform: 'capitalize' }}>
-            {f === 'todos' ? 'Todos' : f === 'ativos' ? '✅ Ativos' : '⏸️ Inativos'}
-          </button>
-        ))}
-        <span style={{ fontSize: '.85rem', color: 'var(--text-muted)', alignSelf: 'center', marginLeft: '.25rem' }}>
-          {lista.length} técnico(s)
-        </span>
-      </div>
+            {editId && (
+              <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '1rem', marginBottom: '1rem' }}>
+                <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: '.75rem', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700 }}>
+                  🔄 Movimentação
+                </p>
+                <div style={{ fontSize: '.82rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
+                  Time atual: <strong style={{ color: 'var(--text)' }}>{nomeTime(editando?.time_atual ?? null)}</strong>
+                  {!editando?.ativo && <span style={{ marginLeft: '.5rem', color: 'var(--rebaixamento)' }}>· Inativo</span>}
+                </div>
 
-      {/* LISTA */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-        {lista.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>Nenhum técnico encontrado.</p>}
-        {lista.map(t => (
-          <div key={t.id} className="card" style={{ padding: '1rem 1.25rem', borderLeft: `3px solid ${t.ativo ? 'var(--verde)' : 'var(--border)'}` }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.3rem', flexWrap: 'wrap' }}>
-                  <strong style={{ fontSize: '1rem' }}>{t.nome}</strong>
-                  {t.nacionalidade && <span className="badge badge-cinza">{t.nacionalidade}</span>}
-                  {!t.ativo && <span className="badge badge-vermelho">Inativo</span>}
+                {!form.inativar && (
+                  <div className="grid-2" style={{ marginBottom: '.75rem' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Transferir para</label>
+                      <select value={form.novoTime} onChange={e => setForm(f => ({ ...f, novoTime: e.target.value }))}>
+                        <option value="">Manter time atual</option>
+                        {times.filter(t => t.id !== editando?.time_atual).map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                      </select>
+                    </div>
+                    {form.novoTime && (
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label>Data de início no novo time</label>
+                        <input type="date" value={form.dataInicio} onChange={e => setForm(f => ({ ...f, dataInicio: e.target.value }))} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', fontSize: '.85rem' }}>
+                    <input type="checkbox" checked={form.inativar}
+                      onChange={e => setForm(f => ({ ...f, inativar: e.target.checked, novoTime: '' }))} />
+                    Marcar como inativo (desempregado)
+                  </label>
+                  {form.inativar && (
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Data de saída</label>
+                      <input type="date" value={form.dataInativacao} onChange={e => setForm(f => ({ ...f, dataInativacao: e.target.value }))} />
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>
-                  {t.ativo
-                    ? (t.time_atual ? `🏠 ${nomeTime(t.time_atual)}` : '🔍 Disponível')
-                    : '⏸️ Desempregado'}
-                </div>
-                {/* Histórico */}
-                {t.historico.length > 0 && (
-                  <div style={{ marginTop: '.5rem', display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
-                    {t.historico.map((h, i) => (
-                      <span key={i} style={{
-                        fontSize: '.7rem', padding: '.1rem .45rem', borderRadius: 4,
-                        background: h.inativo ? 'rgba(239,68,68,.1)' : 'var(--surface2)',
-                        border: '1px solid var(--border)', color: h.inativo ? 'var(--rebaixamento)' : 'var(--text-muted)'
-                      }}>
-                        {h.inativo ? '⏸️ Inativo' : nomeTime(h.time_id)}
-                        {' · '}{h.data_inicio}{h.data_fim ? ` → ${h.data_fim}` : ' → atual'}
-                      </span>
-                    ))}
+
+                {editando && !editando.ativo && (
+                  <div style={{ marginTop: '.75rem', padding: '.6rem .75rem', background: 'rgba(0,168,79,.08)', borderRadius: 6, fontSize: '.82rem', color: 'var(--verde)' }}>
+                    ℹ️ Para reativar, selecione um novo time acima.
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => edit(t)}>✏️ Editar</button>
-                <button className="btn btn-danger btn-sm" onClick={() => del(t.id, t.nome)}>🗑️</button>
+            )}
+
+            <div style={{ display: 'flex', gap: '.75rem' }}>
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? 'Salvando...' : (editId ? 'Salvar alterações' : 'Cadastrar técnico')}
+              </button>
+              {editId && (
+                <button type="button" className="btn btn-ghost" onClick={() => { setForm(emptyForm()); setEditId(null); }}>
+                  Cancelar
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* FILTROS */}
+        <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem' }}>
+          {(['todos', 'ativos', 'inativos'] as const).map(f => (
+            <button key={f} onClick={() => setFiltroAtivo(f)}
+              className={`btn btn-sm ${filtroAtivo === f ? 'btn-primary' : 'btn-ghost'}`}
+              style={{ textTransform: 'capitalize' }}>
+              {f === 'todos' ? 'Todos' : f === 'ativos' ? '✅ Ativos' : '⏸️ Inativos'}
+            </button>
+          ))}
+          <span style={{ fontSize: '.85rem', color: 'var(--text-muted)', alignSelf: 'center', marginLeft: '.25rem' }}>
+            {lista.length} técnico(s)
+          </span>
+        </div>
+
+        {/* LISTA */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {lista.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>Nenhum técnico encontrado.</p>}
+          {lista.map(t => (
+            <div key={t.id} className="card" style={{ padding: '1rem 1.25rem', borderLeft: `3px solid ${t.ativo ? 'var(--verde)' : 'var(--border)'}` }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.3rem', flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: '1rem' }}>{t.nome}</strong>
+                    {t.nacionalidade && <span className="badge badge-cinza">{t.nacionalidade}</span>}
+                    {!t.ativo && <span className="badge badge-vermelho">Inativo</span>}
+                  </div>
+                  <div style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>
+                    {t.ativo
+                      ? (t.time_atual ? `🏠 ${nomeTime(t.time_atual)}` : '🔍 Disponível')
+                      : '⏸️ Desempregado'}
+                  </div>
+
+                  {/* Histórico com botão para expandir/editar */}
+                  {t.historico.length > 0 && (
+                    <div style={{ marginTop: '.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setHistoricoExpandido(historicoExpandido === t.id ? null : t.id)}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '.35rem',
+                          fontSize: '.72rem', color: 'var(--text-muted)', padding: 0,
+                          marginBottom: historicoExpandido === t.id ? '.5rem' : 0,
+                        }}
+                      >
+                        <span style={{ transform: historicoExpandido === t.id ? 'rotate(90deg)' : 'none', transition: 'transform .15s', display: 'inline-block' }}>▶</span>
+                        Histórico de vínculos ({t.historico.length} entrada{t.historico.length !== 1 ? 's' : ''})
+                      </button>
+
+                      {historicoExpandido === t.id && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                          {t.historico.map((h, idx) => {
+                            const esteEditando = historicoEditando?.tecnicoId === t.id && historicoEditando.idx === idx;
+
+                            if (esteEditando && historicoEditando) {
+                              // Formulário inline de edição da entrada
+                              return (
+                                <div key={idx} style={{
+                                  background: 'rgba(255,223,0,.06)', border: '1px solid rgba(255,223,0,.25)',
+                                  borderRadius: 6, padding: '.65rem .75rem',
+                                }}>
+                                  <p style={{ fontSize: '.72rem', color: 'var(--amarelo)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '.6rem' }}>
+                                    ✏️ Editando entrada #{idx + 1}
+                                  </p>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.5rem', marginBottom: '.5rem' }}>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label>Time</label>
+                                      <select
+                                        value={historicoEditando.inativo ? '' : (historicoEditando.time_id ?? '')}
+                                        onChange={e => setHistoricoEditando(f => f ? { ...f, time_id: e.target.value || null } : f)}
+                                        disabled={historicoEditando.inativo}
+                                        style={{ opacity: historicoEditando.inativo ? 0.4 : 1 }}
+                                      >
+                                        <option value="">Sem time (inativo)</option>
+                                        {times.map(tm => <option key={tm.id} value={tm.id}>{tm.nome}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label>Data início *</label>
+                                      <input
+                                        type="date"
+                                        value={historicoEditando.data_inicio}
+                                        onChange={e => setHistoricoEditando(f => f ? { ...f, data_inicio: e.target.value } : f)}
+                                      />
+                                    </div>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label>Data fim</label>
+                                      <input
+                                        type="date"
+                                        value={historicoEditando.data_fim}
+                                        onChange={e => setHistoricoEditando(f => f ? { ...f, data_fim: e.target.value } : f)}
+                                        placeholder="Em aberto"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.6rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontSize: '.8rem', cursor: 'pointer' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={historicoEditando.inativo}
+                                        onChange={e => setHistoricoEditando(f => f ? { ...f, inativo: e.target.checked, time_id: e.target.checked ? null : f.time_id } : f)}
+                                      />
+                                      Período de inatividade
+                                    </label>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '.5rem' }}>
+                                    <button className="btn btn-primary btn-sm" onClick={salvarEdicaoHistorico}>💾 Salvar</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={cancelarEdicaoHistorico}>Cancelar</button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // Linha normal do histórico
+                            return (
+                              <div key={idx} className="hist-row" style={{
+                                display: 'flex', alignItems: 'center', gap: '.5rem',
+                                fontSize: '.72rem', padding: '.35rem .6rem',
+                                background: 'var(--surface2)', border: '1px solid var(--border)',
+                                borderRadius: 5,
+                              }}>
+                                <span style={{
+                                  fontSize: '.65rem', padding: '.1rem .35rem', borderRadius: 3,
+                                  background: h.inativo ? 'rgba(239,68,68,.1)' : 'var(--surface)',
+                                  border: '1px solid var(--border)',
+                                  color: h.inativo ? 'var(--rebaixamento)' : 'var(--text-muted)',
+                                  flexShrink: 0,
+                                }}>
+                                  {h.inativo ? '⏸️ Inativo' : nomeTime(h.time_id)}
+                                </span>
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                  {h.data_inicio}{h.data_fim ? ` → ${h.data_fim}` : ' → atual'}
+                                </span>
+                                <div className="hist-acoes" style={{ marginLeft: 'auto', display: 'flex', gap: '.3rem', opacity: 0, transition: 'opacity .15s' }}>
+                                  <button
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ padding: '.15rem .45rem', fontSize: '.72rem' }}
+                                    onClick={() => iniciarEdicaoHistorico(t, idx)}
+                                    title="Editar esta entrada"
+                                  >✏️</button>
+                                  <button
+                                    className="btn btn-danger btn-sm"
+                                    style={{ padding: '.15rem .45rem', fontSize: '.72rem' }}
+                                    onClick={() => excluirEntradaHistorico(t, idx)}
+                                    title="Remover esta entrada"
+                                  >🗑️</button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => edit(t)}>✏️ Editar</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => del(t.id, t.nome)}>🗑️</button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
     </div>
   );
 }
