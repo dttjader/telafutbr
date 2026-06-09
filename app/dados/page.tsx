@@ -72,7 +72,7 @@ export default async function DadosPage() {
   const arbitrosNomes = new Set<string>();
   const arbitrosPrincipais = new Set<string>();
   for (const p of encerradas) {
-    const arb = p.arbitragem as Record<string, string>;
+    const arb = p.arbitragem;
     if (arb?.principal?.trim())   { arbitrosNomes.add(arb.principal.trim()); arbitrosPrincipais.add(arb.principal.trim()); }
     if (arb?.assistente1?.trim()) arbitrosNomes.add(arb.assistente1.trim());
     if (arb?.assistente2?.trim()) arbitrosNomes.add(arb.assistente2.trim());
@@ -132,4 +132,4 @@ export default async function DadosPage() {
       totalArbitrosPrincipais={arbitrosPrincipais.size}
     />
   );
-    }
+}
