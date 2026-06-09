@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getPartidas, getTimes, getEstadios, getJogadores, getTecnicos } from '@/lib/data';
+import { Arbitragem } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ const CARGO_EMOJI: Record<CargoArbitro, string> = {
   var:         '📺',
 };
 
-function getCargosNaPartida(nome: string, arbitragem: Record<string, string>): CargoArbitro[] {
+function getCargosNaPartida(nome: string, arbitragem: Arbitragem): CargoArbitro[] {
   const cargos: CargoArbitro[] = [];
   if (arbitragem.principal?.trim() === nome)   cargos.push('principal');
   if (arbitragem.assistente1?.trim() === nome) cargos.push('assistente1');
@@ -43,8 +44,9 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
   const encerradas = partidas
     .filter(p => p.status === 'encerrada')
     .filter(p => {
-      const arb = p.arbitragem as Record<string, string>;
-      return Object.values(arb).some(v => v?.trim() === nomeArbitro);
+      const arb = p.arbitragem;
+      return [arb.principal, arb.assistente1, arb.assistente2, arb.quarto, arb.var]
+        .some(v => v?.trim() === nomeArbitro);
     })
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
 
@@ -63,7 +65,7 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
       if (c.tipo === 'amarelo' || c.tipo === 'amarelo_tecnico') totalAmarelos++;
       else if (c.tipo === 'vermelho' || c.tipo === 'vermelho_tecnico') totalVermelhos++;
     }
-    getCargosNaPartida(nomeArbitro, p.arbitragem as Record<string, string>).forEach(c => cargosUsados.add(c));
+    getCargosNaPartida(nomeArbitro, p.arbitragem).forEach(c => cargosUsados.add(c));
   }
 
   const isPrincipal = cargosUsados.has('principal');
@@ -95,12 +97,12 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
           {/* Cards de stats */}
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
             {[
-              { label: 'Partidas',   valor: encerradas.length,            cor: 'var(--amarelo)'      },
-              { label: 'Gols',       valor: totalGols,                    cor: 'var(--verde)'         },
-              { label: 'G/Jogo',     valor: (totalGols / encerradas.length).toFixed(2), cor: 'var(--verde)' },
-              { label: 'Amarelos',   valor: totalAmarelos,                cor: '#f59e0b'              },
-              { label: '🟨/Jogo',    valor: (totalAmarelos / encerradas.length).toFixed(2), cor: '#f59e0b' },
-              { label: 'Vermelhos',  valor: totalVermelhos,               cor: 'var(--rebaixamento)'  },
+              { label: 'Partidas',  valor: encerradas.length,                                      cor: 'var(--amarelo)'      },
+              { label: 'Gols',      valor: totalGols,                                              cor: 'var(--verde)'        },
+              { label: 'G/Jogo',    valor: (totalGols / encerradas.length).toFixed(2),             cor: 'var(--verde)'        },
+              { label: 'Amarelos',  valor: totalAmarelos,                                          cor: '#f59e0b'             },
+              { label: '🟨/Jogo',   valor: (totalAmarelos / encerradas.length).toFixed(2),        cor: '#f59e0b'             },
+              { label: 'Vermelhos', valor: totalVermelhos,                                         cor: 'var(--rebaixamento)' },
             ].map(s => (
               <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '.75rem 1.25rem', textAlign: 'center', minWidth: 80 }}>
                 <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.8rem', color: s.cor, lineHeight: 1 }}>{s.valor}</div>
@@ -124,13 +126,13 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
             const tc = times.find(t => t.id === p.time_casa_id);
             const tv = times.find(t => t.id === p.time_visitante_id);
             const est = estadios.find(e => e.id === p.estadio_id);
-            const cargos = getCargosNaPartida(nomeArbitro, p.arbitragem as Record<string, string>);
+            const cargos = getCargosNaPartida(nomeArbitro, p.arbitragem);
 
-            const amarelos = p.cartoes.filter(c => c.tipo === 'amarelo' || c.tipo === 'amarelo_tecnico');
+            const amarelos  = p.cartoes.filter(c => c.tipo === 'amarelo' || c.tipo === 'amarelo_tecnico');
             const vermelhos = p.cartoes.filter(c => c.tipo === 'vermelho' || c.tipo === 'vermelho_tecnico');
             const todosCartoes = [...p.cartoes].sort((a, b) => a.minuto - b.minuto);
 
-            const gols = p.placar_casa + p.placar_visitante;
+            const gols   = p.placar_casa + p.placar_visitante;
             const dataFmt = p.data ? p.data.split('-').reverse().join('/') : '—';
 
             return (
@@ -139,17 +141,13 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                   {/* Placar */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flex: 1, minWidth: 200 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '.15rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text)' }}>{tc?.sigla ?? p.time_casa_id}</span>
-                    </div>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{tc?.sigla ?? p.time_casa_id}</span>
                     <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', display: 'flex', alignItems: 'center', gap: '.25rem' }}>
                       <span>{p.placar_casa}</span>
                       <span style={{ color: 'var(--verde)', fontSize: '1rem' }}>×</span>
                       <span>{p.placar_visitante}</span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.15rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text)' }}>{tv?.sigla ?? p.time_visitante_id}</span>
-                    </div>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{tv?.sigla ?? p.time_visitante_id}</span>
                   </div>
 
                   {/* Meta info */}
@@ -173,7 +171,7 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
                   </Link>
                 </div>
 
-                {/* Resumo rápido: gols e cartões desta partida */}
+                {/* Resumo rápido */}
                 <div style={{ padding: '.6rem 1.25rem', background: 'var(--surface2)', display: 'flex', gap: '1.5rem', fontSize: '.8rem', color: 'var(--text-muted)', borderBottom: todosCartoes.length > 0 ? '1px solid var(--border)' : 'none', flexWrap: 'wrap' }}>
                   <span>⚽ <strong style={{ color: 'var(--text)' }}>{gols}</strong> gol(is)</span>
                   <span>🟨 <strong style={{ color: amarelos.length > 0 ? '#f59e0b' : 'var(--text-muted)' }}>{amarelos.length}</strong> amarelo(s)</span>
@@ -193,14 +191,11 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
                         const corBorda   = isVermelho ? 'var(--rebaixamento)' : 'var(--amarelo)';
                         const icone      = isVermelho ? '🟥' : '🟨';
                         const timeDoCartao = times.find(t => t.id === c.time_id);
+                        const tecnicoId  = (c as any).tecnico_id as string | undefined;
 
-                        // Nome do punido
-                        let nomePunido: string;
-                        if (isTecnico && (c as any).tecnico_id) {
-                          nomePunido = nomeTec((c as any).tecnico_id) ?? nomeJog(c.jogador_id);
-                        } else {
-                          nomePunido = nomeJog(c.jogador_id);
-                        }
+                        const nomePunido = isTecnico && tecnicoId
+                          ? (nomeTec(tecnicoId) ?? nomeJog(c.jogador_id))
+                          : nomeJog(c.jogador_id);
 
                         const tipoLabel: Record<string, string> = {
                           amarelo: '', vermelho: '',
@@ -209,15 +204,10 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
 
                         return (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.45rem .75rem', background: 'var(--surface2)', borderRadius: 7, borderLeft: `3px solid ${corBorda}`, fontSize: '.83rem' }}>
-                            {/* Minuto */}
                             <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--verde)', minWidth: 44, flexShrink: 0 }}>
                               {c.minuto}{(c as any).acrescimo > 0 ? `+${(c as any).acrescimo}` : ''}'
                             </span>
-
-                            {/* Ícone */}
                             <span style={{ fontSize: '1rem', flexShrink: 0 }}>{icone}</span>
-
-                            {/* Jogador / técnico */}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
                                 <strong>{nomePunido}</strong>
@@ -227,15 +217,12 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
                                   </span>
                                 )}
                               </div>
-                              {/* Motivo */}
                               {c.motivo && (
                                 <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '.15rem', fontStyle: 'italic' }}>
                                   {c.motivo}
                                 </div>
                               )}
                             </div>
-
-                            {/* Time */}
                             <span style={{ fontSize: '.75rem', color: 'var(--text-muted)', flexShrink: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4, padding: '.1rem .35rem', fontFamily: "'Bebas Neue',sans-serif" }}>
                               {timeDoCartao?.sigla ?? c.time_id}
                             </span>
@@ -246,7 +233,6 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
                   </div>
                 )}
 
-                {/* Sem cartões */}
                 {todosCartoes.length === 0 && (
                   <div style={{ padding: '.75rem 1.25rem', fontSize: '.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                     Nenhum cartão nesta partida.
@@ -259,4 +245,4 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
       </div>
     </div>
   );
-                   }
+                    }
