@@ -7,9 +7,11 @@ import { clientGetPartidas, clientGetTimes, clientUpsertPartida, clientDeletePar
 const STATUS_OPTS = [{value:'agendada',label:'Agendada'},{value:'ao_vivo',label:'Ao Vivo'},{value:'encerrada',label:'Encerrada'},{value:'adiada',label:'Adiada'}];
 const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_casa_id:'',time_visitante_id:'',estadio_id:'',placar_casa:'0',placar_visitante:'0',publico:'',acrescimo_primeiro:'0',acrescimo_segundo:'0',arb_principal:'',arb_ass1:'',arb_ass2:'',arb_quarto:'',arb_var:'',tecnico_casa_id:'',tecnico_visitante_id:''});
 
-// Times reais — exclui qualquer pseudo-id como 'outros'
 const PSEUDO_IDS = new Set(['outros']);
 const filtrarTimesReais = (times: Time[]) => times.filter(t => !PSEUDO_IDS.has(t.id));
+
+// Rodada completa = 10 partidas que NÃO sejam adiadas
+const PARTIDAS_POR_RODADA = 10;
 
 export default function AdminPartidas() {
   const router = useRouter();
@@ -27,7 +29,6 @@ export default function AdminPartidas() {
     const [p,t,e,tc] = await Promise.all([clientGetPartidas(),clientGetTimes(),clientGetEstadios(),clientGetTecnicos()]);
     setTecnicos(tc);
     setPartidas([...p].sort((a,b)=>b.rodada-a.rodada||a.data.localeCompare(b.data)));
-    // Garantir que nunca exiba pseudo-times
     setTimes(filtrarTimesReais(t));
     setEstadios(e);
   };
@@ -81,7 +82,6 @@ export default function AdminPartidas() {
   const statusBadge:Record<string,string>={agendada:'badge-cinza',ao_vivo:'badge-vermelho',encerrada:'badge-verde',adiada:'badge-amarelo'};
   const statusLabel:Record<string,string>={agendada:'Agendada',ao_vivo:'🔴 Ao Vivo',encerrada:'Encerrada',adiada:'Adiada'};
   const rodadas=[...new Set(partidas.map(p=>p.rodada))].sort((a,b)=>b-a);
-  const PARTIDAS_POR_RODADA = 10;
 
   const [openRodadas, setOpenRodadas] = useState<Record<number, boolean>>({});
 
@@ -89,7 +89,8 @@ export default function AdminPartidas() {
     if (partidas.length > 0 && Object.keys(openRodadas).length === 0) {
       const init: Record<number, boolean> = {};
       rodadas.forEach(rod => {
-        const count = partidas.filter(p => p.rodada === rod).length;
+        // Apenas partidas não-adiadas contam para completude
+        const count = partidas.filter(p => p.rodada === rod && p.status !== 'adiada').length;
         init[rod] = count < PARTIDAS_POR_RODADA;
       });
       setOpenRodadas(init);
@@ -189,7 +190,9 @@ export default function AdminPartidas() {
 
       {rodadas.map(rod=>{
         const ps=partidas.filter(p=>p.rodada===rod);
-        const completa=ps.length>=PARTIDAS_POR_RODADA;
+        // Rodada completa apenas quando há 10 partidas não-adiadas
+        const countValidas = ps.filter(p => p.status !== 'adiada').length;
+        const completa = countValidas >= PARTIDAS_POR_RODADA;
         const isOpen=openRodadas[rod]??false;
         return (
           <section key={rod} style={{marginBottom:'1rem'}}>
@@ -230,4 +233,4 @@ export default function AdminPartidas() {
       {partidas.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'3rem'}}>Nenhuma partida cadastrada.</p>}
     </div>
   );
-}
+        }
