@@ -8,7 +8,6 @@ const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
 const TIPO_GOL = ['normal','penalti','falta','contra','penalti_perdido','penalti_defendido'];
 const TIPO_GOL_LABEL:Record<string,string>={normal:'Gol',penalti:'Pênalti',falta:'Falta',contra:'Contra',penalti_perdido:'Pênalti Perdido',penalti_defendido:'Pênalti Defendido'};
 
-// ── Respostas pré-programadas ────────────────────────────────────────────────
 const DESCRICOES_GOL: Record<string, string[]> = {
   normal: ['Chute com o pé esquerdo','Chute com o pé direito','Cabeceio após cruzamento','Cabeceio em escanteio','Chute de primeira','Chute de fora da área','Finalização em velocidade','Toque na saída do goleiro','Rebote após defesa','Contra-ataque rápido'],
   penalti: ['Convertido — canto esquerdo','Convertido — canto direito','Convertido — centro','Convertido — colocado','Pênalti cavado'],
@@ -25,7 +24,6 @@ const MOTIVOS_CARTAO: Record<string, string[]> = {
   vermelho_tecnico: ['Expulsão por reclamação reiterada','Conduta violenta','Insulto ao árbitro','Segunda advertência (técnico)','Agressão a membro da comissão'],
 };
 
-// Ordenação por minuto + acréscimo
 function ordenarPorMinuto<T extends { minuto: number; acrescimo?: number }>(arr: T[]): T[] {
   return [...arr].sort((a, b) => {
     const ma = a.minuto + (a.acrescimo ?? 0) * 0.01;
@@ -34,13 +32,12 @@ function ordenarPorMinuto<T extends { minuto: number; acrescimo?: number }>(arr:
   });
 }
 
-// Tipo interno de cartão (extende para suportar tecnico_id)
 type CartaoEx = Cartao & { acrescimo?: number; tecnico_id?: string };
 
 const selectSt: React.CSSProperties = {background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.35rem .5rem',fontSize:'.88rem',width:'100%'};
 const inputSt: React.CSSProperties = {...selectSt};
 
-// ── Componente de chips de sugestão ─────────────────────────────────────────
+// Componente de chips de sugestão
 function Chips({opcoes, valor, onSelect, corAtivo='var(--verde)', bgAtivo='rgba(0,168,79,.15)', borderAtivo='var(--verde)'}:{
   opcoes:string[]; valor:string; onSelect:(v:string)=>void;
   corAtivo?:string; bgAtivo?:string; borderAtivo?:string;
@@ -56,6 +53,42 @@ function Chips({opcoes, valor, onSelect, corAtivo='var(--verde)', bgAtivo='rgba(
           cursor:'pointer', transition:'all .12s', whiteSpace:'nowrap',
         }}>{s}</button>
       ))}
+    </div>
+  );
+}
+
+// Componente de seleção de time — dois botões lado a lado
+function TimePicker({
+  value, onChange, timeCasaId, timeVisId, timeCasaNome, timeVisNome,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  timeCasaId: string;
+  timeVisId: string;
+  timeCasaNome: string;
+  timeVisNome: string;
+}) {
+  const btnBase: React.CSSProperties = {
+    flex: 1, padding: '.45rem .75rem', borderRadius: 6, border: '1px solid var(--border)',
+    fontFamily: "'Bebas Neue', sans-serif", fontSize: '.95rem', letterSpacing: '.05em',
+    cursor: 'pointer', transition: 'all .15s', textAlign: 'center' as const,
+  };
+  const btnAtivo: React.CSSProperties = {
+    ...btnBase,
+    background: 'var(--verde)', borderColor: 'var(--verde)', color: '#fff',
+  };
+  const btnInativo: React.CSSProperties = {
+    ...btnBase,
+    background: 'var(--surface2)', color: 'var(--text-muted)',
+  };
+  return (
+    <div style={{ display: 'flex', gap: '.5rem' }}>
+      <button type="button" style={value === timeCasaId ? btnAtivo : btnInativo} onClick={() => onChange(timeCasaId)}>
+        {timeCasaNome}
+      </button>
+      <button type="button" style={value === timeVisId ? btnAtivo : btnInativo} onClick={() => onChange(timeVisId)}>
+        {timeVisNome}
+      </button>
     </div>
   );
 }
@@ -81,7 +114,8 @@ export default function AdminPartidaEventos() {
     try {
       const golsValidos = updated.gols.filter(g => !['penalti_perdido','penalti_defendido'].includes(g.tipo));
       const placarCasa = golsValidos.filter(g => g.time_id === updated.time_casa_id).length;
-      const placarVis  = golsValidos.filter(g => g.time_id === updated.time_visitante_id).length;      await clientUpsertPartida({...updated, placar_casa:placarCasa, placar_visitante:placarVis});
+      const placarVis  = golsValidos.filter(g => g.time_id === updated.time_visitante_id).length;
+      await clientUpsertPartida({...updated, placar_casa:placarCasa, placar_visitante:placarVis});
       flash(true,'Salvo!'); load();
     } catch(e) { flash(false,'Erro: '+String(e)); }
   };
@@ -96,10 +130,12 @@ export default function AdminPartidaEventos() {
   const nomeTime = (tid:string) => times.find(t=>t.id===tid)?.sigla ?? tid;
   const nomeTec  = (tid:string|undefined) => tid ? (tecnicos.find(t=>t.id===tid)?.nome ?? tid) : '—';
 
-  // Técnicos vinculados à partida
   const tecnicosDaPartida = tecnicos.filter(t =>
     t.id === partida.tecnico_casa_id || t.id === partida.tecnico_visitante_id
   );
+
+  const timeCasaNome = timeCasa?.sigla ?? 'Mandante';
+  const timeVisNome  = timeVis?.sigla  ?? 'Visitante';
 
   // ── ESCALAÇÃO ───────────────────────────────────────────────────────────────
   const EscalacaoTab = () => {
@@ -199,11 +235,9 @@ export default function AdminPartidaEventos() {
     const escVis  = partida!.escalacao_visitante;
     const escMarcadora  = form.time_id===partida!.time_casa_id ? escCasa : escVis;
     const escAdversaria = form.time_id===partida!.time_casa_id ? escVis  : escCasa;
-    // Goleiro adversário automático para todos os tipos que envolvem goleiro
     const goleirosAdv = escAdversaria.filter(e=>e.posicao==='GOL');
     const primeiroGoleiroAdv = goleirosAdv[0]?.jogador_id ?? '';
 
-    // Auto-preenche goleiro adversário quando muda time ou tipo
     useEffect(()=>{
       if(primeiroGoleiroAdv) setForm(v=>({...v, goleiro_id:primeiroGoleiroAdv}));
     }, [form.time_id, form.tipo, primeiroGoleiroAdv]);
@@ -256,12 +290,20 @@ export default function AdminPartidaEventos() {
                 {TIPO_GOL.map(t=><option key={t} value={t}>{TIPO_GOL_LABEL[t]}</option>)}
               </select>
             </div>
-            <div className="form-group"><label>Time que ataca</label>
-              <select style={selectSt} value={form.time_id} onChange={e=>handleTimeChange(e.target.value)}>
-                <option value={partida!.time_casa_id}>{timeCasa?.nome}</option>
-                <option value={partida!.time_visitante_id}>{timeVis?.nome}</option>
-              </select>
-            </div>
+          </div>
+          {/* Time que ataca — dois botões */}
+          <div className="form-group">
+            <label>Time que ataca</label>
+            <TimePicker
+              value={form.time_id}
+              onChange={handleTimeChange}
+              timeCasaId={partida!.time_casa_id}
+              timeVisId={partida!.time_visitante_id}
+              timeCasaNome={timeCasaNome}
+              timeVisNome={timeVisNome}
+            />
+          </div>
+          <div className="grid-3">
             <div className="form-group">
               <label>{isContra?'Jogador que marcou contra *':'Jogador *'}</label>
               <select style={selectSt} value={form.jogador_id} onChange={f('jogador_id')}>
@@ -338,6 +380,7 @@ export default function AdminPartidaEventos() {
     const sugestoes = MOTIVOS_CARTAO[form.tipo] ?? MOTIVOS_CARTAO['amarelo'];
 
     const handleTipoCartaoChange=(novoTipo:string)=>{setForm(v=>({...v,tipo:novoTipo,motivo:'',jogador_id:'',tecnico_id:''}));};
+    const handleTimeChange=(novoTime:string)=>{setForm(v=>({...v,time_id:novoTime,jogador_id:'',tecnico_id:''}));};
 
     const iniciarEdicao=(c:CartaoEx)=>{
       setForm({
@@ -401,12 +444,20 @@ export default function AdminPartidaEventos() {
                 <option value="vermelho_tecnico">🟥 Vermelho — Técnico</option>
               </select>
             </div>
-            <div className="form-group"><label>Time</label>
-              <select style={selectSt} value={form.time_id} onChange={f('time_id')}>
-                <option value={partida!.time_casa_id}>{timeCasa?.nome}</option>
-                <option value={partida!.time_visitante_id}>{timeVis?.nome}</option>
-              </select>
-            </div>
+          </div>
+          {/* Time — dois botões */}
+          <div className="form-group">
+            <label>Time</label>
+            <TimePicker
+              value={form.time_id}
+              onChange={handleTimeChange}
+              timeCasaId={partida!.time_casa_id}
+              timeVisId={partida!.time_visitante_id}
+              timeCasaNome={timeCasaNome}
+              timeVisNome={timeVisNome}
+            />
+          </div>
+          <div className="grid-3">
             {isTecnico ? (
               <div className="form-group"><label>Técnico *</label>
                 <select style={selectSt} value={form.tecnico_id} onChange={f('tecnico_id')}>
@@ -474,7 +525,6 @@ export default function AdminPartidaEventos() {
     const escVis=partida!.escalacao_visitante;
     const escAtual=form.time_id===partida!.time_casa_id?escCasa:escVis;
 
-    // Excluir os dois jogadores da substituição em edição do cálculo de "já usados"
     const subsOutras = editId
       ? partida!.substituicoes.filter(s=>s.time_id===form.time_id&&s.id!==editId)
       : partida!.substituicoes.filter(s=>s.time_id===form.time_id);
@@ -483,6 +533,8 @@ export default function AdminPartidaEventos() {
     const jaEntraram = new Set(subsOutras.map(s=>s.entra_id));
     const quemPodeSair   = escAtual.filter(e=>e.titular||jaEntraram.has(e.jogador_id)).filter(e=>!jaSairam.has(e.jogador_id));
     const quemPodeEntrar = escAtual.filter(e=>!e.titular&&!jaEntraram.has(e.jogador_id));
+
+    const handleTimeChange=(novoTime:string)=>{setForm(v=>({...v,time_id:novoTime,sai_id:'',entra_id:''}));};
 
     const iniciarEdicao=(s:Substituicao)=>{
       setForm({minuto:s.minuto.toString(),time_id:s.time_id,sai_id:s.sai_id,entra_id:s.entra_id});
@@ -512,13 +564,21 @@ export default function AdminPartidaEventos() {
           </h3>
           <div className="grid-3">
             <div className="form-group"><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
-            <div className="form-group"><label>Time</label>
-              <select style={selectSt} value={form.time_id} onChange={f('time_id')}>
-                <option value={partida!.time_casa_id}>{timeCasa?.nome}</option>
-                <option value={partida!.time_visitante_id}>{timeVis?.nome}</option>
-              </select>
-            </div>
-            <div className="form-group"></div>
+            <div className="form-group" style={{gridColumn:'span 2'}}></div>
+          </div>
+          {/* Time — dois botões */}
+          <div className="form-group">
+            <label>Time</label>
+            <TimePicker
+              value={form.time_id}
+              onChange={handleTimeChange}
+              timeCasaId={partida!.time_casa_id}
+              timeVisId={partida!.time_visitante_id}
+              timeCasaNome={timeCasaNome}
+              timeVisNome={timeVisNome}
+            />
+          </div>
+          <div className="grid-2">
             <div className="form-group"><label>↑ Entra *</label>
               <select style={selectSt} value={form.entra_id} onChange={f('entra_id')}>
                 <option value="">Selecione...</option>
@@ -546,7 +606,6 @@ export default function AdminPartidaEventos() {
               <div key={s.id} className="card" style={{padding:'.75rem 1rem',display:'flex',alignItems:'center',gap:'1rem',borderLeft:'3px solid var(--border)',opacity:editId===s.id?0.5:1}}>
                 <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.2rem',color:'var(--verde)',minWidth:40,flexShrink:0}}>{s.minuto}&apos;</span>
                 <span style={{fontSize:'1.2rem',flexShrink:0}}>🔄</span>
-                {/* Nome na mesma linha com cores */}
                 <div style={{flex:1,display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
                   <span style={{display:'flex',alignItems:'center',gap:'.3rem',color:'#22c55e',fontWeight:600}}>
                     <span style={{fontSize:'1rem'}}>↑</span>{nomeJog(s.entra_id)}
