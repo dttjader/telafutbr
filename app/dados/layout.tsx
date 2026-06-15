@@ -7,6 +7,7 @@ const dadosLinks = [
   { href: '/dados/artilharia', label: '⚽ Artilharia'               },
   { href: '/dados/goleiros',   label: '🧤 Goleiros'                 },
   { href: '/dados/analitico',  label: '🔬 Analítico'                },
+  { href: '/dados/times',      label: '🛡️ Times'                    },
   { href: '/dados/arbitros',   label: '🟢 Árbitros'                 },
 ];
 
