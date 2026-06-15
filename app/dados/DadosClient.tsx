@@ -22,7 +22,6 @@ interface Props {
   totalRodadas: number;
   tecnicos: { id: string; nome: string; time_atual: string | null; ativo: boolean; historico: any[] }[];
   times: Time[];
-  // resumo de árbitros para o card de atalho
   totalArbitros: number;
   totalArbitrosPrincipais: number;
 }
@@ -68,6 +67,16 @@ const SubSections = ({ totalJogos, totalGols, totalArbitros, totalArbitrosPrinci
         cor: '#3b82f6',
         bg: 'rgba(59,130,246,.06)',
         border: 'rgba(59,130,246,.2)',
+        meta: null,
+      },
+      {
+        href: '/dados/times',
+        emoji: '🛡️',
+        titulo: 'Times',
+        desc: 'Público, elenco, transferências e melhor time',
+        cor: '#f97316',
+        bg: 'rgba(249,115,22,.06)',
+        border: 'rgba(249,115,22,.2)',
         meta: null,
       },
       {
@@ -356,4 +365,4 @@ export function DadosClient({
       </div>
     </div>
   );
-                    }
+                      }
