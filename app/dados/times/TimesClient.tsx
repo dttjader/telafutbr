@@ -73,31 +73,27 @@ function sortBy<T>(arr: T[], fn: (x: T) => number): T[] {
   return [...arr].sort((a, b) => fn(b) - fn(a));
 }
 
-// Retorna a sub_posicao normalizada de um jogador para classificação
-function subPos(j: JogadorComStats): string {
-  return j.sub_posicao ?? '';
-}
+function sp(j: JogadorComStats): string { return j.sub_posicao ?? ''; }
 
-// Verifica se é lateral (LAT com LD ou LE)
-function isLD(j: JogadorComStats) { return j.posicao === 'LAT' && subPos(j) === 'LD'; }
-function isLE(j: JogadorComStats) { return j.posicao === 'LAT' && subPos(j) === 'LE'; }
+function isLD(j: JogadorComStats)  { return j.posicao === 'LAT' && sp(j) === 'LD'; }
+function isLE(j: JogadorComStats)  { return j.posicao === 'LAT' && sp(j) === 'LE'; }
 function isLAT(j: JogadorComStats) { return j.posicao === 'LAT'; }
 function isZAG(j: JogadorComStats) { return j.posicao === 'ZAG'; }
 
-function isVOL(j: JogadorComStats) { return j.posicao === 'VOL' || (j.posicao === 'MEI' && subPos(j) === 'VOL'); }
-function isMC(j: JogadorComStats)  { return j.posicao === 'MEI' && (subPos(j) === 'MC' || subPos(j) === ''); }
-function isMO(j: JogadorComStats)  { return j.posicao === 'MEI' && subPos(j) === 'MO'; }
+function isVOL(j: JogadorComStats) { return j.posicao === 'VOL' || (j.posicao === 'MEI' && sp(j) === 'VOL'); }
+function isMC(j: JogadorComStats)  { return j.posicao === 'MEI' && (sp(j) === 'MC' || sp(j) === ''); }
+function isMO(j: JogadorComStats)  { return j.posicao === 'MEI' && sp(j) === 'MO'; }
 
-function isCA(j: JogadorComStats)  { return j.posicao === 'ATA' && subPos(j) === 'CA'; }
-function isPD(j: JogadorComStats)  { return j.posicao === 'ATA' && subPos(j) === 'PD'; }
-function isPE(j: JogadorComStats)  { return j.posicao === 'ATA' && subPos(j) === 'PE'; }
+function isCA(j: JogadorComStats)  { return j.posicao === 'ATA' && sp(j) === 'CA'; }
+function isPD(j: JogadorComStats)  { return j.posicao === 'ATA' && sp(j) === 'PD'; }
+function isPE(j: JogadorComStats)  { return j.posicao === 'ATA' && sp(j) === 'PE'; }
 
 export interface BestTeamResult {
   goleiro: JogadorComStats | null;
   defesa: { jogador: JogadorComStats; role: string }[];
   meios: { jogador: JogadorComStats; role: string }[];
   ataque: { jogador: JogadorComStats; role: string }[];
-  // contagens para exibir formação
+  lateraisNoMeio: boolean; // para mostrar nota na UI
   nDef: number;
   nMei: number;
   nAta: number;
@@ -109,175 +105,158 @@ function calcBestTeam(jogadores: JogadorComStats[]): BestTeamResult {
   // ── GOLEIRO ───────────────────────────────────────────────────────────────
   const goleiro = sortBy(com.filter(j => j.posicao === 'GOL'), scoreGoleiro)[0] ?? null;
   const usedIds = new Set<string>(goleiro ? [goleiro.id] : []);
-
   const avail = () => com.filter(j => !usedIds.has(j.id));
 
   // ── BLOCO DEFENSIVO ───────────────────────────────────────────────────────
-  // Pool: ZAG + LAT (LD e LE), sorted by scoreJogoLimpo
+  // Pool ZAG + LAT, ordenado por scoreJogoLimpo
   const defPool = sortBy(avail().filter(j => isZAG(j) || isLAT(j)), scoreJogoLimpo);
-
-  // Top-5 para análise (ou menos se não houver)
   const top5def = defPool.slice(0, 5);
-  const temLD = top5def.some(isLD);
-  const temLE = top5def.some(isLE);
+
+  // Buscar APENAS dentro dos top-5 o melhor LD e o melhor LE
+  const bestLDinTop5 = top5def.find(isLD) ?? null;
+  const bestLEinTop5 = top5def.find(isLE) ?? null;
 
   let defesa: { jogador: JogadorComStats; role: string }[] = [];
+  let lateraisForaDefesa: JogadorComStats[] = []; // laterais que sobraram para o meio
 
-  if (temLD && temLE) {
-    // Pode ser 4: melhor LD + melhor LE + 2 melhores ZAG da lista geral (excluindo os laterais já escolhidos)
-    const bestLD = top5def.filter(isLD)[0];
-    const bestLE = top5def.filter(isLE)[0];
-    const zagPool = defPool.filter(j => j.id !== bestLD.id && j.id !== bestLE.id);
-    const zags = zagPool.slice(0, 2);
+  if (bestLDinTop5 && bestLEinTop5) {
+    // 4 defensores: LD + 2 melhores ZAG dos top-5 (excluindo os laterais) + LE
+    // "melhores zagueiros" = quem não é lateral e está nos top-5
+    const zagsTop5 = top5def
+      .filter(j => j.id !== bestLDinTop5.id && j.id !== bestLEinTop5.id)
+      // aceitar qualquer posição que não seja lateral (ZAG ou até LAT extra se não houver ZAG)
+      .filter(j => isZAG(j))
+      .slice(0, 2);
+
+    // Se não houver 2 ZAGs nos top-5, completar com os melhores não-lateral
+    const zagsOuDef = zagsTop5.length >= 2
+      ? zagsTop5
+      : top5def
+          .filter(j => j.id !== bestLDinTop5.id && j.id !== bestLEinTop5.id)
+          .slice(0, 2);
+
     defesa = [
-      { jogador: bestLD, role: 'LD' },
-      ...zags.map(j => ({ jogador: j, role: isZAG(j) ? 'ZAG' : isLD(j) ? 'LD' : 'LE' })),
-      { jogador: bestLE, role: 'LE' },
+      { jogador: bestLDinTop5, role: 'LD' },
+      ...zagsOuDef.map(j => ({ jogador: j, role: isLD(j) ? 'LD' : isLE(j) ? 'LE' : 'ZAG' })),
+      { jogador: bestLEinTop5, role: 'LE' },
     ];
+    // Laterais não entram no meio neste cenário
+    lateraisForaDefesa = [];
   } else {
-    // 3 defensores: os 3 melhores do pool geral
-    defesa = defPool.slice(0, 3).map(j => ({
-      jogador: j,
-      role: isLD(j) ? 'LD' : isLE(j) ? 'LE' : 'ZAG',
-    }));
+    // Sem um lado completo: pegar os 3 melhores ZAGs dentro dos top-5
+    // (se não houver 3 ZAGs nos top-5, pegar apenas os disponíveis)
+    const zagsTop5 = top5def.filter(isZAG).slice(0, 3);
+    defesa = zagsTop5.map(j => ({ jogador: j, role: 'ZAG' }));
+
+    // Laterais que estavam nos top-5 mas não entraram na defesa ficam disponíveis para o meio
+    const defIds = new Set(defesa.map(d => d.jogador.id));
+    lateraisForaDefesa = top5def.filter(j => isLAT(j) && !defIds.has(j.id));
   }
 
   defesa.forEach(d => usedIds.add(d.jogador.id));
   const nDef = defesa.length; // 3 ou 4
+  const lateraisNaDefesa = nDef === 4; // true = laterais já foram usados na defesa
 
   // ── BLOCO DE MEIO-CAMPO ───────────────────────────────────────────────────
-  // Pool: VOL + MC (MEI sem sub ou MC) + MO, sorted by scoreJogoLimpo
-  const meiPool = sortBy(avail().filter(j => isVOL(j) || isMC(j) || isMO(j)), scoreJogoLimpo);
-  const top5mei = meiPool.slice(0, 5);
+  // Pool base: VOL + MC + MO (disponíveis, já excluindo usados)
+  const meiPoolBase = sortBy(avail().filter(j => isVOL(j) || isMC(j) || isMO(j)), scoreJogoLimpo);
 
-  const cntVOL = top5mei.filter(isVOL).length;
-  const cntMC  = top5mei.filter(isMC).length;
-  const cntMO  = top5mei.filter(isMO).length;
-
+  // Se os laterais NÃO foram usados na defesa, tenta incluí-los no pool do meio (pool de 7)
   let meios: { jogador: JogadorComStats; role: string }[] = [];
+  let lateraisNoMeio = false;
 
-  // Helpers para pegar melhor de cada tipo (da lista completa, excluindo já usados no bloco)
-  const bestOfType = (fn: (j: JogadorComStats) => boolean, exclude: Set<string>) =>
-    meiPool.filter(j => fn(j) && !exclude.has(j.id))[0] ?? null;
+  if (!lateraisNaDefesa) {
+    // Pool ampliado: LAT (disponíveis) + VOL + MC + MO → top-7
+    const latDisponiveis = sortBy(avail().filter(j => isLAT(j)), scoreJogoLimpo);
+    const poolAmpliado = sortBy([...latDisponiveis, ...meiPoolBase], scoreJogoLimpo);
+    const top7 = poolAmpliado.slice(0, 7);
 
-  const buildMeios = (selecionados: JogadorComStats[], roleMap: (j: JogadorComStats) => string) =>
-    selecionados.map(j => ({ jogador: j, role: roleMap(j) }));
+    const ldNoTop7 = top7.find(isLD) ?? null;
+    const leNoTop7 = top7.find(isLE) ?? null;
 
-  const roleLabel = (j: JogadorComStats) => isVOL(j) ? 'VOL' : isMO(j) ? 'MO' : 'MC';
+    if (ldNoTop7 && leNoTop7) {
+      // Pool de 7 tem LD e LE: montar com 2 laterais + 1 VOL + 1 MC + 1 MO (5 meios)
+      // ou reduzir para 4 se faltar alguma posição
+      lateraisNoMeio = true;
 
-  if (cntVOL >= 3) {
-    // Limitar a 2 VOL + 1 MC + 1 MO
-    const excl = new Set<string>();
-    const vols  = top5mei.filter(isVOL).slice(0, 2);
-    vols.forEach(j => excl.add(j.id));
-    const mc = bestOfType(isMC, excl);
-    if (mc) excl.add(mc.id);
-    const mo = bestOfType(isMO, excl);
-    meios = buildMeios(
-      [...vols, ...(mc ? [mc] : []), ...(mo ? [mo] : [])],
-      roleLabel,
-    );
-  } else if (cntMC >= 3) {
-    // Limitar a 2 MC + 1 VOL + 1 MO
-    const excl = new Set<string>();
-    const mcs  = top5mei.filter(isMC).slice(0, 2);
-    mcs.forEach(j => excl.add(j.id));
-    const vol = bestOfType(isVOL, excl);
-    if (vol) excl.add(vol.id);
-    const mo = bestOfType(isMO, excl);
-    meios = buildMeios(
-      [...mcs, ...(vol ? [vol] : []), ...(mo ? [mo] : [])],
-      roleLabel,
-    );
-  } else if (cntMO >= 3) {
-    // Limitar a 2 MO + 1 VOL + 1 MC
-    const excl = new Set<string>();
-    const mos  = top5mei.filter(isMO).slice(0, 2);
-    mos.forEach(j => excl.add(j.id));
-    const vol = bestOfType(isVOL, excl);
-    if (vol) excl.add(vol.id);
-    const mc = bestOfType(isMC, excl);
-    meios = buildMeios(
-      [...mos, ...(vol ? [vol] : []), ...(mc ? [mc] : [])],
-      roleLabel,
-    );
-  } else {
-    // Nenhuma posição tem 3+: verificar se algum par tem 2+2
-    // Regra: se 2 de dois tipos entre os top-5, manter todos 5
-    const pares = (cntVOL >= 2 ? 1 : 0) + (cntMC >= 2 ? 1 : 0) + (cntMO >= 2 ? 1 : 0);
-    if (pares >= 2) {
-      meios = buildMeios(top5mei, roleLabel);
-    } else {
-      // Menos de 2 posições com par: 1 de cada (no máximo 3)
       const excl = new Set<string>();
-      const vol = bestOfType(isVOL, excl);
+      excl.add(ldNoTop7.id);
+      excl.add(leNoTop7.id);
+
+      const vol = meiPoolBase.find(j => isVOL(j) && !excl.has(j.id)) ?? null;
       if (vol) excl.add(vol.id);
-      const mc = bestOfType(isMC, excl);
+      const mc = meiPoolBase.find(j => isMC(j) && !excl.has(j.id)) ?? null;
       if (mc) excl.add(mc.id);
-      const mo = bestOfType(isMO, excl);
-      meios = buildMeios(
-        [...(vol ? [vol] : []), ...(mc ? [mc] : []), ...(mo ? [mo] : [])],
-        roleLabel,
-      );
+      const mo = meiPoolBase.find(j => isMO(j) && !excl.has(j.id)) ?? null;
+
+      // Montar a lista: LD + VOL? + MC? + MO? + LE
+      const centroMeio = [
+        ...(vol ? [{ jogador: vol, role: 'VOL' }] : []),
+        ...(mc  ? [{ jogador: mc,  role: 'MC'  }] : []),
+        ...(mo  ? [{ jogador: mo,  role: 'MO'  }] : []),
+      ];
+
+      meios = [
+        { jogador: ldNoTop7, role: 'LD' },
+        ...centroMeio,
+        { jogador: leNoTop7, role: 'LE' },
+      ];
+      // Marcar todos como usados
+      meios.forEach(m => usedIds.add(m.jogador.id));
+    } else {
+      // Pool de 7 não tem LD e LE: ignorar laterais e usar regra original de 5
+      lateraisNoMeio = false;
+      meios = buildMeiosCom5(meiPoolBase, usedIds);
+      meios.forEach(m => usedIds.add(m.jogador.id));
     }
+  } else {
+    // Laterais já na defesa: regra original de 5
+    meios = buildMeiosCom5(meiPoolBase, usedIds);
+    meios.forEach(m => usedIds.add(m.jogador.id));
   }
 
-  meios.forEach(m => usedIds.add(m.jogador.id));
-  const nMei = meios.length; // 3, 4 ou 5
+  const nMei = meios.length;
 
   // ── BLOCO DE ATAQUE ───────────────────────────────────────────────────────
-  // Vagas restantes (11 - 1 goleiro - nDef - nMei)
   const vagasAta = 11 - 1 - nDef - nMei;
 
   const ataPool = sortBy(avail().filter(j => j.posicao === 'ATA'), scoreJogoLimpo);
   const caPool  = ataPool.filter(isCA);
   const pdPool  = ataPool.filter(isPD);
   const pePool  = ataPool.filter(isPE);
-  // Fallback: ATA sem sub_posicao entra no pool geral
   const semSub  = ataPool.filter(j => !j.sub_posicao);
+
+  const pick1CA = (excl: Set<string>) => [...caPool, ...semSub].find(j => !excl.has(j.id)) ?? null;
+  const pick1PD = (excl: Set<string>) => pdPool.find(j => !excl.has(j.id)) ?? null;
+  const pick1PE = (excl: Set<string>) => pePool.find(j => !excl.has(j.id)) ?? null;
 
   let ataque: { jogador: JogadorComStats; role: string }[] = [];
 
-  const pick1CA = (excl: Set<string>) => [...caPool, ...semSub].filter(j => !excl.has(j.id))[0] ?? null;
-  const pick1PD = (excl: Set<string>) => pdPool.filter(j => !excl.has(j.id))[0] ?? null;
-  const pick1PE = (excl: Set<string>) => pePool.filter(j => !excl.has(j.id))[0] ?? null;
-
   if (vagasAta <= 0) {
-    // Sem vagas — não adiciona atacantes
     ataque = [];
   } else if (vagasAta === 1) {
-    // 1 vaga → Centroavante
     const ca = pick1CA(usedIds);
     if (ca) ataque = [{ jogador: ca, role: 'CA' }];
   } else if (vagasAta === 2) {
-    // 2 vagas: dois CA ou PD+PE dependendo dos top-4 geral
+    // PD e PE nos top-4? → um de cada. Senão → dois CA
     const top4 = ataPool.slice(0, 4);
-    const hasPD = top4.some(isPD);
-    const hasPE = top4.some(isPE);
     const excl = new Set(usedIds);
-
-    if (hasPD && hasPE) {
-      // Um de cada ponta
+    if (top4.some(isPD) && top4.some(isPE)) {
       const pd = pick1PD(excl);
       if (pd) excl.add(pd.id);
       const pe = pick1PE(excl);
-      if (pe) excl.add(pe.id);
-      // Se conseguiu ambos, usa os dois
-      if (pd && pe) {
-        ataque = [{ jogador: pd, role: 'PD' }, { jogador: pe, role: 'PE' }];
-      } else {
-        // Fallback: completar com CA
-        const ca1 = pick1CA(excl);
-        const ca2 = pick1CA(new Set([...excl, ...(ca1 ? [ca1.id] : [])]));
-        ataque = [
-          ...(pd ? [{ jogador: pd, role: 'PD' }] : []),
-          ...(pe ? [{ jogador: pe, role: 'PE' }] : []),
-          ...(ca1 && !pd ? [{ jogador: ca1, role: 'CA' }] : []),
-          ...(ca2 && !pe ? [{ jogador: ca2, role: 'CA' }] : []),
-        ].slice(0, 2);
+      ataque = [
+        ...(pd ? [{ jogador: pd, role: 'PD' }] : []),
+        ...(pe ? [{ jogador: pe, role: 'PE' }] : []),
+      ];
+      // completar com CA se faltar alguém
+      while (ataque.length < 2) {
+        const ataExcl = new Set([...excl, ...ataque.map(a => a.jogador.id)]);
+        const ca = pick1CA(ataExcl);
+        if (!ca) break;
+        ataque.push({ jogador: ca, role: 'CA' });
       }
     } else {
-      // Dois CA
       const ca1 = pick1CA(excl);
       if (ca1) excl.add(ca1.id);
       const ca2 = pick1CA(excl);
@@ -287,35 +266,84 @@ function calcBestTeam(jogadores: JogadorComStats[]): BestTeamResult {
       ];
     }
   } else {
-    // 3+ vagas → 1 CA + 1 PD + 1 PE (usa pool geral para preencher se faltar)
+    // 3+ vagas → 1 CA + 1 PD + 1 PE
     const excl = new Set(usedIds);
-    const ca = pick1CA(excl);
-    if (ca) excl.add(ca.id);
-    const pd = pick1PD(excl);
-    if (pd) excl.add(pd.id);
-    const pe = pick1PE(excl);
-    if (pe) excl.add(pe.id);
-
+    const ca = pick1CA(excl); if (ca) excl.add(ca.id);
+    const pd = pick1PD(excl); if (pd) excl.add(pd.id);
+    const pe = pick1PE(excl); if (pe) excl.add(pe.id);
     ataque = [
       ...(ca ? [{ jogador: ca, role: 'CA' }] : []),
       ...(pd ? [{ jogador: pd, role: 'PD' }] : []),
       ...(pe ? [{ jogador: pe, role: 'PE' }] : []),
     ];
-
-    // Se sobrou vagas e não encontramos todos os tipos, completa com o melhor disponível
-    if (ataque.length < vagasAta) {
-      const ataUsed = new Set([...excl, ...ataque.map(a => a.jogador.id)]);
-      const restantes = ataPool.filter(j => !ataUsed.has(j.id)).slice(0, vagasAta - ataque.length);
-      ataque = [...ataque, ...restantes.map(j => ({
-        jogador: j,
-        role: isCA(j) ? 'CA' : isPD(j) ? 'PD' : isPE(j) ? 'PE' : 'ATA',
-      }))];
+    // Completar vagas restantes com qualquer atacante disponível
+    while (ataque.length < vagasAta) {
+      const ataExcl = new Set([...excl, ...ataque.map(a => a.jogador.id)]);
+      const extra = ataPool.find(j => !ataExcl.has(j.id));
+      if (!extra) break;
+      ataque.push({ jogador: extra, role: isCA(extra) ? 'CA' : isPD(extra) ? 'PD' : isPE(extra) ? 'PE' : 'ATA' });
     }
   }
 
   const nAta = ataque.length;
 
-  return { goleiro, defesa, meios, ataque, nDef, nMei, nAta };
+  return { goleiro, defesa, meios, ataque, lateraisNoMeio, nDef, nMei, nAta };
+}
+
+// Regra original de meio-campo com pool de 5 (VOL + MC + MO)
+function buildMeiosCom5(
+  meiPool: JogadorComStats[],
+  usedIds: Set<string>,
+): { jogador: JogadorComStats; role: string }[] {
+  const top5 = meiPool.filter(j => !usedIds.has(j.id)).slice(0, 5);
+
+  const cntVOL = top5.filter(isVOL).length;
+  const cntMC  = top5.filter(isMC).length;
+  const cntMO  = top5.filter(isMO).length;
+
+  const roleLabel = (j: JogadorComStats) => isVOL(j) ? 'VOL' : isMO(j) ? 'MO' : 'MC';
+
+  const bestOf = (fn: (j: JogadorComStats) => boolean, excl: Set<string>) =>
+    meiPool.find(j => fn(j) && !excl.has(j.id) && !usedIds.has(j.id)) ?? null;
+
+  if (cntVOL >= 3) {
+    const excl = new Set<string>();
+    const vols = top5.filter(isVOL).slice(0, 2); vols.forEach(j => excl.add(j.id));
+    const mc = bestOf(isMC, excl); if (mc) excl.add(mc.id);
+    const mo = bestOf(isMO, excl);
+    return [...vols, ...(mc ? [mc] : []), ...(mo ? [mo] : [])].map(j => ({ jogador: j, role: roleLabel(j) }));
+  }
+  if (cntMC >= 3) {
+    const excl = new Set<string>();
+    const mcs = top5.filter(isMC).slice(0, 2); mcs.forEach(j => excl.add(j.id));
+    const vol = bestOf(isVOL, excl); if (vol) excl.add(vol.id);
+    const mo = bestOf(isMO, excl);
+    return [...mcs, ...(vol ? [vol] : []), ...(mo ? [mo] : [])].map(j => ({ jogador: j, role: roleLabel(j) }));
+  }
+  if (cntMO >= 3) {
+    const excl = new Set<string>();
+    const mos = top5.filter(isMO).slice(0, 2); mos.forEach(j => excl.add(j.id));
+    const vol = bestOf(isVOL, excl); if (vol) excl.add(vol.id);
+    const mc = bestOf(isMC, excl);
+    return [...mos, ...(vol ? [vol] : []), ...(mc ? [mc] : [])].map(j => ({ jogador: j, role: roleLabel(j) }));
+  }
+
+  // Nenhuma posição com 3+: se duas posições têm 2+ cada → manter os 5 do top5
+  const pares = (cntVOL >= 2 ? 1 : 0) + (cntMC >= 2 ? 1 : 0) + (cntMO >= 2 ? 1 : 0);
+  if (pares >= 2) {
+    return top5.map(j => ({ jogador: j, role: roleLabel(j) }));
+  }
+
+  // Caso base: 1 de cada posição
+  const excl = new Set<string>();
+  const vol = bestOf(isVOL, excl); if (vol) excl.add(vol.id);
+  const mc  = bestOf(isMC,  excl); if (mc)  excl.add(mc.id);
+  const mo  = bestOf(isMO,  excl);
+  return [
+    ...(vol ? [vol] : []),
+    ...(mc  ? [mc]  : []),
+    ...(mo  ? [mo]  : []),
+  ].map(j => ({ jogador: j, role: roleLabel(j) }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -681,9 +709,14 @@ export function TimesClient({ timesData }: Props) {
               }}>
                 {formacao}
               </span>
-              <p style={{ fontSize: '.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                Goleiro: média gols sofridos · Defesa & Meio & Ataque: jogo limpo (min∕cartão) + gols marcados
-              </p>
+              <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>
+                <div>Goleiro: menor média de gols sofridos · Demais: jogo limpo (min∕cartão) + gols</div>
+                {bestTeam.lateraisNoMeio && (
+                  <div style={{ color: '#22c55e', marginTop: '.2rem' }}>
+                    ↳ Laterais não encontrados nos top-5 da defesa — incluídos no meio-campo
+                  </div>
+                )}
+              </div>
             </div>
 
             <div style={{
@@ -713,8 +746,12 @@ export function TimesClient({ timesData }: Props) {
               />
 
               <FieldRow
-                label={`Meio-campo (${bestTeam.nMei})`}
-                cor="#8b5cf6"
+                label={
+                  bestTeam.lateraisNoMeio
+                    ? `Meio-campo com Laterais (${bestTeam.nMei})`
+                    : `Meio-campo (${bestTeam.nMei})`
+                }
+                cor={bestTeam.lateraisNoMeio ? '#22c55e' : '#8b5cf6'}
                 players={bestTeam.meios}
               />
 
@@ -735,8 +772,8 @@ export function TimesClient({ timesData }: Props) {
                 <span><strong style={{ color: 'var(--text)' }}>j</strong> Partidas disputadas</span>
                 <span><strong style={{ color: 'var(--amarelo)' }}>&apos;</strong> Minutos em campo</span>
                 <span><strong style={{ color: '#22c55e' }}>⚽</strong> Gols marcados</span>
-                <span><strong style={{ color: '#f59e0b' }}>GOL</strong> min∕gol sofrido (menor = melhor)</span>
-                <span>Defesa/Meio/Ataque ordena por jogo limpo + gols</span>
+                <span><strong style={{ color: '#f59e0b' }}>GOL</strong> min∕gol sofrido (∞ = nenhum gol sofrido)</span>
+                <span>Defesa 3 ZAG ou LD+2ZAG+LE · Meio 3–5 · Ataque 1–3</span>
               </div>
             </div>
           </section>
