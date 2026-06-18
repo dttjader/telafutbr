@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time, Jogador } from '@/lib/types';
 
@@ -20,14 +20,25 @@ interface JogadorComStats extends Jogador {
   transferencias_aqui?: { time_id: string; data: string }[];
 }
 
+interface JogoPublico {
+  rodada: number;
+  data: string;
+  adversario: string;
+  placar_casa: number;
+  placar_visitante: number;
+  publico: number;
+}
+
 interface TimeData {
   time: Time;
   publicoCasa: {
     total: number;
     jogos: number;
+    jogosLista: JogoPublico[];
     porEstadio: Record<string, { total: number; jogos: number; nome: string }>;
   };
   publicoVisitante: { total: number; jogos: number };
+  totalMinutos: number;
   ativos: JogadorComStats[];
   foramEmbora: JogadorComStats[];
   vieram: JogadorComStats[];
@@ -99,8 +110,11 @@ export interface BestTeamResult {
   nAta: number;
 }
 
-function calcBestTeam(jogadores: JogadorComStats[]): BestTeamResult {
+function calcBestTeam(jogadores: JogadorComStats[], totalMinutos: number): BestTeamResult {
+  const limiar = totalMinutos * 0.5;
   const com = jogadores.filter(j => j.stats.partidas > 0);
+  // Jogadores de linha com >= 50% dos minutos totais do time
+  const comLinha = com.filter(j => j.posicao !== 'GOL' && j.stats.minutos >= limiar);
 
   // ── GOLEIRO ───────────────────────────────────────────────────────────────
   const goleiro = sortBy(com.filter(j => j.posicao === 'GOL'), scoreGoleiro)[0] ?? null;
@@ -109,7 +123,7 @@ function calcBestTeam(jogadores: JogadorComStats[]): BestTeamResult {
 
   // ── BLOCO DEFENSIVO ───────────────────────────────────────────────────────
   // Pool ZAG + LAT, ordenado por scoreJogoLimpo
-  const defPool = sortBy(avail().filter(j => isZAG(j) || isLAT(j)), scoreJogoLimpo);
+  const defPool = sortBy(comLinha.filter(j => (isZAG(j) || isLAT(j)) && !usedIds.has(j.id)), scoreJogoLimpo);
   const top5def = defPool.slice(0, 5);
 
   // Buscar APENAS dentro dos top-5 o melhor LD e o melhor LE
@@ -159,7 +173,7 @@ function calcBestTeam(jogadores: JogadorComStats[]): BestTeamResult {
 
   // ── BLOCO DE MEIO-CAMPO ───────────────────────────────────────────────────
   // Pool base: VOL + MC + MO (disponíveis, já excluindo usados)
-  const meiPoolBase = sortBy(avail().filter(j => isVOL(j) || isMC(j) || isMO(j)), scoreJogoLimpo);
+  const meiPoolBase = sortBy(comLinha.filter(j => (isVOL(j) || isMC(j) || isMO(j)) && !usedIds.has(j.id)), scoreJogoLimpo);
 
   // Se os laterais NÃO foram usados na defesa, tenta incluí-los no pool do meio (pool de 7)
   let meios: { jogador: JogadorComStats; role: string }[] = [];
@@ -167,7 +181,7 @@ function calcBestTeam(jogadores: JogadorComStats[]): BestTeamResult {
 
   if (!lateraisNaDefesa) {
     // Pool ampliado: LAT (disponíveis) + VOL + MC + MO → top-7
-    const latDisponiveis = sortBy(avail().filter(j => isLAT(j)), scoreJogoLimpo);
+    const latDisponiveis = sortBy(comLinha.filter(j => isLAT(j) && !usedIds.has(j.id)), scoreJogoLimpo);
     const poolAmpliado = sortBy([...latDisponiveis, ...meiPoolBase], scoreJogoLimpo);
     const top7 = poolAmpliado.slice(0, 7);
 
@@ -220,7 +234,7 @@ function calcBestTeam(jogadores: JogadorComStats[]): BestTeamResult {
   // ── BLOCO DE ATAQUE ───────────────────────────────────────────────────────
   const vagasAta = 11 - 1 - nDef - nMei;
 
-  const ataPool = sortBy(avail().filter(j => j.posicao === 'ATA'), scoreJogoLimpo);
+  const ataPool = sortBy(comLinha.filter(j => j.posicao === 'ATA' && !usedIds.has(j.id)), scoreJogoLimpo);
   const caPool  = ataPool.filter(isCA);
   const pdPool  = ataPool.filter(isPD);
   const pePool  = ataPool.filter(isPE);
@@ -373,12 +387,15 @@ function BestPlayerCard({
         ? `${Math.round(minVal / jogador.stats.gols_sofridos)}'∕gol`
         : '∞ min/gol')
     : null;
+  const temGols = jogador.stats.gols > 0;
+  const temAmarelo = jogador.stats.cartoes_amarelos > 0;
+  const temVermelho = jogador.stats.cartoes_vermelhos > 0;
 
   return (
     <div style={{
       background: `${cor}12`, border: `1px solid ${cor}30`,
       borderRadius: 8, padding: '.65rem .75rem', textAlign: 'center',
-      flex: 1, minWidth: 88,
+      flex: 1, minWidth: 110,
     }}>
       <div style={{
         fontSize: '.58rem', color: cor,
@@ -392,9 +409,8 @@ function BestPlayerCard({
           #{jogador.numero}
         </div>
       )}
-      <div style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--text)', margin: '.2rem 0' }}>
-        {/* Último sobrenome para caber melhor */}
-        {jogador.nome.split(' ').length > 1 ? jogador.nome.split(' ').pop() : jogador.nome}
+      <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--text)', margin: '.2rem 0', lineHeight: 1.3 }}>
+        {jogador.nome}
       </div>
       <div style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>
         {jogador.stats.partidas}j · {minVal}&apos;
@@ -402,8 +418,18 @@ function BestPlayerCard({
       {gs && (
         <div style={{ fontSize: '.62rem', color: cor, marginTop: '.15rem', fontWeight: 600 }}>{gs}</div>
       )}
-      {!gs && jogador.stats.gols > 0 && (
-        <div style={{ fontSize: '.62rem', color: '#22c55e', marginTop: '.15rem' }}>⚽ {jogador.stats.gols}</div>
+      {!gs && (
+        <div style={{ display: 'flex', gap: '.3rem', justifyContent: 'center', marginTop: '.25rem', flexWrap: 'wrap' }}>
+          {temGols && (
+            <span style={{ fontSize: '.62rem', color: '#22c55e', fontWeight: 600 }}>⚽{jogador.stats.gols}</span>
+          )}
+          {temAmarelo && (
+            <span style={{ fontSize: '.62rem', color: '#f59e0b', fontWeight: 600 }}>🟨{jogador.stats.cartoes_amarelos}</span>
+          )}
+          {temVermelho && (
+            <span style={{ fontSize: '.62rem', color: '#ef4444', fontWeight: 600 }}>🟥{jogador.stats.cartoes_vermelhos}</span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -446,6 +472,13 @@ function FieldRow({
 export function TimesClient({ timesData }: Props) {
   const [selectedTimeId, setSelectedTimeId] = useState<string>(timesData[0]?.time.id ?? '');
   const [abaJog, setAbaJog] = useState<'ativos' | 'vieram' | 'foramEmbora'>('ativos');
+  const [jogosAbertos, setJogosAbertos] = useState(false);
+
+  // Resetar estado ao mudar de time
+  useEffect(() => {
+    setJogosAbertos(false);
+    setAbaJog('ativos');
+  }, [selectedTimeId]);
 
   const data = useMemo(
     () => timesData.find(d => d.time.id === selectedTimeId) ?? null,
@@ -459,7 +492,7 @@ export function TimesClient({ timesData }: Props) {
 
   const bestTeam = useMemo(() => {
     if (!data || data.ativos.every(j => j.stats.partidas === 0)) return null;
-    return calcBestTeam(data.ativos);
+    return calcBestTeam(data.ativos, data.totalMinutos);
   }, [data]);
 
   if (!data) return (
@@ -468,7 +501,7 @@ export function TimesClient({ timesData }: Props) {
     </div>
   );
 
-  const { time, publicoCasa, publicoVisitante, ativos, foramEmbora, vieram } = data;
+  const { time, publicoCasa, publicoVisitante, totalMinutos, ativos, foramEmbora, vieram } = data;
   const corTime = time.cor_primaria;
   const estadiosList = Object.values(publicoCasa.porEstadio).sort((a, b) => b.jogos - a.jogos);
   const jogadoresExibidos = abaJog === 'ativos' ? ativos : abaJog === 'vieram' ? vieram : foramEmbora;
@@ -551,6 +584,51 @@ export function TimesClient({ timesData }: Props) {
                   <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '.2rem' }}>
                     {publicoCasa.jogos} jogo(s) · total: {fmt(publicoCasa.total)}
                   </div>
+                  {/* Dropdown jogo a jogo */}
+                  <button
+                    onClick={() => setJogosAbertos(v => !v)}
+                    style={{
+                      marginTop: '.75rem', width: '100%',
+                      background: 'var(--surface2)', border: '1px solid var(--border)',
+                      borderRadius: 6, color: 'var(--text-muted)', padding: '.35rem .6rem',
+                      fontSize: '.72rem', cursor: 'pointer', display: 'flex',
+                      alignItems: 'center', justifyContent: 'space-between',
+                      fontFamily: 'Barlow, sans-serif',
+                    }}
+                  >
+                    <span>Jogo a jogo por rodada</span>
+                    <span style={{ transform: jogosAbertos ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>▾</span>
+                  </button>
+                  {jogosAbertos && (
+                    <div style={{ marginTop: '.5rem', display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                      {publicoCasa.jogosLista.map((jg, i) => {
+                        const dataFmt = jg.data ? jg.data.split('-').reverse().join('/') : '—';
+                        return (
+                          <div key={i} style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'auto 1fr auto auto',
+                            alignItems: 'center', gap: '.5rem',
+                            padding: '.35rem .5rem',
+                            background: i % 2 === 0 ? 'var(--surface2)' : 'var(--surface)',
+                            borderRadius: 5, fontSize: '.75rem',
+                          }}>
+                            <span style={{ fontFamily: "'Bebas Neue',sans-serif", color: corTime, minWidth: 28 }}>
+                              R{jg.rodada}
+                            </span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '.68rem' }}>
+                              {dataFmt} · vs {jg.adversario}
+                            </span>
+                            <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.9rem', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                              {jg.placar_casa} × {jg.placar_visitante}
+                            </span>
+                            <span style={{ color: corTime, fontWeight: 600, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                              {fmt(jg.publico)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               )}
             </div>
