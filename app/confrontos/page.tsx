@@ -1,372 +1,515 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { times, confrontos } from '@/lib/data';
+import { createClient } from '@/utils/supabase/server'
+
+export const revalidate = 0
+
+interface Jogo {
+  id: string | number
+  time_casa_id: number
+  time_visitante_id: number
+  placar_casa: number | null
+  placar_visitante: number | null
+  status: string
+  data: string
+  hora: string
+  rodada: number
+  times_casa: { nome: string; sigla: string; escudo?: string }
+  times_visitante: { nome: string; sigla: string; escudo?: string }
+}
 
 interface Time {
-  id: number;
-  nome: string;
-  sigla?: string;
-  cor?: string;
-  escudo?: string;
+  id: number
+  nome: string
+  sigla: string
+  escudo?: string
 }
 
-interface Confronto {
-  id: number;
-  time_casa_id: number;
-  time_visitante_id: number;
-  placar_casa: number;
-  placar_visitante: number;
-  status: string;
-  data: string;
-  hora: string;
+const homeShadeBg: Record<number, string> = {
+  0: 'rgba(0, 128, 0, 0.55)',
+  1: 'rgba(0, 128, 0, 0.45)',
+  2: 'rgba(0, 128, 0, 0.35)',
+  3: 'rgba(0, 128, 0, 0.25)',
+  4: 'rgba(0, 128, 0, 0.15)',
 }
 
-const PSEUDO_IDS = new Set(['outros']);
+function corCelula(v: number, ehCasa: boolean) {
+  if (v > 0) return ehCasa ? 'rgba(0, 128, 0, 0.55)' : 'rgba(255, 0, 0, 0.55)'
+  if (v < 0) return ehCasa ? 'rgba(255, 0, 0, 0.55)' : 'rgba(0, 128, 0, 0.55)'
+  return 'rgba(128, 128, 128, 0.35)'
+}
 
-export default function ConfrontosPage(): JSX.Element {
-  const [lista, setLista] = useState<Confronto[]>([]);
-  const [carregando, setCarregando] = useState<boolean>(true);
+export default async function Confrontos2026() {
+  const supabase = await createClient()
 
-  useEffect(() => {
-    let ativo = true;
-    async function carregar() {
-      try {
-        const dados = await confrontos();
-        if (ativo) setLista(dados as Confronto[]);
-      } catch (e) {
-        console.error('Erro ao carregar confrontos:', e);
-      } finally {
-        if (ativo) setCarregando(false);
+  const { data: jogos } = await supabase
+    .from('jogos')
+    .select(
+      'id, time_casa_id, time_visitante_id, placar_casa, placar_visitante, status, data, hora, rodada, times_casa:nome, times_visitante:nome'
+    )
+    .eq('temporada', '2026')
+    .order('data', { ascending: true })
+    .order('hora', { ascending: true })
+
+  const { data: times } = await supabase.from('times').select('id, nome, sigla, escudo').order('nome')
+
+  const listaJogos: Jogo[] = (jogos as unknown as Jogo[]) ?? []
+  const listaTimes: Time[] = times ?? []
+
+  const encerradas = listaJogos.filter((j) => j.status === 'encerrada')
+  const naoEncerradas = listaJogos.filter((j) => j.status !== 'encerrada')
+
+  const vitoriasCasa = encerradas.filter((j) => (j.placar_casa ?? 0) > (j.placar_visitante ?? 0)).length
+  const empates = encerradas.filter((j) => (j.placar_casa ?? 0) === (j.placar_visitante ?? 0)).length
+  const vitoriasFora = encerradas.filter((j) => (j.placar_casa ?? 0) < (j.placar_visitante ?? 0)).length
+  const golsCasa = encerradas.reduce((s, j) => s + (j.placar_casa ?? 0), 0)
+  const golsFora = encerradas.reduce((s, j) => s + (j.placar_visitante ?? 0), 0)
+  const totalGols = golsCasa + golsFora
+  const mediaGols = encerradas.length ? (totalGols / encerradas.length).toFixed(2) : '0.00'
+
+  const timesOrdenados = [...listaTimes].sort((a, b) => a.nome.localeCompare(b.nome))
+
+  const idx: Record<string | number, number> = {}
+  timesOrdenados.forEach((t, i) => {
+    idx[t.id] = i
+    idx[t.sigla] = i
+  })
+
+  const ultimas5Casa: Record<number, Map<string, number>> = {}
+
+  timesOrdenados.forEach((timeCasa) => {
+    const jogosCasa = listaJogos
+      .filter(
+        (j) =>
+          j.time_casa_id === timeCasa.id &&
+          j.status === 'encerrada' &&
+          j.placar_casa !== null &&
+          j.placar_visitante !== null
+      )
+      .sort((a, b) => {
+        const da = new Date(`${a.data}T${a.hora || '00:00'}`).getTime()
+        const db = new Date(`${b.data}T${b.hora || '00:00'}`).getTime()
+        return db - da
+      })
+      .slice(0, 5)
+
+    const map = new Map<string, number>()
+    jogosCasa.forEach((j, index) => {
+      const visitante = listaTimes.find((t) => t.id === j.time_visitante_id)
+      if (visitante) {
+        map.set(String(visitante.id), index)
       }
-    }
-    carregar();
-    return () => {
-      ativo = false;
-    };
-  }, []);
+    })
 
-  const timesMap = useMemo(() => {
-    const mapa: Record<number, Time> = {};
-    const listaTimes = times() as Time[];
-    for (let i = 0; i < listaTimes.length; i++) {
-      const t = listaTimes[i];
-      if (t && typeof t.id === 'number') {
-        mapa[t.id] = t;
-      }
-    }
-    return mapa;
-  }, []);
+    ultimas5Casa[timeCasa.id] = map
+  })
 
-  const {
-    totalJogos,
-    totalVitoriasCasa,
-    totalEmpates,
-    totalVitoriasFora,
-    totalGols,
-    mediaGols,
-    aproveitamentoMandante,
-  } = useMemo(() => {
-    let jogos = 0;
-    let vitoriasCasa = 0;
-    let empates = 0;
-    let vitoriasFora = 0;
-    let gols = 0;
-    let pontosMandantePossiveis = 0;
-    let pontosMandanteGanhos = 0;
+  const matrizSaldoCasa: (number | null)[][] = Array(timesOrdenados.length)
+    .fill(null)
+    .map(() => Array(timesOrdenados.length).fill(null))
+  const matrizSaldoFora: (number | null)[][] = Array(timesOrdenados.length)
+    .fill(null)
+    .map(() => Array(timesOrdenados.length).fill(null))
+  const matrizPontos: (number | null)[][] = Array(timesOrdenados.length)
+    .fill(null)
+    .map(() => Array(timesOrdenados.length).fill(null))
+  const matrizGols: (number | null)[][] = Array(timesOrdenados.length)
+    .fill(null)
+    .map(() => Array(timesOrdenados.length).fill(null))
 
-    for (let i = 0; i < lista.length; i++) {
-      const c = lista[i];
-      if (!c || c.status !== 'finalizado') continue;
-      jogos++;
-      gols = gols + c.placar_casa + c.placar_visitante;
-      pontosMandantePossiveis = pontosMandantePossiveis + 3;
+  encerradas.forEach((j) => {
+    const iCasa = idx[j.time_casa_id]
+    const iFora = idx[j.time_visitante_id]
+    if (iCasa === undefined || iFora === undefined) return
 
-      if (c.placar_casa > c.placar_visitante) {
-        vitoriasCasa++;
-        pontosMandanteGanhos = pontosMandanteGanhos + 3;
-      } else if (c.placar_casa < c.placar_visitante) {
-        vitoriasFora++;
-      } else {
-        empates++;
-        pontosMandanteGanhos = pontosMandanteGanhos + 1;
-      }
-    }
+    const gc = j.placar_casa ?? 0
+    const gf = j.placar_visitante ?? 0
 
-    const media = jogos > 0 ? Number((gols / jogos).toFixed(2)) : 0;
-    const aproveitamento =
-      pontosMandantePossiveis > 0
-        ? Number(((pontosMandanteGanhos / pontosMandantePossiveis) * 100).toFixed(1))
-        : 0;
-
-    return {
-      totalJogos: jogos,
-      totalVitoriasCasa: vitoriasCasa,
-      totalEmpates: empates,
-      totalVitoriasFora: vitoriasFora,
-      totalGols: gols,
-      mediaGols: media,
-      aproveitamentoMandante: aproveitamento,
-    };
-  }, [lista]);
-
-  const resultadosCruzados = useMemo(() => {
-    const mapa: Record<string, { v: number; e: number; d: number; gp: number; gc: number }> = {};
-
-    for (let i = 0; i < lista.length; i++) {
-      const c = lista[i];
-      if (!c || c.status !== 'finalizado') continue;
-      const chave = `${c.time_casa_id}x${c.time_visitante_id}`;
-      if (!mapa[chave]) {
-        mapa[chave] = { v: 0, e: 0, d: 0, gp: 0, gc: 0 };
-      }
-      const item = mapa[chave];
-      item.gp = item.gp + c.placar_casa;
-      item.gc = item.gc + c.placar_visitante;
-      if (c.placar_casa > c.placar_visitante) item.v++;
-      else if (c.placar_casa < c.placar_visitante) item.d++;
-      else item.e++;
+    let pontosCasa = 0
+    let pontosFora = 0
+    if (gc > gf) {
+      pontosCasa = 3
+    } else if (gc < gf) {
+      pontosFora = 3
+    } else {
+      pontosCasa = 1
+      pontosFora = 1
     }
 
-    return mapa;
-  }, [lista]);
+    matrizSaldoCasa[iCasa][iFora] = gc - gf
+    matrizSaldoFora[iFora][iCasa] = gf - gc
+    matrizPontos[iCasa][iFora] = pontosCasa
+    matrizPontos[iFora][iCasa] = pontosFora
+    matrizGols[iCasa][iFora] = gc
+    matrizGols[iFora][iCasa] = gf
+  })
 
-  const ultimas5Casa = useMemo<Record<number, Map<string, number>>>(() => {
-    const mapa: Record<number, Map<string, number>> = {};
+  const resumoCasa = timesOrdenados
+    .map((t) => {
+      const i = idx[t.id]
+      const jogos = matrizSaldoCasa[i].filter((v) => v !== null).length
+      const v = matrizSaldoCasa[i].filter((v) => (v ?? 0) > 0).length
+      const e = matrizSaldoCasa[i].filter((v) => v === 0).length
+      const d = matrizSaldoCasa[i].filter((v) => (v ?? 0) < 0).length
+      const gp = matrizGols[i].reduce((s, v) => s + (v ?? 0), 0)
+      const gc = matrizGols.map((row) => row[i]).reduce((s, v) => s + (v ?? 0), 0)
+      const sg = gp - gc
+      const pts = matrizPontos[i].reduce((s, v) => s + (v ?? 0), 0)
+      return { time: t, jogos, v, e, d, gp, gc, sg, pts }
+    })
+    .sort((a, b) => b.pts - a.pts || b.sg - a.sg || b.gp - a.gp)
 
-    const porMandante: Record<number, Confronto[]> = {};
-    for (let i = 0; i < lista.length; i++) {
-      const c = lista[i];
-      if (!c || c.status !== 'finalizado') continue;
-      if (!porMandante[c.time_casa_id]) porMandante[c.time_casa_id] = [];
-      porMandante[c.time_casa_id].push(c);
-    }
-
-    const chaves = Object.keys(porMandante);
-    for (let i = 0; i < chaves.length; i++) {
-      const timeId = Number(chaves[i]);
-      const jogosTime = porMandante[timeId];
-      const ultimos = jogosTime.slice(-5);
-      const degrades = new Map<string, number>();
-
-      for (let j = 0; j < ultimos.length; j++) {
-        const c = ultimos[j];
-        const chave = `${c.data}T${c.hora}`;
-        const peso = j + 1;
-        degrades.set(chave, peso);
-      }
-      mapa[timeId] = degrades;
-    }
-
-    return mapa;
-  }, [lista]);
-
-  const resumoMandante = useMemo(() => {
-    const mapa: Record<number, { p: number; j: number; v: number; e: number; d: number; gp: number; gc: number; sg: number; nome: string }> = {};
-
-    for (let i = 0; i < lista.length; i++) {
-      const c = lista[i];
-      if (!c || c.status !== 'finalizado') continue;
-      const id = c.time_casa_id;
-      if (!mapa[id]) {
-        const t = timesMap[id];
-        mapa[id] = { p: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, nome: t ? t.nome : `Time ${id}` };
-      }
-      const item = mapa[id];
-      item.j++;
-      item.gp = item.gp + c.placar_casa;
-      item.gc = item.gc + c.placar_visitante;
-      if (c.placar_casa > c.placar_visitante) {
-        item.v++;
-        item.p = item.p + 3;
-      } else if (c.placar_casa < c.placar_visitante) {
-        item.d++;
-      } else {
-        item.e++;
-        item.p = item.p + 1;
-      }
-      item.sg = item.gp - item.gc;
-    }
-
-    const arr = Object.values(mapa);
-    arr.sort((a, b) => {
-      if (b.p !== a.p) return b.p - a.p;
-      return b.sg - a.sg;
-    });
-    return arr;
-  }, [lista, timesMap]);
-
-  const resumoVisitante = useMemo(() => {
-    const mapa: Record<number, { p: number; j: number; v: number; e: number; d: number; gp: number; gc: number; sg: number; nome: string }> = {};
-
-    for (let i = 0; i < lista.length; i++) {
-      const c = lista[i];
-      if (!c || c.status !== 'finalizado') continue;
-      const id = c.time_visitante_id;
-      if (!mapa[id]) {
-        const t = timesMap[id];
-        mapa[id] = { p: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, nome: t ? t.nome : `Time ${id}` };
-      }
-      const item = mapa[id];
-      item.j++;
-      item.gp = item.gp + c.placar_visitante;
-      item.gc = item.gc + c.placar_casa;
-      if (c.placar_visitante > c.placar_casa) {
-        item.v++;
-        item.p = item.p + 3;
-      } else if (c.placar_visitante < c.placar_casa) {
-        item.d++;
-      } else {
-        item.e++;
-        item.p = item.p + 1;
-      }
-      item.sg = item.gp - item.gc;
-    }
-
-    const arr = Object.values(mapa);
-    arr.sort((a, b) => {
-      if (b.p !== a.p) return b.p - a.p;
-      return b.sg - a.sg;
-    });
-    return arr;
-  }, [lista, timesMap]);
-
-  if (carregando) {
-    return <div style={{ padding: 24, fontFamily: 'sans-serif' }}>Carregando confrontos...</div>;
-  }
+  const resumoFora = timesOrdenados
+    .map((t) => {
+      const i = idx[t.id]
+      const jogos = matrizSaldoFora[i].filter((v) => v !== null).length
+      const v = matrizSaldoFora[i].filter((v) => (v ?? 0) > 0).length
+      const e = matrizSaldoFora[i].filter((v) => v === 0).length
+      const d = matrizSaldoFora[i].filter((v) => (v ?? 0) < 0).length
+      const gp = matrizGols.map((row) => row[i]).reduce((s, v) => s + (v ?? 0), 0)
+      const gc = matrizGols[i].reduce((s, v) => s + (v ?? 0), 0)
+      const sg = gp - gc
+      const pts = matrizPontos.map((row) => row[i]).reduce((s, v) => s + (v ?? 0), 0)
+      return { time: t, jogos, v, e, d, gp, gc, sg, pts }
+    })
+    .sort((a, b) => b.pts - a.pts || b.sg - a.sg || b.gp - a.gp)
 
   return (
-    <div style={{ padding: 24, fontFamily: 'Arial, sans-serif', background: '#f5f5f5', minHeight: '100vh' }}>
-      <h1 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 42, marginBottom: 24, color: '#1a1a1a' }}>
-        Confrontos
+    <div
+      style={{
+        fontFamily: "'Bebas Neue', sans-serif",
+        minHeight: '100vh',
+        background: '#0f172a',
+        color: '#f8fafc',
+        padding: '24px',
+      }}
+    >
+      <link
+        href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"
+        rel="stylesheet"
+      />
+
+      <h1
+        style={{
+          fontSize: '42px',
+          textAlign: 'center',
+          letterSpacing: '2px',
+          marginBottom: '24px',
+        }}
+      >
+        CONFRONTOS 2026
       </h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, marginBottom: 32 }}>
-        <div style={{ background: '#1e3a8a', color: '#fff', padding: 16, borderRadius: 8, textAlign: 'center', fontFamily: 'Bebas Neue, sans-serif' }}>
-          <div style={{ fontSize: 28 }}>{totalJogos}</div>
-          <div style={{ fontSize: 14 }}>Jogos</div>
-        </div>
-        <div style={{ background: '#166534', color: '#fff', padding: 16, borderRadius: 8, textAlign: 'center', fontFamily: 'Bebas Neue, sans-serif' }}>
-          <div style={{ fontSize: 28 }}>{totalVitoriasCasa}</div>
-          <div style={{ fontSize: 14 }}>Vitórias Casa</div>
-        </div>
-        <div style={{ background: '#ca8a04', color: '#fff', padding: 16, borderRadius: 8, textAlign: 'center', fontFamily: 'Bebas Neue, sans-serif' }}>
-          <div style={{ fontSize: 28 }}>{totalEmpates}</div>
-          <div style={{ fontSize: 14 }}>Empates</div>
-        </div>
-        <div style={{ background: '#7f1d1d', color: '#fff', padding: 16, borderRadius: 8, textAlign: 'center', fontFamily: 'Bebas Neue, sans-serif' }}>
-          <div style={{ fontSize: 28 }}>{totalVitoriasFora}</div>
-          <div style={{ fontSize: 14 }}>Vitórias Fora</div>
-        </div>
-        <div style={{ background: '#4338ca', color: '#fff', padding: 16, borderRadius: 8, textAlign: 'center', fontFamily: 'Bebas Neue, sans-serif' }}>
-          <div style={{ fontSize: 28 }}>{totalGols}</div>
-          <div style={{ fontSize: 14 }}>Gols</div>
-        </div>
-        <div style={{ background: '#0f766e', color: '#fff', padding: 16, borderRadius: 8, textAlign: 'center', fontFamily: 'Bebas Neue, sans-serif' }}>
-          <div style={{ fontSize: 28 }}>{mediaGols}</div>
-          <div style={{ fontSize: 14 }}>Média Gols</div>
-        </div>
-        <div style={{ background: '#c2410c', color: '#fff', padding: 16, borderRadius: 8, textAlign: 'center', fontFamily: 'Bebas Neue, sans-serif' }}>
-          <div style={{ fontSize: 28 }}>{aproveitamentoMandante}%</div>
-          <div style={{ fontSize: 14 }}>Aproveitamento Mandante</div>
-        </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: '12px',
+          marginBottom: '32px',
+        }}
+      >
+        {[
+          { label: 'JOGOS', value: encerradas.length + naoEncerradas.length },
+          { label: 'ENCERRADOS', value: encerradas.length },
+          { label: 'VITÓRIAS CASA', value: vitoriasCasa },
+          { label: 'EMPATES', value: empates },
+          { label: 'VITÓRIAS FORA', value: vitoriasFora },
+          { label: 'GOLS TOTAIS', value: totalGols },
+          { label: 'MÉDIA GOLS/JOGO', value: mediaGols },
+        ].map((stat, index) => (
+          <div
+            key={index}
+            style={{
+              background: 'rgba(30, 41, 59, 0.9)',
+              border: '1px solid #334155',
+              borderRadius: '8px',
+              padding: '16px 8px',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '24px', color: '#38bdf8' }}>{stat.value}</div>
+            <div style={{ fontSize: '14px', color: '#94a3b8', letterSpacing: '1px' }}>
+              {stat.label}
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
-        <div style={{ background: '#fff', padding: 16, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-          <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, marginBottom: 12 }}>Resumo Mandante</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#e5e7eb' }}>
-                <th style={{ padding: 8, textAlign: 'left' }}>Time</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>P</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>J</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>V</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>E</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>D</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>SG</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resumoMandante.map((item, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: 8 }}>{item.nome}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.p}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.j}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.v}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.e}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.d}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.sg}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ background: '#fff', padding: 16, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-          <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, marginBottom: 12 }}>Resumo Visitante</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#e5e7eb' }}>
-                <th style={{ padding: 8, textAlign: 'left' }}>Time</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>P</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>J</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>V</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>E</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>D</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>SG</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resumoVisitante.map((item, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: 8 }}>{item.nome}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.p}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.j}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.v}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.e}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.d}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{item.sg}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div style={{ background: '#fff', padding: 16, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, marginBottom: 12 }}>Lista de Confrontos</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {lista.map((c) => {
-            const casa = timesMap[c.time_casa_id];
-            const visitante = timesMap[c.time_visitante_id];
-            const degrades = ultimas5Casa[c.time_casa_id];
-            const peso = degrades ? degrades.get(`${c.data}T${c.hora}`) : undefined;
-            const opacidade = peso ? 0.4 + peso * 0.12 : 1;
-            return (
-              <div
-                key={c.id}
+      <div style={{ overflowX: 'auto', marginBottom: '48px' }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '14px',
+            minWidth: '900px',
+          }}
+        >
+          <thead>
+            <tr>
+              <th
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 12,
-                  borderRadius: 6,
-                  background: `rgba(30, 58, 138, ${opacidade})`,
-                  color: '#fff',
+                  background: '#1e293b',
+                  padding: '10px',
+                  border: '1px solid #334155',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 2,
                 }}
-              >
-                <div style={{ flex: 1, textAlign: 'left' }}>{casa ? casa.nome : c.time_casa_id}</div>
-                <div style={{ fontWeight: 'bold', fontSize: 20, minWidth: 80, textAlign: 'center' }}>
-                  {c.placar_casa} x {c.placar_visitante}
-                </div>
-                <div style={{ flex: 1, textAlign: 'right' }}>{visitante ? visitante.nome : c.time_visitante_id}</div>
-                <div style={{ minWidth: 120, textAlign: 'right', fontSize: 12, opacity: 0.8 }}>
-                  {c.data} {c.hora}
-                </div>
-              </div>
-            );
-          })}
+              ></th>
+              {timesOrdenados.map((t) => (
+                <th
+                  key={t.id}
+                  style={{
+                    background: '#1e293b',
+                    padding: '10px',
+                    border: '1px solid #334155',
+                    writingMode: 'vertical-rl',
+                    transform: 'rotate(180deg)',
+                    minWidth: '36px',
+                  }}
+                  title={t.nome}
+                >
+                  {t.sigla}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {timesOrdenados.map((tCasa) => {
+              const iCasa = idx[tCasa.id]
+              return (
+                <tr key={tCasa.id}>
+                  <td
+                    style={{
+                      background: '#1e293b',
+                      padding: '10px',
+                      border: '1px solid #334155',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 1,
+                      fontWeight: 'bold',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={tCasa.nome}
+                  >
+                    {tCasa.sigla}
+                  </td>
+                  {timesOrdenados.map((tFora) => {
+                    const iFora = idx[tFora.id]
+                    const saldo = matrizSaldoCasa[iCasa][iFora]
+                    const recencyIdx = ultimas5Casa[tCasa.id]?.get(String(tFora.id))
+
+                    if (iCasa === iFora) {
+                      return (
+                        <td
+                          key={tFora.id}
+                          style={{
+                            background: '#0f172a',
+                            padding: '10px',
+                            border: '1px solid #334155',
+                            textAlign: 'center',
+                          }}
+                        >
+                          —
+                        </td>
+                      )
+                    }
+
+                    return (
+                      <td
+                        key={tFora.id}
+                        style={{
+                          background:
+                            recencyIdx !== undefined
+                              ? homeShadeBg[recencyIdx]
+                              : saldo !== null
+                              ? corCelula(saldo, true)
+                              : 'transparent',
+                          padding: '10px',
+                          border: '1px solid #334155',
+                          textAlign: 'center',
+                          color: saldo !== null ? '#fff' : '#64748b',
+                          fontWeight: 'bold',
+                          cursor: 'default',
+                        }}
+                        title={`${tCasa.nome} x ${tFora.nome}`}
+                      >
+                        {saldo !== null ? (saldo > 0 ? `+${saldo}` : saldo) : '-'}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+          gap: '24px',
+        }}
+      >
+        <div
+          style={{
+            background: 'rgba(30, 41, 59, 0.8)',
+            border: '1px solid #334155',
+            borderRadius: '12px',
+            padding: '20px',
+          }}
+        >
+          <h2
+            style={{
+              fontSize: '26px',
+              marginBottom: '16px',
+              borderBottom: '2px solid #38bdf8',
+              paddingBottom: '8px',
+            }}
+          >
+            RESUMO COMO MANDANTE
+          </h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead>
+              <tr style={{ background: '#1e293b' }}>
+                {['#', 'TIME', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'PTS'].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #334155',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {resumoCasa.map((r, pos) => (
+                <tr key={r.time.id} style={{ background: pos % 2 === 0 ? '#0f172a' : '#1e293b' }}>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {pos + 1}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155' }}>{r.time.nome}</td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.jogos}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.v}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.e}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.d}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.gp}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.gc}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.sg > 0 ? `+${r.sg}` : r.sg}
+                  </td>
+                  <td
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #334155',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      color: '#38bdf8',
+                    }}
+                  >
+                    {r.pts}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          style={{
+            background: 'rgba(30, 41, 59, 0.8)',
+            border: '1px solid #334155',
+            borderRadius: '12px',
+            padding: '20px',
+          }}
+        >
+          <h2
+            style={{
+              fontSize: '26px',
+              marginBottom: '16px',
+              borderBottom: '2px solid #f472b6',
+              paddingBottom: '8px',
+            }}
+          >
+            RESUMO COMO VISITANTE
+          </h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead>
+              <tr style={{ background: '#1e293b' }}>
+                {['#', 'TIME', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'PTS'].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #334155',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {resumoFora.map((r, pos) => (
+                <tr key={r.time.id} style={{ background: pos % 2 === 0 ? '#0f172a' : '#1e293b' }}>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {pos + 1}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155' }}>{r.time.nome}</td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.jogos}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.v}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.e}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.d}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.gp}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.gc}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+                    {r.sg > 0 ? `+${r.sg}` : r.sg}
+                  </td>
+                  <td
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #334155',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      color: '#f472b6',
+                    }}
+                  >
+                    {r.pts}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-  );
+  )
 }
