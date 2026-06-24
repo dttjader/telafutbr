@@ -20,15 +20,18 @@ export default async function DadosPage() {
     const casaVenceu = p.placar_casa > p.placar_visitante;
     const visVenceu  = p.placar_visitante > p.placar_casa;
     const empate     = p.placar_casa === p.placar_visitante;
+
     const [a, b] = casaVenceu
       ? [p.placar_casa, p.placar_visitante]
       : [p.placar_visitante, p.placar_casa];
+
     const key = `${a}x${b}`;
     if (!placarMap[key]) placarMap[key] = { count: 0, vitVisitante: 0, empates: 0 };
     placarMap[key].count++;
     if (visVenceu)  placarMap[key].vitVisitante++;
     if (empate)     placarMap[key].empates++;
   }
+
   const placaresFrequentes = Object.entries(placarMap)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 15)
@@ -49,9 +52,30 @@ export default async function DadosPage() {
     estadioMap[p.estadio_id].gols += p.placar_casa + p.placar_visitante;
     estadioMap[p.estadio_id].jogos++;
   }
+
   const rankingEstadio = Object.values(estadioMap)
     .filter(e => e.jogos > 0)
     .map(e => ({ ...e, media: e.gols / e.jogos }))
+    .sort((a, b) => b.media - a.media);
+
+  // ── Cidades (Novo Levantamento) ───────────────────────────────────────────
+  const cidadeMap: Record<string, { gols: number; jogos: number; nome: string; estado: string }> = {};
+  for (const p of encerradas) {
+    const e = estadios.find(e => e.id === p.estadio_id);
+    const cidadeNome = e?.cidade ?? 'Desconhecida';
+    const estadoUf = e?.estado ?? '??';
+    const key = `${cidadeNome}-${estadoUf}`;
+
+    if (!cidadeMap[key]) {
+      cidadeMap[key] = { gols: 0, jogos: 0, nome: cidadeNome, estado: estadoUf };
+    }
+    cidadeMap[key].gols += p.placar_casa + p.placar_visitante;
+    cidadeMap[key].jogos++;
+  }
+
+  const rankingCidade = Object.values(cidadeMap)
+    .filter(c => c.jogos > 0)
+    .map(c => ({ ...c, media: c.gols / c.jogos }))
     .sort((a, b) => b.media - a.media);
 
   // ── Estados ───────────────────────────────────────────────────────────────
@@ -63,12 +87,13 @@ export default async function DadosPage() {
     estadoMap[uf].gols += p.placar_casa + p.placar_visitante;
     estadoMap[uf].jogos++;
   }
+
   const rankingEstado = Object.entries(estadoMap)
     .filter(([, v]) => v.jogos > 0)
     .map(([uf, v]) => ({ uf, ...v, media: v.gols / v.jogos }))
     .sort((a, b) => b.media - a.media);
 
-  // ── Resumo de árbitros (só contagens para o card de atalho) ───────────────
+  // ── Resumo de árbitros ───────────────────────────────────────────────────
   const arbitrosNomes = new Set<string>();
   const arbitrosPrincipais = new Set<string>();
   for (const p of encerradas) {
@@ -123,6 +148,7 @@ export default async function DadosPage() {
       totalGolsVis={totalGolsVis}
       placaresFrequentes={placaresFrequentes}
       rankingEstadio={rankingEstadio}
+      rankingCidade={rankingCidade}
       rankingEstado={rankingEstado}
       rankingTecnicos={rankingTecnicos}
       totalRodadas={totalRodadas}
