@@ -27,7 +27,6 @@ export interface Props {
   totalArbitrosPrincipais: number;
 }
 
-// Funções auxiliares movidas para o escopo do arquivo
 const barStyle = (pct: number, cor: string): React.CSSProperties => ({
   width: `${Math.max(pct * 100, 3)}%`, height: 8, background: cor, borderRadius: 4, transition: 'width .4s',
 });
@@ -36,7 +35,6 @@ const secTitle = (text: string) => (
   <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>{text}</h2>
 );
 
-// Componente SubSections definido no arquivo
 const SubSections = ({ totalJogos, totalGols, totalArbitros, totalArbitrosPrincipais }: {
   totalJogos: number; totalGols: number; totalArbitros: number; totalArbitrosPrincipais: number;
 }) => (
@@ -137,8 +135,8 @@ export function DadosClient({
 
   const limiar50 = Math.ceil(totalRodadas * 0.5);
   const tecConsolidados   = rankingTecnicos.filter(r => r.j >= limiar50);
-  const tecIntermediarios = rankingTecnicos.filter(r => r.j > 3 && r.j &lt; limiar50);
-  const tecEstrantes      = rankingTecnicos.filter(r => r.j &lt;= 3);
+  const tecIntermediarios = rankingTecnicos.filter(r => r.j > 3 && r.j < limiar50);
+  const tecEstrantes      = rankingTecnicos.filter(r => r.j <= 3);
 
   const nomeTecnico   = (id: string) => tecnicos.find(t => t.id === id)?.nome ?? id;
   const timeDoTecnico = (id: string) => {
@@ -202,7 +200,7 @@ export function DadosClient({
                     <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: 'var(--rebaixamento)', fontWeight: 600 }}>{r.d}</td>
                     <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>{r.gp}</td>
                     <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>{r.gc}</td>
-                    <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontWeight: 600, color: saldo > 0 ? 'var(--libertadores)' : saldo &lt; 0 ? 'var(--rebaixamento)' : 'inherit' }}>
+                    <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontWeight: 600, color: saldo > 0 ? 'var(--libertadores)' : saldo < 0 ? 'var(--rebaixamento)' : 'inherit' }}>
                       {saldo > 0 ? `+${saldo}` : saldo}
                     </td>
                     <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem', color: 'var(--amarelo)' }}>{r.pts}</td>
@@ -371,7 +369,7 @@ export function DadosClient({
           </div>
           {rankingTecnicos.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Nenhuma partida com técnico registrado.</p>}
           {rankingTecnicos.length > 0 && (
-            &lt;>
+            <>
               <TabelaTecnicos dados={tecConsolidados}   subtitulo={`Consolidados — ${limiar50}+ jogos (≥ 50% das rodadas)`} />
               <TabelaTecnicos dados={tecIntermediarios} subtitulo={`Em construção — 4 a ${Math.max(limiar50 - 1, 4)} jogos`} />
               <TabelaTecnicos dados={tecEstrantes}      subtitulo="Estreantes — até 3 jogos" />
