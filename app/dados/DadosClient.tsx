@@ -17,6 +17,7 @@ interface Props {
   totalGolsVis: number;
   placaresFrequentes: { placar: string; count: number; vitVisitante: number; isEmpate: boolean }[];
   rankingEstadio: { nome: string; cidade: string; estado: string; gols: number; jogos: number; media: number }[];
+  rankingCidade: { nome: string; estado: string; gols: number; jogos: number; media: number }[]; // Nova interface
   rankingEstado: { uf: string; gols: number; jogos: number; media: number }[];
   rankingTecnicos: RankingTecnico[];
   totalRodadas: number;
@@ -120,7 +121,7 @@ const SubSections = ({ totalJogos, totalGols, totalArbitros, totalArbitrosPrinci
 export function DadosClient({
   totalJogos, totalGols, totalGolsCasa, totalGolsVis,
   placaresFrequentes,
-  rankingEstadio, rankingEstado,
+  rankingEstadio, rankingCidade, rankingEstado,
   rankingTecnicos, totalRodadas, tecnicos, times,
   totalArbitros, totalArbitrosPrincipais,
 }: Props) {
@@ -129,6 +130,7 @@ export function DadosClient({
   const mediaVis   = totalJogos > 0 ? (totalGolsVis  / totalJogos).toFixed(2) : '—';
   const maxPlacar  = placaresFrequentes[0]?.count ?? 1;
   const maxEstadio = rankingEstadio[0]?.media ?? 1;
+  const maxCidade  = rankingCidade[0]?.media  ?? 1;
   const maxEstado  = rankingEstado[0]?.media  ?? 1;
 
   const limiar50 = Math.ceil(totalRodadas * 0.5);
@@ -297,8 +299,10 @@ export function DadosClient({
           </div>
         </div>
 
-        {/* Estádios e estados */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+        {/* Estádios, Cidades e Estados */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+          
+          {/* Coluna da Esquerda: Estádios */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
             {secTitle('🏟️ Média de gols por estádio')}
             {rankingEstadio.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados.</p>}
@@ -318,26 +322,55 @@ export function DadosClient({
               </div>
             ))}
           </div>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
-            {secTitle('📍 Média de gols por estado')}
-            {rankingEstado.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados.</p>}
-            {rankingEstado.map((e, i) => (
-              <div key={e.uf} style={{ marginBottom: '.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.2rem', fontSize: '.85rem' }}>
-                  <span>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--verde)', marginRight: '.4rem' }}>{i + 1}.</span>
-                    <strong>{e.uf}</strong>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '.75rem', marginLeft: '.4rem' }}>· {e.jogos}j</span>
-                  </span>
-                  <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--amarelo)' }}>{e.media.toFixed(2)}</span>
+
+          {/* Coluna da Direita: Cidades e Estados Agrupados */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            {/* Cidades */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+              {secTitle('🏙️ Média de gols por cidade')}
+              {rankingCidade.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados.</p>}
+              {rankingCidade.map((c, i) => (
+                <div key={`${c.nome}-${c.estado}`} style={{ marginBottom: '.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.2rem', fontSize: '.85rem' }}>
+                    <span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--verde)', marginRight: '.4rem' }}>{i + 1}.</span>
+                      <strong>{c.nome}</strong>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '.75rem', marginLeft: '.4rem' }}>({c.estado}) · {c.jogos}j</span>
+                    </span>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--amarelo)' }}>{c.media.toFixed(2)}</span>
+                  </div>
+                  <div style={{ background: 'var(--surface2)', borderRadius: 4, height: 6 }}>
+                    <div style={barStyle(c.media / maxCidade, '#3b82f6')} />
+                  </div>
                 </div>
-                <div style={{ background: 'var(--surface2)', borderRadius: 4, height: 6 }}>
-                  <div style={barStyle(e.media / maxEstado, '#f59e0b')} />
+              ))}
+            </div>
+
+            {/* Estados */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+              {secTitle('📍 Média de gols por estado')}
+              {rankingEstado.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sem dados.</p>}
+              {rankingEstado.map((e, i) => (
+                <div key={e.uf} style={{ marginBottom: '.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.2rem', fontSize: '.85rem' }}>
+                    <span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--verde)', marginRight: '.4rem' }}>{i + 1}.</span>
+                      <strong>{e.uf}</strong>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '.75rem', marginLeft: '.4rem' }}>· {e.jogos}j</span>
+                    </span>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--amarelo)' }}>{e.media.toFixed(2)}</span>
+                  </div>
+                  <div style={{ background: 'var(--surface2)', borderRadius: 4, height: 6 }}>
+                    <div style={barStyle(e.media / maxEstado, '#f59e0b')} />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
           </div>
         </div>
+
 
         {/* Ranking técnicos */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
