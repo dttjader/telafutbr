@@ -1,4 +1,5 @@
-import React from 'react';
+'use client';
+import React, { useState } from 'react';
 import { Time } from '@/lib/types';
 
 interface Props {
@@ -223,17 +224,24 @@ function EscudoSVG({ sigla, size }: {
   return escudos[sigla] ?? null;
 }
 
-export function EscudoTime({ time, size = 44, showNome = false }: Props) {
-  if (!time) return null;
+// Tenta carregar imagem da pasta /escudos/{sigla}.png
+// Se falhar, cai no SVG ou no fallback de cor
+function EscudoImagem({
+  sigla, size, corPrimaria, corSecundaria,
+}: {
+  sigla: string;
+  size: number;
+  corPrimaria: string;
+  corSecundaria: string;
+}) {
+  const [imgErro, setImgErro] = useState(false);
 
-  const fontSize = Math.round(size * 0.28);
-  const svg = EscudoSVG({ sigla: time.sigla, size });
-
-  return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+  if (imgErro) {
+    // Fallback: SVG desenhado ou círculo colorido
+    const svg = EscudoSVG({ sigla, size });
+    return (
       <span style={{
-        width: size,
-        height: size,
+        width: size, height: size,
         borderRadius: '50%',
         display: 'inline-flex',
         alignItems: 'center',
@@ -242,21 +250,58 @@ export function EscudoTime({ time, size = 44, showNome = false }: Props) {
         overflow: 'hidden',
         background: svg
           ? 'transparent'
-          : `linear-gradient(135deg, ${time.cor_primaria} 0%, ${time.cor_secundaria || '#888'} 100%)`,
+          : `linear-gradient(135deg, ${corPrimaria} 0%, ${corSecundaria || '#888'} 100%)`,
         border: svg ? 'none' : '2px solid rgba(255,255,255,.12)',
         boxShadow: svg ? 'none' : '0 2px 8px rgba(0,0,0,.5)',
       }}>
         {svg ?? (
           <span style={{
             fontFamily: "'Bebas Neue', sans-serif",
-            fontSize,
+            fontSize: Math.round(size * 0.28),
             color: '#fff',
             textShadow: '0 1px 3px rgba(0,0,0,.8)',
           }}>
-            {time.sigla}
+            {sigla}
           </span>
         )}
       </span>
+    );
+  }
+
+  return (
+    <span style={{
+      width: size, height: size,
+      borderRadius: '50%',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      overflow: 'hidden',
+    }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`/escudos/${sigla}.png`}
+        alt={sigla}
+        width={size}
+        height={size}
+        style={{ objectFit: 'contain', width: size, height: size }}
+        onError={() => setImgErro(true)}
+      />
+    </span>
+  );
+}
+
+export function EscudoTime({ time, size = 44, showNome = false }: Props) {
+  if (!time) return null;
+
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <EscudoImagem
+        sigla={time.sigla}
+        size={size}
+        corPrimaria={time.cor_primaria}
+        corSecundaria={time.cor_secundaria ?? '#888'}
+      />
       {showNome && (
         <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {time.nome}
