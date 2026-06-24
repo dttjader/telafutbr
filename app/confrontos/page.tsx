@@ -1,515 +1,536 @@
-import { createClient } from '@/utils/supabase/server'
+import React from "react";
+import { getPartidas, getTimes } from "@/lib/data";
 
-export const revalidate = 0
+type Time = {
+  id: string | number;
+  nome: string;
+  sigla?: string;
+  [key: string]: any;
+};
 
-interface Jogo {
-  id: string | number
-  time_casa_id: number
-  time_visitante_id: number
-  placar_casa: number | null
-  placar_visitante: number | null
-  status: string
-  data: string
-  hora: string
-  rodada: number
-  times_casa: { nome: string; sigla: string; escudo?: string }
-  times_visitante: { nome: string; sigla: string; escudo?: string }
+type Partida = {
+  id: string | number;
+  mandante_id: string | number;
+  visitante_id: string | number;
+  gols_mandante?: number;
+  gols_visitante?: number;
+  status?: string;
+  data?: string;
+  hora?: string;
+  [key: string]: any;
+};
+
+const PSEUDO_IDS = new Set(['outros']);
+
+function parseDateTime(p: Partida): number {
+  if (!p.data) return 0;
+  const data = String(p.data);
+  const hora = p.hora ? String(p.hora) : '00:00';
+  return new Date(`${data}T${hora}`).getTime();
 }
 
-interface Time {
-  id: number
-  nome: string
-  sigla: string
-  escudo?: string
-}
+export default async function Home() {
+  const times = await getTimes();
+  const partidas = await getPartidas();
 
-const homeShadeBg: Record<number, string> = {
-  0: 'rgba(0, 128, 0, 0.55)',
-  1: 'rgba(0, 128, 0, 0.45)',
-  2: 'rgba(0, 128, 0, 0.35)',
-  3: 'rgba(0, 128, 0, 0.25)',
-  4: 'rgba(0, 128, 0, 0.15)',
-}
+  const idx: Record<string | number, number> = {};
+  times.forEach((time: Time, index: number) => {
+    idx[time.id] = index;
+  });
 
-function corCelula(v: number, ehCasa: boolean) {
-  if (v > 0) return ehCasa ? 'rgba(0, 128, 0, 0.55)' : 'rgba(255, 0, 0, 0.55)'
-  if (v < 0) return ehCasa ? 'rgba(255, 0, 0, 0.55)' : 'rgba(0, 128, 0, 0.55)'
-  return 'rgba(128, 128, 128, 0.35)'
-}
+  const encerradas = partidas.filter(
+    (p: Partida) => p.status === 'encerrada' || p.status === 'finalizada'
+  );
 
-export default async function Confrontos2026() {
-  const supabase = await createClient()
+  const totPart = encerradas.length;
+  const totManVit = encerradas.filter(
+    (p: Partida) => (p.gols_mandante ?? 0) > (p.gols_visitante ?? 0)
+  ).length;
+  const totEmp = encerradas.filter(
+    (p: Partida) => (p.gols_mandante ?? 0) === (p.gols_visitante ?? 0)
+  ).length;
+  const totVisVit = encerradas.filter(
+    (p: Partida) => (p.gols_mandante ?? 0) < (p.gols_visitante ?? 0)
+  ).length;
+  const totGols = encerradas.reduce(
+    (acc: number, p: Partida) => acc + (p.gols_mandante ?? 0) + (p.gols_visitante ?? 0),
+    0
+  );
+  const totGolsMan = encerradas.reduce(
+    (acc: number, p: Partida) => acc + (p.gols_mandante ?? 0),
+    0
+  );
+  const totGolsVis = encerradas.reduce(
+    (acc: number, p: Partida) => acc + (p.gols_visitante ?? 0),
+    0
+  );
 
-  const { data: jogos } = await supabase
-    .from('jogos')
-    .select(
-      'id, time_casa_id, time_visitante_id, placar_casa, placar_visitante, status, data, hora, rodada, times_casa:nome, times_visitante:nome'
-    )
-    .eq('temporada', '2026')
-    .order('data', { ascending: true })
-    .order('hora', { ascending: true })
+  const ultimas5Casa: Record<number, Map<string, number>> = {};
+  times.forEach((time: Time, i: number) => {
+    const partidasCasa = encerradas
+      .filter((p: Partida) => String(p.mandante_id) === String(time.id))
+      .sort((a: Partida, b: Partida) => parseDateTime(b) - parseDateTime(a))
+      .slice(0, 5);
 
-  const { data: times } = await supabase.from('times').select('id, nome, sigla, escudo').order('nome')
+    const map = new Map<string, number>();
+    partidasCasa.forEach((p: Partida, index: number) => {
+      map.set(String(p.visitante_id), index);
+    });
+    ultimas5Casa[i] = map;
+  });
 
-  const listaJogos: Jogo[] = (jogos as unknown as Jogo[]) ?? []
-  const listaTimes: Time[] = times ?? []
+  const homeShadeBg = ['#e6f7e6', '#c6e9c6', '#a6dba6', '#86cd86', '#66bf66'];
+  const homeShadeText = ['#1a4a1a', '#1a4a1a', '#1a4a1a', '#1a4a1a', '#ffffff'];
 
-  const encerradas = listaJogos.filter((j) => j.status === 'encerrada')
-  const naoEncerradas = listaJogos.filter((j) => j.status !== 'encerrada')
+  const statsMandante = times.map((time: Time, i: number) => {
+    const jogos = encerradas.filter(
+      (p: Partida) => String(p.mandante_id) === String(time.id)
+    );
+    const v = jogos.filter(
+      (p: Partida) => (p.gols_mandante ?? 0) > (p.gols_visitante ?? 0)
+    ).length;
+    const e = jogos.filter(
+      (p: Partida) => (p.gols_mandante ?? 0) === (p.gols_visitante ?? 0)
+    ).length;
+    const d = jogos.filter(
+      (p: Partida) => (p.gols_mandante ?? 0) < (p.gols_visitante ?? 0)
+    ).length;
+    const gp = jogos.reduce((acc: number, p: Partida) => acc + (p.gols_mandante ?? 0), 0);
+    const gc = jogos.reduce((acc: number, p: Partida) => acc + (p.gols_visitante ?? 0), 0);
+    const pts = v * 3 + e;
+    return { time, v, e, d, gp, gc, saldo: gp - gc, pts, i };
+  });
 
-  const vitoriasCasa = encerradas.filter((j) => (j.placar_casa ?? 0) > (j.placar_visitante ?? 0)).length
-  const empates = encerradas.filter((j) => (j.placar_casa ?? 0) === (j.placar_visitante ?? 0)).length
-  const vitoriasFora = encerradas.filter((j) => (j.placar_casa ?? 0) < (j.placar_visitante ?? 0)).length
-  const golsCasa = encerradas.reduce((s, j) => s + (j.placar_casa ?? 0), 0)
-  const golsFora = encerradas.reduce((s, j) => s + (j.placar_visitante ?? 0), 0)
-  const totalGols = golsCasa + golsFora
-  const mediaGols = encerradas.length ? (totalGols / encerradas.length).toFixed(2) : '0.00'
+  const statsVisitante = times.map((time: Time, i: number) => {
+    const jogos = encerradas.filter(
+      (p: Partida) => String(p.visitante_id) === String(time.id)
+    );
+    const v = jogos.filter(
+      (p: Partida) => (p.gols_visitante ?? 0) > (p.gols_mandante ?? 0)
+    ).length;
+    const e = jogos.filter(
+      (p: Partida) => (p.gols_visitante ?? 0) === (p.gols_mandante ?? 0)
+    ).length;
+    const d = jogos.filter(
+      (p: Partida) => (p.gols_visitante ?? 0) < (p.gols_mandante ?? 0)
+    ).length;
+    const gp = jogos.reduce((acc: number, p: Partida) => acc + (p.gols_visitante ?? 0), 0);
+    const gc = jogos.reduce((acc: number, p: Partida) => acc + (p.gols_mandante ?? 0), 0);
+    const pts = v * 3 + e;
+    return { time, v, e, d, gp, gc, saldo: gp - gc, pts, i };
+  });
 
-  const timesOrdenados = [...listaTimes].sort((a, b) => a.nome.localeCompare(b.nome))
+  const rankMandante = [...statsMandante].sort(
+    (a, b) => b.pts - a.pts || b.saldo - a.saldo
+  );
+  const rankVisitante = [...statsVisitante].sort(
+    (a, b) => b.pts - a.pts || b.saldo - a.saldo
+  );
 
-  const idx: Record<string | number, number> = {}
-  timesOrdenados.forEach((t, i) => {
-    idx[t.id] = i
-    idx[t.sigla] = i
-  })
-
-  const ultimas5Casa: Record<number, Map<string, number>> = {}
-
-  timesOrdenados.forEach((timeCasa) => {
-    const jogosCasa = listaJogos
-      .filter(
-        (j) =>
-          j.time_casa_id === timeCasa.id &&
-          j.status === 'encerrada' &&
-          j.placar_casa !== null &&
-          j.placar_visitante !== null
-      )
-      .sort((a, b) => {
-        const da = new Date(`${a.data}T${a.hora || '00:00'}`).getTime()
-        const db = new Date(`${b.data}T${b.hora || '00:00'}`).getTime()
-        return db - da
-      })
-      .slice(0, 5)
-
-    const map = new Map<string, number>()
-    jogosCasa.forEach((j, index) => {
-      const visitante = listaTimes.find((t) => t.id === j.time_visitante_id)
-      if (visitante) {
-        map.set(String(visitante.id), index)
-      }
-    })
-
-    ultimas5Casa[timeCasa.id] = map
-  })
-
-  const matrizSaldoCasa: (number | null)[][] = Array(timesOrdenados.length)
-    .fill(null)
-    .map(() => Array(timesOrdenados.length).fill(null))
-  const matrizSaldoFora: (number | null)[][] = Array(timesOrdenados.length)
-    .fill(null)
-    .map(() => Array(timesOrdenados.length).fill(null))
-  const matrizPontos: (number | null)[][] = Array(timesOrdenados.length)
-    .fill(null)
-    .map(() => Array(timesOrdenados.length).fill(null))
-  const matrizGols: (number | null)[][] = Array(timesOrdenados.length)
-    .fill(null)
-    .map(() => Array(timesOrdenados.length).fill(null))
-
-  encerradas.forEach((j) => {
-    const iCasa = idx[j.time_casa_id]
-    const iFora = idx[j.time_visitante_id]
-    if (iCasa === undefined || iFora === undefined) return
-
-    const gc = j.placar_casa ?? 0
-    const gf = j.placar_visitante ?? 0
-
-    let pontosCasa = 0
-    let pontosFora = 0
-    if (gc > gf) {
-      pontosCasa = 3
-    } else if (gc < gf) {
-      pontosFora = 3
-    } else {
-      pontosCasa = 1
-      pontosFora = 1
-    }
-
-    matrizSaldoCasa[iCasa][iFora] = gc - gf
-    matrizSaldoFora[iFora][iCasa] = gf - gc
-    matrizPontos[iCasa][iFora] = pontosCasa
-    matrizPontos[iFora][iCasa] = pontosFora
-    matrizGols[iCasa][iFora] = gc
-    matrizGols[iFora][iCasa] = gf
-  })
-
-  const resumoCasa = timesOrdenados
-    .map((t) => {
-      const i = idx[t.id]
-      const jogos = matrizSaldoCasa[i].filter((v) => v !== null).length
-      const v = matrizSaldoCasa[i].filter((v) => (v ?? 0) > 0).length
-      const e = matrizSaldoCasa[i].filter((v) => v === 0).length
-      const d = matrizSaldoCasa[i].filter((v) => (v ?? 0) < 0).length
-      const gp = matrizGols[i].reduce((s, v) => s + (v ?? 0), 0)
-      const gc = matrizGols.map((row) => row[i]).reduce((s, v) => s + (v ?? 0), 0)
-      const sg = gp - gc
-      const pts = matrizPontos[i].reduce((s, v) => s + (v ?? 0), 0)
-      return { time: t, jogos, v, e, d, gp, gc, sg, pts }
-    })
-    .sort((a, b) => b.pts - a.pts || b.sg - a.sg || b.gp - a.gp)
-
-  const resumoFora = timesOrdenados
-    .map((t) => {
-      const i = idx[t.id]
-      const jogos = matrizSaldoFora[i].filter((v) => v !== null).length
-      const v = matrizSaldoFora[i].filter((v) => (v ?? 0) > 0).length
-      const e = matrizSaldoFora[i].filter((v) => v === 0).length
-      const d = matrizSaldoFora[i].filter((v) => (v ?? 0) < 0).length
-      const gp = matrizGols.map((row) => row[i]).reduce((s, v) => s + (v ?? 0), 0)
-      const gc = matrizGols[i].reduce((s, v) => s + (v ?? 0), 0)
-      const sg = gp - gc
-      const pts = matrizPontos.map((row) => row[i]).reduce((s, v) => s + (v ?? 0), 0)
-      return { time: t, jogos, v, e, d, gp, gc, sg, pts }
-    })
-    .sort((a, b) => b.pts - a.pts || b.sg - a.sg || b.gp - a.gp)
+  const cardStats = [
+    { label: 'JOGOS', value: totPart, bg: '#3498db', color: '#fff' },
+    { label: 'VITÓRIAS MANDANTE', value: totManVit, bg: '#2ecc71', color: '#fff' },
+    { label: 'EMPATES', value: totEmp, bg: '#f1c40f', color: '#000' },
+    { label: 'VITÓRIAS VISITANTE', value: totVisVit, bg: '#e74c3c', color: '#fff' },
+    { label: 'GOLS', value: totGols, bg: '#9b59b6', color: '#fff' },
+    { label: 'GOLS MANDANTE', value: totGolsMan, bg: '#1abc9c', color: '#fff' },
+    { label: 'GOLS VISITANTE', value: totGolsVis, bg: '#e67e22', color: '#fff' },
+  ];
 
   return (
-    <div
+    <main
       style={{
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: 'Bebas Neue, sans-serif',
+        padding: '2rem',
+        background: '#f8f9fa',
         minHeight: '100vh',
-        background: '#0f172a',
-        color: '#f8fafc',
-        padding: '24px',
       }}
     >
-      <link
-        href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"
-        rel="stylesheet"
-      />
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');`}</style>
 
       <h1
         style={{
-          fontSize: '42px',
+          fontSize: '2.5rem',
           textAlign: 'center',
-          letterSpacing: '2px',
-          marginBottom: '24px',
+          marginBottom: '1.5rem',
+          color: '#1a1a1a',
+          letterSpacing: '1px',
         }}
       >
-        CONFRONTOS 2026
+        Estatísticas 2026
       </h1>
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '12px',
-          marginBottom: '32px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+          gap: '1rem',
+          marginBottom: '2rem',
         }}
       >
-        {[
-          { label: 'JOGOS', value: encerradas.length + naoEncerradas.length },
-          { label: 'ENCERRADOS', value: encerradas.length },
-          { label: 'VITÓRIAS CASA', value: vitoriasCasa },
-          { label: 'EMPATES', value: empates },
-          { label: 'VITÓRIAS FORA', value: vitoriasFora },
-          { label: 'GOLS TOTAIS', value: totalGols },
-          { label: 'MÉDIA GOLS/JOGO', value: mediaGols },
-        ].map((stat, index) => (
+        {cardStats.map((card, index) => (
           <div
             key={index}
             style={{
-              background: 'rgba(30, 41, 59, 0.9)',
-              border: '1px solid #334155',
+              background: card.bg,
+              color: card.color,
+              padding: '1rem',
               borderRadius: '8px',
-              padding: '16px 8px',
               textAlign: 'center',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             }}
           >
-            <div style={{ fontSize: '24px', color: '#38bdf8' }}>{stat.value}</div>
-            <div style={{ fontSize: '14px', color: '#94a3b8', letterSpacing: '1px' }}>
-              {stat.label}
+            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+              {card.value}
             </div>
+            <div style={{ fontSize: '0.95rem' }}>{card.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ overflowX: 'auto', marginBottom: '48px' }}>
+      <section style={{ marginBottom: '2rem', overflowX: 'auto' }}>
+        <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem' }}>
+          Tabela Cruzada
+        </h2>
         <table
           style={{
-            width: '100%',
             borderCollapse: 'collapse',
-            fontSize: '14px',
-            minWidth: '900px',
+            width: '100%',
+            background: '#fff',
+            fontFamily: 'Arial, sans-serif',
           }}
         >
           <thead>
             <tr>
               <th
                 style={{
-                  background: '#1e293b',
-                  padding: '10px',
-                  border: '1px solid #334155',
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 2,
+                  border: '1px solid #ddd',
+                  padding: '8px',
+                  background: '#333',
+                  color: '#fff',
+                  minWidth: '120px',
                 }}
-              ></th>
-              {timesOrdenados.map((t) => (
+              >
+                Mandante \ Visitante
+              </th>
+              {times.map((time: Time) => (
                 <th
-                  key={t.id}
+                  key={time.id}
                   style={{
-                    background: '#1e293b',
-                    padding: '10px',
-                    border: '1px solid #334155',
-                    writingMode: 'vertical-rl',
-                    transform: 'rotate(180deg)',
-                    minWidth: '36px',
+                    border: '1px solid #ddd',
+                    padding: '8px',
+                    background: '#333',
+                    color: '#fff',
+                    fontSize: '0.75rem',
+                    minWidth: '60px',
                   }}
-                  title={t.nome}
                 >
-                  {t.sigla}
+                  {time.sigla || time.nome}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {timesOrdenados.map((tCasa) => {
-              const iCasa = idx[tCasa.id]
-              return (
-                <tr key={tCasa.id}>
-                  <td
-                    style={{
-                      background: '#1e293b',
-                      padding: '10px',
-                      border: '1px solid #334155',
-                      position: 'sticky',
-                      left: 0,
-                      zIndex: 1,
-                      fontWeight: 'bold',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={tCasa.nome}
-                  >
-                    {tCasa.sigla}
-                  </td>
-                  {timesOrdenados.map((tFora) => {
-                    const iFora = idx[tFora.id]
-                    const saldo = matrizSaldoCasa[iCasa][iFora]
-                    const recencyIdx = ultimas5Casa[tCasa.id]?.get(String(tFora.id))
-
-                    if (iCasa === iFora) {
-                      return (
-                        <td
-                          key={tFora.id}
-                          style={{
-                            background: '#0f172a',
-                            padding: '10px',
-                            border: '1px solid #334155',
-                            textAlign: 'center',
-                          }}
-                        >
-                          —
-                        </td>
-                      )
-                    }
-
-                    return (
-                      <td
-                        key={tFora.id}
-                        style={{
-                          background:
-                            recencyIdx !== undefined
-                              ? homeShadeBg[recencyIdx]
-                              : saldo !== null
-                              ? corCelula(saldo, true)
-                              : 'transparent',
-                          padding: '10px',
-                          border: '1px solid #334155',
-                          textAlign: 'center',
-                          color: saldo !== null ? '#fff' : '#64748b',
-                          fontWeight: 'bold',
-                          cursor: 'default',
-                        }}
-                        title={`${tCasa.nome} x ${tFora.nome}`}
-                      >
-                        {saldo !== null ? (saldo > 0 ? `+${saldo}` : saldo) : '-'}
-                      </td>
-                    )
-                  })}
-                </tr>
-              )
-            })}
+            {times.map((timeCasa: Time, i: number) => (
+              <tr key={timeCasa.id}>
+                <td
+                  style={{
+                    border: '1px solid #ddd',
+                    padding: '8px',
+                    fontWeight: 'bold',
+                    background: '#f0f0f0',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  {timeCasa.nome}
+                </td>
+                {times.map((timeFora: Time, j: number) => {
+                  const recencyIdx = ultimas5Casa[i]?.get(
+                    String(times[j].id)
+                  );
+                  const cellStyle: React.CSSProperties = {
+                    border: '1px solid #ddd',
+                    padding: '8px',
+                    textAlign: 'center',
+                    fontSize: '0.75rem',
+                    background:
+                      recencyIdx !== undefined
+                        ? homeShadeBg[recencyIdx]
+                        : 'transparent',
+                    color:
+                      recencyIdx !== undefined
+                        ? homeShadeText[recencyIdx]
+                        : '#333',
+                  };
+                  return (
+                    <td key={timeFora.id} style={cellStyle}>
+                      {i === j ? '—' : recencyIdx !== undefined ? recencyIdx + 1 : ''}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
-      </div>
+      </section>
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-          gap: '24px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '2rem',
         }}
       >
-        <div
-          style={{
-            background: 'rgba(30, 41, 59, 0.8)',
-            border: '1px solid #334155',
-            borderRadius: '12px',
-            padding: '20px',
-          }}
-        >
-          <h2
+        <section>
+          <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem' }}>
+            Classificação Mandante
+          </h2>
+          <table
             style={{
-              fontSize: '26px',
-              marginBottom: '16px',
-              borderBottom: '2px solid #38bdf8',
-              paddingBottom: '8px',
+              borderCollapse: 'collapse',
+              width: '100%',
+              background: '#fff',
+              fontFamily: 'Arial, sans-serif',
             }}
           >
-            RESUMO COMO MANDANTE
-          </h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
             <thead>
-              <tr style={{ background: '#1e293b' }}>
-                {['#', 'TIME', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'PTS'].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: '8px',
-                      border: '1px solid #334155',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
+              <tr>
+                {['#', 'Time', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'Pts'].map(
+                  (header) => (
+                    <th
+                      key={header}
+                      style={{
+                        border: '1px solid #ddd',
+                        padding: '8px',
+                        background: '#2ecc71',
+                        color: '#fff',
+                      }}
+                    >
+                      {header}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
-              {resumoCasa.map((r, pos) => (
-                <tr key={r.time.id} style={{ background: pos % 2 === 0 ? '#0f172a' : '#1e293b' }}>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+              {rankMandante.map((s, pos) => (
+                <tr key={s.time.id}>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
                     {pos + 1}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155' }}>{r.time.nome}</td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.jogos}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.v}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.e}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.d}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.gp}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.gc}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.sg > 0 ? `+${r.sg}` : r.sg}
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                    {s.time.nome}
                   </td>
                   <td
                     style={{
+                      border: '1px solid #ddd',
                       padding: '8px',
-                      border: '1px solid #334155',
                       textAlign: 'center',
-                      fontWeight: 'bold',
-                      color: '#38bdf8',
                     }}
                   >
-                    {r.pts}
+                    {s.v + s.e + s.d}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.v}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.e}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.d}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.gp}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.gc}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.saldo}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {s.pts}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
 
-        <div
-          style={{
-            background: 'rgba(30, 41, 59, 0.8)',
-            border: '1px solid #334155',
-            borderRadius: '12px',
-            padding: '20px',
-          }}
-        >
-          <h2
+        <section>
+          <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem' }}>
+            Classificação Visitante
+          </h2>
+          <table
             style={{
-              fontSize: '26px',
-              marginBottom: '16px',
-              borderBottom: '2px solid #f472b6',
-              paddingBottom: '8px',
+              borderCollapse: 'collapse',
+              width: '100%',
+              background: '#fff',
+              fontFamily: 'Arial, sans-serif',
             }}
           >
-            RESUMO COMO VISITANTE
-          </h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
             <thead>
-              <tr style={{ background: '#1e293b' }}>
-                {['#', 'TIME', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'PTS'].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: '8px',
-                      border: '1px solid #334155',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
+              <tr>
+                {['#', 'Time', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'Pts'].map(
+                  (header) => (
+                    <th
+                      key={header}
+                      style={{
+                        border: '1px solid #ddd',
+                        padding: '8px',
+                        background: '#e74c3c',
+                        color: '#fff',
+                      }}
+                    >
+                      {header}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
-              {resumoFora.map((r, pos) => (
-                <tr key={r.time.id} style={{ background: pos % 2 === 0 ? '#0f172a' : '#1e293b' }}>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
+              {rankVisitante.map((s, pos) => (
+                <tr key={s.time.id}>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
                     {pos + 1}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155' }}>{r.time.nome}</td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.jogos}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.v}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.e}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.d}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.gp}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.gc}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #334155', textAlign: 'center' }}>
-                    {r.sg > 0 ? `+${r.sg}` : r.sg}
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                    {s.time.nome}
                   </td>
                   <td
                     style={{
+                      border: '1px solid #ddd',
                       padding: '8px',
-                      border: '1px solid #334155',
                       textAlign: 'center',
-                      fontWeight: 'bold',
-                      color: '#f472b6',
                     }}
                   >
-                    {r.pts}
+                    {s.v + s.e + s.d}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.v}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.e}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.d}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.gp}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.gc}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {s.saldo}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {s.pts}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
       </div>
-    </div>
-  )
+    </main>
+  );
 }
