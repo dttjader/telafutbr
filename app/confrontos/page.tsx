@@ -1,285 +1,492 @@
-import { getPartidas, getTimes } from '@/lib/data';
+import { getPartidas, getTimes } from "@/lib/data";
 
-export const dynamic = 'force-dynamic';
+export default async function Home() {
+  const partidas = await getPartidas();
+  const times = await getTimes();
 
-// Times reais — exclui pseudo-ids como 'outros'
-const PSEUDO_IDS = new Set(['outros']);
-
-export default async function ConfrontosPage() {
-  const [partidas, todosOsTimes] = await Promise.all([getPartidas(), getTimes()]);
-
-  // Filtrar apenas times reais
-  const times = todosOsTimes.filter(t => !PSEUDO_IDS.has(t.id));
-
-  const encerradas = partidas.filter(p => p.status === 'encerrada')
-    .sort((a, b) => b.data.localeCompare(a.data) || b.hora.localeCompare(a.hora));
-
-  const n = times.length;
-  const idx: Record<string, number> = {};
-  times.forEach((t, i) => { idx[t.id] = i; });
-
-  const ultimas5Casa: Record<number, Set<string>> = {};
-  times.forEach((_, i) => {
-    const jogosTime = encerradas.filter(p => idx[p.time_casa_id] === i).slice(0, 5);
-    ultimas5Casa[i] = new Set(jogosTime.map(p => `${idx[p.time_casa_id]}-${idx[p.time_visitante_id]}`));
+  const idx: Record<number, number> = {};
+  const timesList = Object.values(times);
+  timesList.forEach((time, i) => {
+    idx[time.id] = i;
   });
 
-  const ultimas5Fora: Record<number, Set<string>> = {};
-  times.forEach((_, i) => {
-    const jogosTime = encerradas.filter(p => idx[p.time_visitante_id] === i).slice(0, 5);
-    ultimas5Fora[i] = new Set(jogosTime.map(p => `${idx[p.time_casa_id]}-${idx[p.time_visitante_id]}`));
-  });
+  const n = timesList.length;
 
-  const placar: ({ gc: number; gv: number; data: string } | null)[][] =
-    Array.from({ length: n }, () => Array(n).fill(null));
+  const matrixCasa: Record<number, Record<number, string>> = {};
+  const matrixVisitante: Record<number, Record<number, string>> = {};
+  const ultimas5Casa: Record<number, Map<string, number>> = {};
 
-  let totPart = 0, totManVit = 0, totEmp = 0, totVisVit = 0, totGols = 0, totGolsMan = 0, totGolsVis = 0;
-
-  for (const p of encerradas) {
-    const i = idx[p.time_casa_id], j = idx[p.time_visitante_id];
-    // Ignorar partidas com times que não estão na lista (ex: time_id = 'outros')
-    if (i === undefined || j === undefined) continue;
-    placar[i][j] = { gc: p.placar_casa, gv: p.placar_visitante, data: p.data };
-    totPart++; totGols += p.placar_casa + p.placar_visitante;
-    totGolsMan += p.placar_casa; totGolsVis += p.placar_visitante;
-    if (p.placar_casa > p.placar_visitante) totManVit++;
-    else if (p.placar_casa < p.placar_visitante) totVisVit++;
-    else totEmp++;
+  for (let i = 0; i < n; i++) {
+    matrixCasa[i] = {};
+    matrixVisitante[i] = {};
+    ultimas5Casa[i] = new Map<string, number>();
   }
 
-  const resumo = times.map((_, i) => {
-    let j2 = 0, v = 0, e = 0, d = 0, gm = 0, gs = 0;
-    for (let j = 0; j < n; j++) {
-      const cm = placar[i][j];
-      if (cm) { j2++; gm += cm.gc; gs += cm.gv; if (cm.gc > cm.gv) v++; else if (cm.gc < cm.gv) d++; else e++; }
-      const cv = placar[j][i];
-      if (cv) { j2++; gm += cv.gv; gs += cv.gc; if (cv.gv > cv.gc) v++; else if (cv.gv < cv.gc) d++; else e++; }
-    }
-    return { j: j2, v, e, d, gm, gs, pts: v * 3 + e };
+  const jogosTime: Record<number, typeof partidas> = {};
+  timesList.forEach((time) => {
+    jogosTime[time.id] = partidas.filter(
+      (p) => p.time_casa_id === time.id || p.time_visitante_id === time.id
+    );
   });
 
-  const resumoCasa = times.map((time, i) => {
-    let j2 = 0, v = 0, e = 0, d = 0, gm = 0, gs = 0;
-    const jogos: { data: string; resultado: 'V' | 'E' | 'D' }[] = [];
-    for (let j = 0; j < n; j++) {
-      const p = placar[i][j];
-      if (!p) continue;
-      j2++; gm += p.gc; gs += p.gv;
-      const res: 'V' | 'E' | 'D' = p.gc > p.gv ? 'V' : p.gc < p.gv ? 'D' : 'E';
-      if (p.gc > p.gv) v++; else if (p.gc < p.gv) d++; else e++;
-      jogos.push({ data: p.data, resultado: res });
+  partidas.forEach((p) => {
+    const i = idx[p.time_casa_id];
+    const j = idx[p.time_visitante_id];
+    if (i === undefined || j === undefined) return;
+
+    matrixCasa[i][j] = `${p.gols_casa ?? "-"} x ${p.gols_visitante ?? "-"}`;
+    matrixVisitante[j][i] = `${p.gols_visitante ?? "-"} x ${p.gols_casa ?? "-"}`;
+
+    const jogosCasa = jogosTime[p.time_casa_id].filter(
+      (jogo) => jogo.time_casa_id === p.time_casa_id
+    );
+    const recencyIdx = jogosCasa.indexOf(p);
+    if (recencyIdx >= 0 && recencyIdx < 5) {
+      ultimas5Casa[i].set(`${i}-${j}`, recencyIdx);
     }
-    jogos.sort((a, b) => b.data.localeCompare(a.data));
-    return { j: j2, v, e, d, gm, gs, pts: v * 3 + e, ultimos5: jogos.slice(0, 5) };
   });
 
-  const resumoFora = times.map((time, i) => {
-    let j2 = 0, v = 0, e = 0, d = 0, gm = 0, gs = 0;
-    const jogos: { data: string; resultado: 'V' | 'E' | 'D' }[] = [];
-    for (let j = 0; j < n; j++) {
-      const p = placar[j][i];
-      if (!p) continue;
-      j2++; gm += p.gv; gs += p.gc;
-      const res: 'V' | 'E' | 'D' = p.gv > p.gc ? 'V' : p.gv < p.gc ? 'D' : 'E';
-      if (p.gv > p.gc) v++; else if (p.gv < p.gc) d++; else e++;
-      jogos.push({ data: p.data, resultado: res });
-    }
-    jogos.sort((a, b) => b.data.localeCompare(a.data));
-    return { j: j2, v, e, d, gm, gs, pts: v * 3 + e, ultimos5: jogos.slice(0, 5) };
-  });
-
-  const sortedIdxCasa = [...times.map((_, i) => i)]
-    .filter(i => resumoCasa[i].j > 0)
-    .sort((a, b) => resumoCasa[b].pts - resumoCasa[a].pts || (resumoCasa[b].gm - resumoCasa[b].gs) - (resumoCasa[a].gm - resumoCasa[a].gs));
-  const sortedIdxFora = [...times.map((_, i) => i)]
-    .filter(i => resumoFora[i].j > 0)
-    .sort((a, b) => resumoFora[b].pts - resumoFora[a].pts || (resumoFora[b].gm - resumoFora[b].gs) - (resumoFora[a].gm - resumoFora[a].gs));
-
-  const stats = [
-    { l: 'Partidas', v: totPart },
-    { l: 'Vit. mandante', v: totManVit, cor: '#1a7a40' },
-    { l: 'Empates', v: totEmp },
-    { l: 'Vit. visitante', v: totVisVit, cor: '#a81a1a' },
-    { l: 'Total de gols', v: totGols },
-    { l: 'Gols mandante', v: totGolsMan },
-    { l: 'Gols visitante', v: totGolsVis },
+  const homeShadeBg = [
+    "rgba(59, 130, 246, 0.35)",
+    "rgba(59, 130, 246, 0.28)",
+    "rgba(59, 130, 246, 0.21)",
+    "rgba(59, 130, 246, 0.14)",
+    "rgba(59, 130, 246, 0.07)",
   ];
 
-  const cellStyle = (gc: number, gv: number): React.CSSProperties => {
-    if (gc > gv) return { color: '#1a5fa8', fontWeight: 600 };
-    if (gc < gv) return { color: '#a81a1a', fontWeight: 600 };
-    return { color: 'var(--text-muted)' };
+  const homeShadeOutline = [
+    "rgba(59, 130, 246, 0.55)",
+    "rgba(59, 130, 246, 0.48)",
+    "rgba(59, 130, 246, 0.41)",
+    "rgba(59, 130, 246, 0.34)",
+    "rgba(59, 130, 246, 0.27)",
+  ];
+
+  const totalJogos = partidas.length;
+  const totalGols = partidas.reduce(
+    (acc, p) => acc + (p.gols_casa || 0) + (p.gols_visitante || 0),
+    0
+  );
+  const mediaGols = totalJogos > 0 ? (totalGols / totalJogos).toFixed(2) : "0";
+  const vitoriasCasa = partidas.filter(
+    (p) => (p.gols_casa ?? 0) > (p.gols_visitante ?? 0)
+  ).length;
+  const vitoriasVisitante = partidas.filter(
+    (p) => (p.gols_visitante ?? 0) > (p.gols_casa ?? 0)
+  ).length;
+  const empates = partidas.filter(
+    (p) => (p.gols_casa ?? 0) === (p.gols_visitante ?? 0)
+  ).length;
+
+  const mandanteStats = {
+    vitorias: vitoriasCasa,
+    empates: empates,
+    derrotas: vitoriasVisitante,
+    golsMarcados: partidas.reduce((acc, p) => acc + (p.gols_casa || 0), 0),
+    golsSofridos: partidas.reduce((acc, p) => acc + (p.gols_visitante || 0), 0),
   };
 
-  const homeShadeBg = ['rgba(0,168,79,.35)', 'rgba(0,168,79,.25)', 'rgba(0,168,79,.16)', 'rgba(0,168,79,.09)', 'rgba(0,168,79,.04)'];
-  const awayShadeBg = ['rgba(59,130,246,.35)', 'rgba(59,130,246,.25)', 'rgba(59,130,246,.16)', 'rgba(59,130,246,.09)', 'rgba(59,130,246,.04)'];
-  const resColor: Record<string, string> = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' };
-
-  const th: React.CSSProperties = { border: '1px solid #2a2a2a', textAlign: 'center', padding: '3px 2px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: '.05em' };
-  const td: React.CSSProperties = { border: '1px solid #222', textAlign: 'center', padding: '3px 1px', fontSize: 12, lineHeight: 1.4 };
+  const visitanteStats = {
+    vitorias: vitoriasVisitante,
+    empates: empates,
+    derrotas: vitoriasCasa,
+    golsMarcados: partidas.reduce((acc, p) => acc + (p.gols_visitante || 0), 0),
+    golsSofridos: partidas.reduce((acc, p) => acc + (p.gols_casa || 0), 0),
+  };
 
   return (
-    <div style={{ paddingBottom: '4rem' }}>
-      <div style={{ background: 'linear-gradient(135deg,#0a0a0a 0%,#0d1f0d 50%,#0a0a0a 100%)', borderBottom: '1px solid var(--border)', padding: '2rem 0 1.5rem', marginBottom: '1.5rem' }}>
-        <div className="container">
-          <p style={{ fontSize: '.75rem', color: 'var(--verde)', textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, marginBottom: '.3rem' }}>Quadro de Jogos</p>
-          <h1 style={{ fontSize: 'clamp(2rem,5vw,3.5rem)' }}>Confrontos Diretos 2026</h1>
-        </div>
-      </div>
+    <main
+      style={{
+        width: "100%",
+        minHeight: "100vh",
+        padding: "24px",
+        background: "var(--bg, #f8fafc)",
+        color: "var(--fg, #0f172a)",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      }}
+    >
+      <h1
+        style={{
+          fontSize: "1.75rem",
+          fontWeight: 700,
+          marginBottom: "24px",
+          textAlign: "center",
+        }}
+      >
+        Últimos jogos - Tabela cruzada
+      </h1>
 
-      <div className="container">
-        {/* Stats bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 8, marginBottom: '1.5rem' }}>
-          {stats.map(s => (
-            <div key={s.l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>{s.l}</div>
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: s.cor ?? 'var(--amarelo)', lineHeight: 1 }}>{s.v}</div>
-            </div>
-          ))}
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
+        <div
+          style={{
+            padding: "16px",
+            borderRadius: "12px",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>
+            Total de jogos
+          </div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{totalJogos}</div>
         </div>
-
-        {/* Legend */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: '.78rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-          <span><span style={{ color: '#1a5fa8', fontWeight: 700 }}>2×0</span> Vitória mandante</span>
-          <span><span style={{ color: '#a81a1a', fontWeight: 700 }}>0×2</span> Vitória visitante</span>
-          <span><span style={{ color: 'var(--text-muted)' }}>1×1</span> Empate</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 12, height: 12, background: 'rgba(255,223,0,.18)', border: '1px solid rgba(255,223,0,.4)', borderRadius: 2, display: 'inline-block' }} />
-            Últimos 5 jogos de cada time
-          </span>
-          <span style={{ marginLeft: 'auto' }}>Mandante (linha) × Visitante (coluna)</span>
+        <div
+          style={{
+            padding: "16px",
+            borderRadius: "12px",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>
+            Média de gols
+          </div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{mediaGols}</div>
         </div>
+        <div
+          style={{
+            padding: "16px",
+            borderRadius: "12px",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>
+            Vitórias mandante
+          </div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{vitoriasCasa}</div>
+        </div>
+        <div
+          style={{
+            padding: "16px",
+            borderRadius: "12px",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>
+            Empates
+          </div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{empates}</div>
+        </div>
+        <div
+          style={{
+            padding: "16px",
+            borderRadius: "12px",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>
+            Vitórias visitante
+          </div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{vitoriasVisitante}</div>
+        </div>
+      </section>
 
-        {/* Cross table */}
-        <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)', marginBottom: '2rem' }}>
-          <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 900 }}>
-            <colgroup>
-              <col style={{ width: 36 }} />
-              {times.map(t => <col key={t.id} style={{ width: 36 }} />)}
-              {['P', 'V', 'E', 'D', 'GM', 'GS', 'Pts'].map(h => <col key={h} style={{ width: 30 }} />)}
-            </colgroup>
-            <thead>
-              <tr>
-                <th style={{ ...th, fontSize: 8 }}>↓Casa/Vis→</th>
-                {times.map(t => (
-                  <th key={t.id} style={{ ...th, writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: 56, verticalAlign: 'bottom', padding: '4px 1px', fontSize: 9 }}>{t.id}</th>
-                ))}
-                {['P', 'V', 'E', 'D', 'GM', 'GS', 'Pts'].map(h => (
-                  <th key={h} style={{ ...th, background: '#1a2a1a', color: 'var(--verde)', writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: 56, verticalAlign: 'bottom', padding: '4px 1px' }}>{h}</th>
-                ))}
+      <div
+        style={{
+          overflowX: "auto",
+          borderRadius: "12px",
+          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.08)",
+          background: "white",
+          marginBottom: "24px",
+        }}
+      >
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "0.85rem",
+          }}
+        >
+          <thead>
+            <tr>
+              <th
+                style={{
+                  padding: "12px",
+                  borderBottom: "1px solid #e2e8f0",
+                  background: "#f1f5f9",
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 10,
+                  minWidth: "140px",
+                  textAlign: "left",
+                }}
+              >
+                Mandante \ Visitante
+              </th>
+              {timesList.map((time) => (
+                <th
+                  key={time.id}
+                  style={{
+                    padding: "12px",
+                    borderBottom: "1px solid #e2e8f0",
+                    background: "#f1f5f9",
+                    minWidth: "60px",
+                    textAlign: "center",
+                    fontWeight: 600,
+                  }}
+                >
+                  {time.sigla}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {timesList.map((timeCasa, i) => (
+              <tr key={timeCasa.id}>
+                <td
+                  style={{
+                    padding: "12px",
+                    borderBottom: "1px solid #e2e8f0",
+                    position: "sticky",
+                    left: 0,
+                    background: "white",
+                    zIndex: 5,
+                    fontWeight: 600,
+                    textAlign: "left",
+                  }}
+                >
+                  {timeCasa.nome}
+                </td>
+                {timesList.map((timeVisitante, j) => {
+                  const recencyIdx = ultimas5Casa[i].get(`${i}-${j}`);
+                  const isDiag = i === j;
+                  const bg = isDiag
+                    ? "#e2e8f0"
+                    : recencyIdx !== undefined
+                    ? homeShadeBg[recencyIdx]
+                    : "white";
+                  const outlineColor =
+                    recencyIdx !== undefined ? homeShadeOutline[recencyIdx] : "transparent";
+
+                  return (
+                    <td
+                      key={timeVisitante.id}
+                      style={{
+                        padding: "10px",
+                        borderBottom: "1px solid #e2e8f0",
+                        textAlign: "center",
+                        background: bg,
+                        outline: `1px solid ${outlineColor}`,
+                        outlineOffset: "-2px",
+                        fontWeight: recencyIdx !== undefined ? 600 : 400,
+                      }}
+                    >
+                      {isDiag ? "—" : matrixCasa[i][j] ?? ""}
+                    </td>
+                  );
+                })}
               </tr>
-            </thead>
-            <tbody>
-              {times.map((time, i) => {
-                const r = resumo[i];
-                return (
-                  <tr key={time.id} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                    <td style={{ ...td, background: 'var(--surface2)', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, color: 'var(--text)' }}>{time.id}</td>
-                    {times.map((colTime, j) => {
-                      if (i === j) return <td key={j} style={{ ...td, background: '#1a1a1a' }}>—</td>;
-                      const p = placar[i][j];
-                      if (!p) return <td key={j} style={{ ...td, color: '#333' }}></td>;
-                      const isUltima5Casa = ultimas5Casa[i].has(`${i}-${j}`);
-                      const isUltima5Fora = ultimas5Fora[j].has(`${i}-${j}`);
-                      const isUltima5 = isUltima5Casa || isUltima5Fora;
-                      const partidaId = encerradas.find(ep =>
-                        ep.time_casa_id === times[i].id && ep.time_visitante_id === colTime.id
-                      )?.id;
-                      return (
-                        <td key={j} style={{
-                          ...td, ...cellStyle(p.gc, p.gv),
-                          background: isUltima5 ? 'rgba(255,223,0,.18)' : 'transparent',
-                          outline: isUltima5 ? '1px solid rgba(255,223,0,.4)' : 'none',
-                          padding: 0,
-                        }}>
-                          {partidaId ? (
-                            <a href={`/partida/${partidaId}`} style={{ display: 'block', padding: '3px 1px', color: 'inherit', textDecoration: 'none' }}
-                              title={`${times[i].sigla} ${p.gc}×${p.gv} ${colTime.sigla}`}>
-                              {p.gc}×{p.gv}
-                            </a>
-                          ) : `${p.gc}×${p.gv}`}
-                        </td>
-                      );
-                    })}
-                    <td style={{ ...td, background: '#111', color: 'var(--text-muted)' }}>{r.j}</td>
-                    <td style={{ ...td, background: '#111', color: '#22c55e', fontWeight: 600 }}>{r.v}</td>
-                    <td style={{ ...td, background: '#111', color: 'var(--text-muted)' }}>{r.e}</td>
-                    <td style={{ ...td, background: '#111', color: '#ef4444', fontWeight: 600 }}>{r.d}</td>
-                    <td style={{ ...td, background: '#111', color: 'var(--text-muted)' }}>{r.gm}</td>
-                    <td style={{ ...td, background: '#111', color: 'var(--text-muted)' }}>{r.gs}</td>
-                    <td style={{ ...td, background: '#0d1a0d', color: 'var(--amarelo)', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12 }}>{r.pts}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Resumo mandante/visitante */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          {[
-            { titulo: '📋 Como Mandante', sortedIdx: sortedIdxCasa, resumoArr: resumoCasa, shades: homeShadeBg },
-            { titulo: '✈️ Como Visitante', sortedIdx: sortedIdxFora, resumoArr: resumoFora, shades: awayShadeBg },
-          ].map(({ titulo, sortedIdx, resumoArr, shades }) => (
-            <div key={titulo} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ padding: '10px 14px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--amarelo)' }}>
-                {titulo}
-              </div>
-
-              <div style={{ padding: '6px 14px', display: 'flex', gap: 6, alignItems: 'center', fontSize: '.68rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-                <span>Últimos 5 jogos:</span>
-                {shades.map((bg, i) => (
-                  <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <span style={{ width: 12, height: 12, background: bg, border: '1px solid rgba(255,255,255,.1)', borderRadius: 2, display: 'inline-block' }} />
-                    {i === 0 ? 'mais recente' : i === 4 ? 'mais antigo' : ''}
-                  </span>
-                ))}
-              </div>
-
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
-                <thead>
-                  <tr style={{ background: 'var(--surface2)' }}>
-                    {['#', 'Time', 'J', 'V', 'E', 'D', 'GM', 'GS', 'Pts', 'Últ. 5'].map(h => (
-                      <th key={h} style={{ padding: '5px 7px', textAlign: h === 'Time' ? 'left' : 'center', color: 'var(--text-muted)', fontWeight: 600, fontSize: '.78rem', borderBottom: '1px solid var(--border)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedIdx.map((i, pos) => {
-                    const r = resumoArr[i];
-                    const u5 = r.ultimos5;
-                    return (
-                      <tr key={times[i].id} style={{ borderBottom: '1px solid #1a1a1a' }}>
-                        <td style={{ padding: '5px 7px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{pos + 1}</td>
-                        <td style={{ padding: '5px 7px', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: '.04em', color: 'var(--text)', fontSize: '.9rem' }}>{times[i].id}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.j}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--libertadores)', fontWeight: 600, fontSize: '.85rem' }}>{r.v}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.e}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--rebaixamento)', fontWeight: 600, fontSize: '.85rem' }}>{r.d}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.gm}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--text-muted)', fontSize: '.85rem' }}>{r.gs}</td>
-                        <td style={{ textAlign: 'center', padding: '5px 5px', color: 'var(--amarelo)', fontFamily: "'Bebas Neue',sans-serif", fontWeight: 600, fontSize: '.85rem' }}>{r.pts}</td>
-                        <td style={{ padding: '5px 5px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                            {u5.map((jogo, idx) => (
-                              <span key={idx} style={{
-                                width: 16, height: 16, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                background: shades[idx], fontSize: '.65rem', fontWeight: 700, color: resColor[jogo.resultado]
-                              }}>
-                                {jogo.resultado}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+          flexWrap: "wrap",
+          marginBottom: "32px",
+          padding: "12px 16px",
+          background: "white",
+          borderRadius: "12px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          fontSize: "0.8rem",
+        }}
+      >
+        <span style={{ fontWeight: 600 }}>Legenda - Últimos 5 jogos em casa:</span>
+        {homeShadeBg.map((bg, idx) => (
+          <div key={idx} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <div
+              style={{
+                width: "18px",
+                height: "18px",
+                borderRadius: "4px",
+                background: bg,
+                outline: `1px solid ${homeShadeOutline[idx]}`,
+                outlineOffset: "-1px",
+              }}
+            />
+            <span>{idx + 1}º mais recente</span>
+          </div>
+        ))}
+      </div>
+
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: "24px",
+        }}
+      >
+        <div
+          style={{
+            padding: "20px",
+            borderRadius: "12px",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              marginBottom: "16px",
+              color: "#1e293b",
+            }}
+          >
+            Resumo Mandante
+          </h2>
+          <div style={{ display: "grid", gap: "10px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Vitórias</span>
+              <strong>{mandanteStats.vitorias}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Empates</span>
+              <strong>{mandanteStats.empates}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Derrotas</span>
+              <strong>{mandanteStats.derrotas}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Gols marcados</span>
+              <strong>{mandanteStats.golsMarcados}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+              }}
+            >
+              <span>Gols sofridos</span>
+              <strong>{mandanteStats.golsSofridos}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "20px",
+            borderRadius: "12px",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              marginBottom: "16px",
+              color: "#1e293b",
+            }}
+          >
+            Resumo Visitante
+          </h2>
+          <div style={{ display: "grid", gap: "10px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Vitórias</span>
+              <strong>{visitanteStats.vitorias}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Empates</span>
+              <strong>{visitanteStats.empates}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Derrotas</span>
+              <strong>{visitanteStats.derrotas}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <span>Gols marcados</span>
+              <strong>{visitanteStats.golsMarcados}</strong>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "10px 0",
+              }}
+            >
+              <span>Gols sofridos</span>
+              <strong>{visitanteStats.golsSofridos}</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   );
-        }
+}
