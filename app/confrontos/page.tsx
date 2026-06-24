@@ -1,492 +1,364 @@
 import { getPartidas, getTimes } from "@/lib/data";
-import { CSSProperties } from "react";
-
-interface Time {
-  id: string | number;
-  nome: string;
-  sigla?: string;
-  cor?: string;
-}
 
 interface Partida {
-  id: string;
-  time_mandante_id: string | number;
+  id?: string | number;
+  time_casa_id: string | number;
   time_visitante_id: string | number;
-  gols_mandante: number;
+  gols_casa: number;
   gols_visitante: number;
   data?: string;
 }
 
-const PSEUDO_IDS = new Set(["outros"]);
-
-function getTime(d?: string): number {
-  return d ? new Date(d).getTime() : 0;
+interface Time {
+  id: string | number;
+  nome: string;
 }
 
-export default async function ConfrontosPage() {
-  const [times, partidas] = await Promise.all([getTimes(), getPartidas()]);
+const PSEUDO_IDS = new Set(["outros"]);
 
-  const timesValidos: Time[] = (times ?? []).filter(
-    (t) => !PSEUDO_IDS.has(String(t.id))
-  );
+export default async function ConfrontosPage() {
+  const partidas: Partida[] = await getPartidas();
+  const times: Time[] = await getTimes();
 
   const idx: Record<string | number, number> = {};
-  timesValidos.forEach((t, i) => {
+  times.forEach((t, i) => {
     idx[t.id] = i;
   });
 
-  const homeStats = timesValidos.map(() => ({
-    J: 0,
-    V: 0,
-    E: 0,
-    D: 0,
-    GP: 0,
-    GC: 0,
-    SG: 0,
-    Pts: 0,
-  }));
-
-  const awayStats = timesValidos.map(() => ({
-    J: 0,
-    V: 0,
-    E: 0,
-    D: 0,
-    GP: 0,
-    GC: 0,
-    SG: 0,
-    Pts: 0,
-  }));
+  const n = times.length;
 
   let totPart = 0;
   let totManVit = 0;
   let totEmp = 0;
   let totVisVit = 0;
+  let totGols = 0;
   let totGolsMan = 0;
   let totGolsVis = 0;
-  let totGols = 0;
 
-  const homeMatchesByTeam: Record<number, Partida[]> = {};
-  const matchesByHomeAway: Record<number, Record<number, Partida[]>> = {};
+  const mMat: Array<Array<{ jc: number; jf: number; gc: number; gf: number; recency: number } | null>> = Array.from({ length: n }, () => Array.from({ length: n }, () => null));
+  const homeStats: Array<{ pj: number; v: number; e: number; d: number; gp: number; gc: number; pts: number; saldo: number }> = Array.from({ length: n }, () => ({ pj: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, pts: 0, saldo: 0 }));
+  const awayStats: Array<{ pj: number; v: number; e: number; d: number; gp: number; gc: number; pts: number; saldo: number }> = Array.from({ length: n }, () => ({ pj: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, pts: 0, saldo: 0 }));
 
-  (partidas ?? []).forEach((p) => {
-    const h = idx[p.time_mandante_id];
-    const a = idx[p.time_visitante_id];
-    if (h === undefined || a === undefined) return;
-    if (h === a) return;
+  const now = Date.now();
 
-    const gm = p.gols_mandante ?? 0;
-    const gv = p.gols_visitante ?? 0;
+  partidas.forEach((p) => {
+    const cid = p.time_casa_id;
+    const vid = p.time_visitante_id;
+    if (PSEUDO_IDS.has(String(cid)) || PSEUDO_IDS.has(String(vid))) return;
 
-    totPart++;
-    totGolsMan += gm;
-    totGolsVis += gv;
+    const i = idx[cid];
+    const j = idx[vid];
+    if (i === undefined || j === undefined) return;
 
-    homeStats[h].J++;
-    homeStats[h].GP += gm;
-    homeStats[h].GC += gv;
+    const gc = Number(p.gols_casa) || 0;
+    const gf = Number(p.gols_visitante) || 0;
 
-    awayStats[a].J++;
-    awayStats[a].GP += gv;
-    awayStats[a].GC += gm;
+    totPart += 1;
+    totGols += gc + gf;
+    totGolsMan += gc;
+    totGolsVis += gf;
 
-    if (gm > gv) {
-      totManVit++;
-      homeStats[h].V++;
-      homeStats[h].Pts += 3;
-      awayStats[a].D++;
-    } else if (gm === gv) {
-      totEmp++;
-      homeStats[h].E++;
-      homeStats[h].Pts += 1;
-      awayStats[a].E++;
-      awayStats[a].Pts += 1;
+    if (gc > gf) {
+      totManVit += 1;
+      homeStats[i].v += 1;
+      homeStats[i].pts += 3;
+      awayStats[j].d += 1;
+    } else if (gc === gf) {
+      totEmp += 1;
+      homeStats[i].e += 1;
+      homeStats[i].pts += 1;
+      awayStats[j].e += 1;
+      awayStats[j].pts += 1;
     } else {
-      totVisVit++;
-      homeStats[h].D++;
-      awayStats[a].V++;
-      awayStats[a].Pts += 3;
+      totVisVit += 1;
+      homeStats[i].d += 1;
+      awayStats[j].v += 1;
+      awayStats[j].pts += 3;
     }
 
-    if (!homeMatchesByTeam[h]) homeMatchesByTeam[h] = [];
-    homeMatchesByTeam[h].push(p);
+    homeStats[i].pj += 1;
+    homeStats[i].gp += gc;
+    homeStats[i].gc += gf;
+    homeStats[i].saldo += gc - gf;
 
-    if (!matchesByHomeAway[h]) matchesByHomeAway[h] = {};
-    if (!matchesByHomeAway[h][a]) matchesByHomeAway[h][a] = [];
-    matchesByHomeAway[h][a].push(p);
+    awayStats[j].pj += 1;
+    awayStats[j].gp += gf;
+    awayStats[j].gc += gc;
+    awayStats[j].saldo += gf - gc;
+
+    const recency = p.data ? (now - new Date(p.data).getTime()) / (1000 * 60 * 60 * 24) : 9999;
+
+    const existing = mMat[i][j];
+    if (existing) {
+      existing.jc += 1;
+      existing.gc += gc;
+      existing.gf += gf;
+      if (recency < existing.recency) existing.recency = recency;
+    } else {
+      mMat[i][j] = { jc: 1, jf: 0, gc, gf, recency };
+    }
   });
 
-  totGols = totGolsMan + totGolsVis;
-  homeStats.forEach((s) => {
-    s.SG = s.GP - s.GC;
-  });
-  awayStats.forEach((s) => {
-    s.SG = s.GP - s.GC;
-  });
-
-  const ultimas5Casa: Record<number, Map<string, number>> = {};
-  Object.keys(homeMatchesByTeam).forEach((hStr) => {
-    const h = Number(hStr);
-    const sorted = homeMatchesByTeam[h]
-      .slice()
-      .sort((a, b) => getTime(b.data) - getTime(a.data))
-      .slice(0, 5);
-
-    const map = new Map<string, number>();
-    sorted.forEach((p, index) => {
-      const a = idx[p.time_visitante_id];
-      if (a === undefined) return;
-      map.set(String(a), 4 - index);
-    });
-    ultimas5Casa[h] = map;
-  });
-
-  function homeShadeBg(homeIdx: number, awayIdx: number): CSSProperties {
-    const map = ultimas5Casa[homeIdx];
-    if (!map) return {};
-    const recency = map.get(String(awayIdx));
-    if (recency === undefined) return {};
-    const opacity = 0.15 + (recency / 4) * 0.7;
-    return {
-      backgroundImage: `linear-gradient(135deg, rgba(37, 99, 235, ${opacity}) 0%, rgba(37, 99, 235, ${
-        opacity * 0.35
-      }) 100%)`,
-    };
-  }
-
-  function latestScore(homeIdx: number, awayIdx: number): string {
-    const matches = matchesByHomeAway[homeIdx]?.[awayIdx];
-    if (!matches || matches.length === 0) return "—";
-    const latest = matches
-      .slice()
-      .sort((a, b) => getTime(b.data) - getTime(a.data))[0];
-    return `${latest.gols_mandante ?? 0} x ${latest.gols_visitante ?? 0}`;
-  }
-
-  type TeamWithStats = Time & {
-    index: number;
-    stats: (typeof homeStats)[number];
+  const homeShadeBg = (recency: number) => {
+    if (recency <= 30) return "linear-gradient(135deg, #1b5e20 0%, #4caf50 100%)";
+    if (recency <= 90) return "linear-gradient(135deg, #2e7d32 0%, #66bb6a 100%)";
+    if (recency <= 180) return "linear-gradient(135deg, #558b2f 0%, #9ccc65 100%)";
+    if (recency <= 365) return "linear-gradient(135deg, #f9a825 0%, #ffee58 100%)";
+    return "linear-gradient(135deg, #c62828 0%, #ef5350 100%)";
   };
 
-  const homeRanking: TeamWithStats[] = timesValidos
-    .map((t, i) => ({ ...t, index: i, stats: homeStats[i] }))
-    .sort((a, b) => {
-      if (b.stats.Pts !== a.stats.Pts) return b.stats.Pts - a.stats.Pts;
-      if (b.stats.SG !== a.stats.SG) return b.stats.SG - a.stats.SG;
-      return a.nome.localeCompare(b.nome);
-    });
+  const statCards = [
+    { label: "JOGOS", value: totPart, color: "#0d47a1" },
+    { label: "VITÓRIAS MANDANTE", value: totManVit, color: "#1b5e20" },
+    { label: "EMPATES", value: totEmp, color: "#f9a825" },
+    { label: "VITÓRIAS VISITANTE", value: totVisVit, color: "#c62828" },
+    { label: "GOLS TOTAIS", value: totGols, color: "#4a148c" },
+    { label: "GOLS MANDANTE", value: totGolsMan, color: "#006064" },
+    { label: "GOLS VISITANTE", value: totGolsVis, color: "#bf360c" },
+  ];
 
-  const awayRanking: TeamWithStats[] = timesValidos
-    .map((t, i) => ({ ...t, index: i, stats: awayStats[i] }))
-    .sort((a, b) => {
-      if (b.stats.Pts !== a.stats.Pts) return b.stats.Pts - a.stats.Pts;
-      if (b.stats.SG !== a.stats.SG) return b.stats.SG - a.stats.SG;
-      return a.nome.localeCompare(b.nome);
-    });
+  const homeRank = times
+    .map((t, i) => ({ ...t, i, ...homeStats[i] }))
+    .filter((x) => x.pj > 0)
+    .sort((a, b) => b.pts - a.pts || b.saldo - a.saldo || b.gp - a.gp);
 
-  const cardStyle: CSSProperties = {
-    padding: "0.75rem 1rem",
-    borderRadius: "0.5rem",
-    color: "#fff",
-    minWidth: "120px",
-    textAlign: "center",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-  };
-
-  const tableHeaderStyle: CSSProperties = {
-    backgroundColor: "#1e293b",
-    color: "#fff",
-    padding: "0.5rem",
-    border: "1px solid #334155",
-    textAlign: "center",
-    fontWeight: 600,
-  };
-
-  const cellStyle: CSSProperties = {
-    padding: "0.5rem",
-    border: "1px solid #cbd5e1",
-    textAlign: "center",
-    minWidth: "60px",
-  };
+  const awayRank = times
+    .map((t, i) => ({ ...t, i, ...awayStats[i] }))
+    .filter((x) => x.pj > 0)
+    .sort((a, b) => b.pts - a.pts || b.saldo - a.saldo || b.gp - a.gp);
 
   return (
-    <main style={{ padding: "1.5rem", fontFamily: "system-ui, sans-serif" }}>
+    <main
+      style={{
+        minHeight: "100vh",
+        padding: "24px",
+        backgroundColor: "#f5f5f5",
+        fontFamily: "'Bebas Neue', sans-serif",
+      }}
+    >
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');`}</style>
+
       <h1
         style={{
-          fontFamily: '"Bebas Neue", sans-serif',
-          fontSize: "2.5rem",
-          marginBottom: "1rem",
+          fontSize: "48px",
+          textAlign: "center",
+          marginBottom: "24px",
+          letterSpacing: "2px",
+          color: "#212121",
         }}
       >
-        Confrontos
+        CONFRONTOS
       </h1>
-
-      <div
-        style={{
-          display: "flex",
-          gap: "1rem",
-          flexWrap: "wrap",
-          marginBottom: "1.5rem",
-          fontFamily: '"Bebas Neue", sans-serif',
-        }}
-      >
-        <div style={{ ...cardStyle, backgroundColor: "#3b82f6" }}>
-          <div style={{ fontSize: "1.75rem" }}>{totPart}</div>
-          <div style={{ fontSize: "0.9rem" }}>Partidas</div>
-        </div>
-        <div style={{ ...cardStyle, backgroundColor: "#10b981" }}>
-          <div style={{ fontSize: "1.75rem" }}>{totManVit}</div>
-          <div style={{ fontSize: "0.9rem" }}>Vitórias Mandante</div>
-        </div>
-        <div style={{ ...cardStyle, backgroundColor: "#f59e0b" }}>
-          <div style={{ fontSize: "1.75rem" }}>{totEmp}</div>
-          <div style={{ fontSize: "0.9rem" }}>Empates</div>
-        </div>
-        <div style={{ ...cardStyle, backgroundColor: "#ef4444" }}>
-          <div style={{ fontSize: "1.75rem" }}>{totVisVit}</div>
-          <div style={{ fontSize: "0.9rem" }}>Vitórias Visitante</div>
-        </div>
-        <div style={{ ...cardStyle, backgroundColor: "#8b5cf6" }}>
-          <div style={{ fontSize: "1.75rem" }}>{totGols}</div>
-          <div style={{ fontSize: "0.9rem" }}>Gols</div>
-        </div>
-        <div style={{ ...cardStyle, backgroundColor: "#06b6d4" }}>
-          <div style={{ fontSize: "1.75rem" }}>{totGolsMan}</div>
-          <div style={{ fontSize: "0.9rem" }}>Gols Mandante</div>
-        </div>
-        <div style={{ ...cardStyle, backgroundColor: "#f97316" }}>
-          <div style={{ fontSize: "1.75rem" }}>{totGolsVis}</div>
-          <div style={{ fontSize: "0.9rem" }}>Gols Visitante</div>
-        </div>
-      </div>
 
       <section
         style={{
-          marginBottom: "1.5rem",
-          padding: "1rem",
-          backgroundColor: "#f8fafc",
-          borderRadius: "0.5rem",
-          border: "1px solid #e2e8f0",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: "16px",
+          marginBottom: "32px",
         }}
       >
-        <h2
-          style={{
-            fontFamily: '"Bebas Neue", sans-serif',
-            fontSize: "1.5rem",
-            marginBottom: "0.5rem",
-          }}
-        >
-          Legenda
-        </h2>
-        <ul
-          style={{
-            margin: 0,
-            paddingLeft: "1.25rem",
-            lineHeight: 1.6,
-          }}
-        >
-          <li>
-            Cada linha da tabela cruzada representa o time{" "}
-            <strong>mandante</strong>.
-          </li>
-          <li>Cada coluna representa o time <strong>visitante</strong>.</li>
-          <li>
-            O placar exibido é o resultado do <strong>último confronto</strong>{" "}
-            entre mandante e visitante.
-          </li>
-          <li>
-            O degradê azul no fundo indica a recência do mandante: quanto mais
-            intenso, mais recente foi o último jogo em casa contra o adversário.
-          </li>
-          <li>
-            As tabelas de resumo abaixo ordenam os times por pontuação e saldo
-            de gols.
-          </li>
-        </ul>
-      </section>
-
-      <section style={{ marginBottom: "2rem" }}>
-        <h2
-          style={{
-            fontFamily: '"Bebas Neue", sans-serif',
-            fontSize: "1.75rem",
-            marginBottom: "0.75rem",
-          }}
-        >
-          Tabela Cruzada
-        </h2>
-        <div style={{ overflowX: "auto" }}>
-          <table
+        {statCards.map((card, index) => (
+          <div
+            key={index}
             style={{
-              borderCollapse: "collapse",
-              width: "100%",
-              fontSize: "0.85rem",
+              background: card.color,
+              color: "#fff",
+              borderRadius: "12px",
+              padding: "16px",
+              textAlign: "center",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
             }}
           >
+            <div style={{ fontSize: "32px", marginBottom: "4px" }}>{card.value}</div>
+            <div style={{ fontSize: "18px", opacity: 0.9 }}>{card.label}</div>
+          </div>
+        ))}
+      </section>
+
+      <section style={{ overflowX: "auto", marginBottom: "32px" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            backgroundColor: "#fff",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}
+        >
+          <thead>
+            <tr style={{ backgroundColor: "#263238" }}>
+              <th
+                style={{
+                  padding: "12px",
+                  color: "#fff",
+                  fontSize: "18px",
+                  border: "1px solid #37474f",
+                  minWidth: "180px",
+                }}
+              >
+                MANDANTE \ VISITANTE
+              </th>
+              {times.map((t) => (
+                <th
+                  key={t.id}
+                  style={{
+                    padding: "12px",
+                    color: "#fff",
+                    fontSize: "16px",
+                    border: "1px solid #37474f",
+                    minWidth: "100px",
+                  }}
+                >
+                  {t.nome}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {times.map((tCasa, i) => (
+              <tr key={tCasa.id}>
+                <td
+                  style={{
+                    padding: "12px",
+                    fontWeight: "bold",
+                    backgroundColor: "#eceff1",
+                    border: "1px solid #b0bec5",
+                    fontSize: "18px",
+                  }}
+                >
+                  {tCasa.nome}
+                </td>
+                {times.map((tVis, j) => {
+                  const cell = i === j ? null : mMat[i][j];
+                  return (
+                    <td
+                      key={tVis.id}
+                      style={{
+                        padding: "8px",
+                        border: "1px solid #b0bec5",
+                        textAlign: "center",
+                        fontSize: "16px",
+                        background: cell ? homeShadeBg(cell.recency) : "#cfd8dc",
+                        color: cell ? "#fff" : "#90a4ae",
+                      }}
+                    >
+                      {i === j ? "—" : cell ? `${cell.gc} x ${cell.gf}` : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+        <div
+          style={{
+            backgroundColor: "#fff",
+            borderRadius: "12px",
+            padding: "16px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "28px",
+              marginBottom: "16px",
+              color: "#1b5e20",
+              borderBottom: "2px solid #1b5e20",
+              paddingBottom: "8px",
+            }}
+          >
+            MANDANTE
+          </h2>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr>
-                <th style={tableHeaderStyle}>Mandante \ Visitante</th>
-                {timesValidos.map((t) => (
-                  <th
-                    key={String(t.id)}
-                    style={{ ...tableHeaderStyle, minWidth: "70px" }}
-                  >
-                    {t.nome}
-                  </th>
-                ))}
+              <tr style={{ backgroundColor: "#1b5e20", color: "#fff" }}>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>#</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c", textAlign: "left" }}>TIME</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>J</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>V</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>E</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>D</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>GP</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>GC</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>SG</th>
+                <th style={{ padding: "8px", border: "1px solid #388e3c" }}>PTS</th>
               </tr>
             </thead>
             <tbody>
-              {timesValidos.map((home, i) => (
-                <tr key={String(home.id)}>
-                  <th style={{ ...tableHeaderStyle, textAlign: "left" }}>
-                    {home.nome}
-                  </th>
-                  {timesValidos.map((away, j) => (
-                    <td
-                      key={String(away.id)}
-                      style={{ ...cellStyle, ...homeShadeBg(i, j) }}
-                    >
-                      {i === j ? "—" : latestScore(i, j)}
-                    </td>
-                  ))}
+              {homeRank.map((t, pos) => (
+                <tr key={t.id} style={{ backgroundColor: pos % 2 === 0 ? "#f1f8e9" : "#fff" }}>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{pos + 1}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9" }}>{t.nome}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{t.pj}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{t.v}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{t.e}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{t.d}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{t.gp}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{t.gc}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center" }}>{t.saldo}</td>
+                  <td style={{ padding: "8px", border: "1px solid #c8e6c9", textAlign: "center", fontWeight: "bold" }}>{t.pts}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: "#fff",
+            borderRadius: "12px",
+            padding: "16px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "28px",
+              marginBottom: "16px",
+              color: "#c62828",
+              borderBottom: "2px solid #c62828",
+              paddingBottom: "8px",
+            }}
+          >
+            VISITANTE
+          </h2>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ backgroundColor: "#c62828", color: "#fff" }}>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>#</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935", textAlign: "left" }}>TIME</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>J</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>V</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>E</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>D</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>GP</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>GC</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>SG</th>
+                <th style={{ padding: "8px", border: "1px solid #e53935" }}>PTS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {awayRank.map((t, pos) => (
+                <tr key={t.id} style={{ backgroundColor: pos % 2 === 0 ? "#ffebee" : "#fff" }}>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{pos + 1}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2" }}>{t.nome}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{t.pj}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{t.v}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{t.e}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{t.d}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{t.gp}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{t.gc}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center" }}>{t.saldo}</td>
+                  <td style={{ padding: "8px", border: "1px solid #ffcdd2", textAlign: "center", fontWeight: "bold" }}>{t.pts}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: "2rem",
-        }}
-      >
-        <section>
-          <h2
-            style={{
-              fontFamily: '"Bebas Neue", sans-serif',
-              fontSize: "1.75rem",
-              marginBottom: "0.75rem",
-            }}
-          >
-            Resumo Mandante
-          </h2>
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                borderCollapse: "collapse",
-                width: "100%",
-                fontSize: "0.85rem",
-              }}
-            >
-              <thead>
-                <tr>
-                  <th style={tableHeaderStyle}>#</th>
-                  <th style={tableHeaderStyle}>Time</th>
-                  <th style={tableHeaderStyle}>J</th>
-                  <th style={tableHeaderStyle}>V</th>
-                  <th style={tableHeaderStyle}>E</th>
-                  <th style={tableHeaderStyle}>D</th>
-                  <th style={tableHeaderStyle}>GP</th>
-                  <th style={tableHeaderStyle}>GC</th>
-                  <th style={tableHeaderStyle}>SG</th>
-                  <th style={tableHeaderStyle}>Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {homeRanking.map((t, pos) => (
-                  <tr key={String(t.id)}>
-                    <td style={cellStyle}>{pos + 1}</td>
-                    <td
-                      style={{
-                        ...cellStyle,
-                        textAlign: "left",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {t.nome}
-                    </td>
-                    <td style={cellStyle}>{t.stats.J}</td>
-                    <td style={cellStyle}>{t.stats.V}</td>
-                    <td style={cellStyle}>{t.stats.E}</td>
-                    <td style={cellStyle}>{t.stats.D}</td>
-                    <td style={cellStyle}>{t.stats.GP}</td>
-                    <td style={cellStyle}>{t.stats.GC}</td>
-                    <td style={cellStyle}>{t.stats.SG}</td>
-                    <td style={{ ...cellStyle, fontWeight: 700 }}>
-                      {t.stats.Pts}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section>
-          <h2
-            style={{
-              fontFamily: '"Bebas Neue", sans-serif',
-              fontSize: "1.75rem",
-              marginBottom: "0.75rem",
-            }}
-          >
-            Resumo Visitante
-          </h2>
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                borderCollapse: "collapse",
-                width: "100%",
-                fontSize: "0.85rem",
-              }}
-            >
-              <thead>
-                <tr>
-                  <th style={tableHeaderStyle}>#</th>
-                  <th style={tableHeaderStyle}>Time</th>
-                  <th style={tableHeaderStyle}>J</th>
-                  <th style={tableHeaderStyle}>V</th>
-                  <th style={tableHeaderStyle}>E</th>
-                  <th style={tableHeaderStyle}>D</th>
-                  <th style={tableHeaderStyle}>GP</th>
-                  <th style={tableHeaderStyle}>GC</th>
-                  <th style={tableHeaderStyle}>SG</th>
-                  <th style={tableHeaderStyle}>Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {awayRanking.map((t, pos) => (
-                  <tr key={String(t.id)}>
-                    <td style={cellStyle}>{pos + 1}</td>
-                    <td
-                      style={{
-                        ...cellStyle,
-                        textAlign: "left",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {t.nome}
-                    </td>
-                    <td style={cellStyle}>{t.stats.J}</td>
-                    <td style={cellStyle}>{t.stats.V}</td>
-                    <td style={cellStyle}>{t.stats.E}</td>
-                    <td style={cellStyle}>{t.stats.D}</td>
-                    <td style={cellStyle}>{t.stats.GP}</td>
-                    <td style={cellStyle}>{t.stats.GC}</td>
-                    <td style={cellStyle}>{t.stats.SG}</td>
-                    <td style={{ ...cellStyle, fontWeight: 700 }}>
-                      {t.stats.Pts}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
     </main>
   );
 }
