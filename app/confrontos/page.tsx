@@ -1,300 +1,492 @@
-import { times, confrontos } from '@/lib/data';
-
-const PSEUDO_IDS = ['outros'];
+import { getPartidas, getTimes } from "@/lib/data";
+import { CSSProperties } from "react";
 
 interface Time {
   id: string | number;
   nome: string;
-  cor: string;
+  sigla?: string;
+  cor?: string;
 }
 
-interface Confronto {
-  id: number;
-  data: string;
-  timeA: Time | string | number;
-  timeB: Time | string | number;
-  golsA: number;
-  golsB: number;
-  mandante: 'A' | 'B';
+interface Partida {
+  id: string;
+  time_mandante_id: string | number;
+  time_visitante_id: string | number;
+  gols_mandante: number;
+  gols_visitante: number;
+  data?: string;
 }
 
-export default function ConfrontosPage() {
-  // Filtra apenas confrontos válidos, ignorando pseudo-times como 'outros'
-  const confrontosValidos = confrontos.filter((jogo: Confronto) => {
-    const idA = typeof jogo.timeA === 'object' ? jogo.timeA.id : jogo.timeA;
-    const idB = typeof jogo.timeB === 'object' ? jogo.timeB.id : jogo.timeB;
-    return !PSEUDO_IDS.includes(String(idA)) && !PSEUDO_IDS.includes(String(idB));
-  });
+const PSEUDO_IDS = new Set(["outros"]);
 
-  const totalJogos = confrontosValidos.length;
-  const totalGols = confrontosValidos.reduce((acc: number, jogo: Confronto) => acc + jogo.golsA + jogo.golsB, 0);
-  const mediaGols = totalJogos ? (totalGols / totalJogos).toFixed(2) : '0.00';
-  const vitoriasMandante = confrontosValidos.filter((jogo: Confronto) => {
-    if (jogo.mandante === 'A') return jogo.golsA > jogo.golsB;
-    return jogo.golsB > jogo.golsA;
-  }).length;
-  const empates = confrontosValidos.filter((jogo: Confronto) => jogo.golsA === jogo.golsB).length;
-  const vitoriasVisitante = totalJogos - vitoriasMandante - empates;
-  const maiorGoleada = confrontosValidos.reduce((acc: number, jogo: Confronto) => {
-    return Math.max(acc, Math.abs(jogo.golsA - jogo.golsB));
-  }, 0);
-  const primeiroJogo = confrontosValidos[0];
+function getTime(d?: string): number {
+  return d ? new Date(d).getTime() : 0;
+}
 
-  // Índice de recência dos confrontos em casa usando Map (0 = mais recente)
-  const ultimas5Casa = new Map<string | number, number>();
-  const ultimosCasa = confrontosValidos
-    .slice()
-    .sort((a: Confronto, b: Confronto) => new Date(b.data).getTime() - new Date(a.data).getTime())
-    .filter((jogo: Confronto) => {
-      const mandanteId = jogo.mandante === 'A'
-        ? (typeof jogo.timeA === 'object' ? jogo.timeA.id : jogo.timeA)
-        : (typeof jogo.timeB === 'object' ? jogo.timeB.id : jogo.timeB);
-      return !PSEUDO_IDS.includes(String(mandanteId));
-    });
+export default async function ConfrontosPage() {
+  const [times, partidas] = await Promise.all([getTimes(), getPartidas()]);
 
-  ultimosCasa.forEach((jogo: Confronto, index: number) => {
-    const mandanteId = jogo.mandante === 'A'
-      ? (typeof jogo.timeA === 'object' ? jogo.timeA.id : jogo.timeA)
-      : (typeof jogo.timeB === 'object' ? jogo.timeB.id : jogo.timeB);
-    if (!ultimas5Casa.has(mandanteId)) {
-      ultimas5Casa.set(mandanteId, Math.min(index, 4));
-    }
-  });
+  const timesValidos: Time[] = (times ?? []).filter(
+    (t) => !PSEUDO_IDS.has(String(t.id))
+  );
 
-  // CORREÇÃO: idx indexado por time.id (string | number)
   const idx: Record<string | number, number> = {};
-  times.forEach((time: Time, index: number) => {
-    idx[time.id] = index;
+  timesValidos.forEach((t, i) => {
+    idx[t.id] = i;
   });
 
-  const tabelaCruzada: number[][] = Array(times.length)
-    .fill(null)
-    .map(() => Array(times.length).fill(0));
+  const homeStats = timesValidos.map(() => ({
+    J: 0,
+    V: 0,
+    E: 0,
+    D: 0,
+    GP: 0,
+    GC: 0,
+    SG: 0,
+    Pts: 0,
+  }));
 
-  confrontosValidos.forEach((jogo: Confronto) => {
-    const idA = typeof jogo.timeA === 'object' ? jogo.timeA.id : jogo.timeA;
-    const idB = typeof jogo.timeB === 'object' ? jogo.timeB.id : jogo.timeB;
-    const mandanteId = jogo.mandante === 'A' ? idA : idB;
-    const visitanteId = jogo.mandante === 'A' ? idB : idA;
-    const golsMandante = jogo.mandante === 'A' ? jogo.golsA : jogo.golsB;
-    const golsVisitante = jogo.mandante === 'A' ? jogo.golsB : jogo.golsA;
+  const awayStats = timesValidos.map(() => ({
+    J: 0,
+    V: 0,
+    E: 0,
+    D: 0,
+    GP: 0,
+    GC: 0,
+    SG: 0,
+    Pts: 0,
+  }));
 
-    if (idx[mandanteId] !== undefined && idx[visitanteId] !== undefined) {
-      tabelaCruzada[idx[mandanteId]][idx[visitanteId]] += golsMandante;
-      tabelaCruzada[idx[visitanteId]][idx[mandanteId]] += golsVisitante;
+  let totPart = 0;
+  let totManVit = 0;
+  let totEmp = 0;
+  let totVisVit = 0;
+  let totGolsMan = 0;
+  let totGolsVis = 0;
+  let totGols = 0;
+
+  const homeMatchesByTeam: Record<number, Partida[]> = {};
+  const matchesByHomeAway: Record<number, Record<number, Partida[]>> = {};
+
+  (partidas ?? []).forEach((p) => {
+    const h = idx[p.time_mandante_id];
+    const a = idx[p.time_visitante_id];
+    if (h === undefined || a === undefined) return;
+    if (h === a) return;
+
+    const gm = p.gols_mandante ?? 0;
+    const gv = p.gols_visitante ?? 0;
+
+    totPart++;
+    totGolsMan += gm;
+    totGolsVis += gv;
+
+    homeStats[h].J++;
+    homeStats[h].GP += gm;
+    homeStats[h].GC += gv;
+
+    awayStats[a].J++;
+    awayStats[a].GP += gv;
+    awayStats[a].GC += gm;
+
+    if (gm > gv) {
+      totManVit++;
+      homeStats[h].V++;
+      homeStats[h].Pts += 3;
+      awayStats[a].D++;
+    } else if (gm === gv) {
+      totEmp++;
+      homeStats[h].E++;
+      homeStats[h].Pts += 1;
+      awayStats[a].E++;
+      awayStats[a].Pts += 1;
+    } else {
+      totVisVit++;
+      homeStats[h].D++;
+      awayStats[a].V++;
+      awayStats[a].Pts += 3;
     }
+
+    if (!homeMatchesByTeam[h]) homeMatchesByTeam[h] = [];
+    homeMatchesByTeam[h].push(p);
+
+    if (!matchesByHomeAway[h]) matchesByHomeAway[h] = {};
+    if (!matchesByHomeAway[h][a]) matchesByHomeAway[h][a] = [];
+    matchesByHomeAway[h][a].push(p);
   });
 
-  const resumoMandante = times.map((time: Time) => {
-    const i = idx[time.id];
-    const jogosCasa = confrontosValidos.filter((jogo: Confronto) => {
-      const mandanteId = jogo.mandante === 'A'
-        ? (typeof jogo.timeA === 'object' ? jogo.timeA.id : jogo.timeA)
-        : (typeof jogo.timeB === 'object' ? jogo.timeB.id : jogo.timeB);
-      return mandanteId === time.id;
-    });
-    const vitorias = jogosCasa.filter((jogo: Confronto) => {
-      const golsMandante = jogo.mandante === 'A' ? jogo.golsA : jogo.golsB;
-      const golsVisitante = jogo.mandante === 'A' ? jogo.golsB : jogo.golsA;
-      return golsMandante > golsVisitante;
-    }).length;
-    const golsFeitos = jogosCasa.reduce((acc: number, jogo: Confronto) => {
-      return acc + (jogo.mandante === 'A' ? jogo.golsA : jogo.golsB);
-    }, 0);
-    const golsSofridos = jogosCasa.reduce((acc: number, jogo: Confronto) => {
-      return acc + (jogo.mandante === 'A' ? jogo.golsB : jogo.golsA);
-    }, 0);
-    return { time, jogos: jogosCasa.length, vitorias, golsFeitos, golsSofridos, saldo: golsFeitos - golsSofridos };
-  }).sort((a, b) => b.vitorias - a.vitorias || b.saldo - a.saldo);
+  totGols = totGolsMan + totGolsVis;
+  homeStats.forEach((s) => {
+    s.SG = s.GP - s.GC;
+  });
+  awayStats.forEach((s) => {
+    s.SG = s.GP - s.GC;
+  });
 
-  const resumoVisitante = times.map((time: Time) => {
-    const jogosFora = confrontosValidos.filter((jogo: Confronto) => {
-      const visitanteId = jogo.mandante === 'A'
-        ? (typeof jogo.timeB === 'object' ? jogo.timeB.id : jogo.timeB)
-        : (typeof jogo.timeA === 'object' ? jogo.timeA.id : jogo.timeA);
-      return visitanteId === time.id;
-    });
-    const vitorias = jogosFora.filter((jogo: Confronto) => {
-      const golsMandante = jogo.mandante === 'A' ? jogo.golsA : jogo.golsB;
-      const golsVisitante = jogo.mandante === 'A' ? jogo.golsB : jogo.golsA;
-      return golsVisitante > golsMandante;
-    }).length;
-    const golsFeitos = jogosFora.reduce((acc: number, jogo: Confronto) => {
-      return acc + (jogo.mandante === 'A' ? jogo.golsB : jogo.golsA);
-    }, 0);
-    const golsSofridos = jogosFora.reduce((acc: number, jogo: Confronto) => {
-      return acc + (jogo.mandante === 'A' ? jogo.golsA : jogo.golsB);
-    }, 0);
-    return { time, jogos: jogosFora.length, vitorias, golsFeitos, golsSofridos, saldo: golsFeitos - golsSofridos };
-  }).sort((a, b) => b.vitorias - a.vitorias || b.saldo - a.saldo);
+  const ultimas5Casa: Record<number, Map<string, number>> = {};
+  Object.keys(homeMatchesByTeam).forEach((hStr) => {
+    const h = Number(hStr);
+    const sorted = homeMatchesByTeam[h]
+      .slice()
+      .sort((a, b) => getTime(b.data) - getTime(a.data))
+      .slice(0, 5);
 
-  const homeShadeBg = (time: Time) => {
-    const recencia = ultimas5Casa.get(time.id);
-    if (recencia === undefined) return 'transparent';
-    const opacity = 1 - recencia * 0.18;
-    return `rgba(0, 128, 0, ${opacity.toFixed(2)})`;
+    const map = new Map<string, number>();
+    sorted.forEach((p, index) => {
+      const a = idx[p.time_visitante_id];
+      if (a === undefined) return;
+      map.set(String(a), 4 - index);
+    });
+    ultimas5Casa[h] = map;
+  });
+
+  function homeShadeBg(homeIdx: number, awayIdx: number): CSSProperties {
+    const map = ultimas5Casa[homeIdx];
+    if (!map) return {};
+    const recency = map.get(String(awayIdx));
+    if (recency === undefined) return {};
+    const opacity = 0.15 + (recency / 4) * 0.7;
+    return {
+      backgroundImage: `linear-gradient(135deg, rgba(37, 99, 235, ${opacity}) 0%, rgba(37, 99, 235, ${
+        opacity * 0.35
+      }) 100%)`,
+    };
+  }
+
+  function latestScore(homeIdx: number, awayIdx: number): string {
+    const matches = matchesByHomeAway[homeIdx]?.[awayIdx];
+    if (!matches || matches.length === 0) return "—";
+    const latest = matches
+      .slice()
+      .sort((a, b) => getTime(b.data) - getTime(a.data))[0];
+    return `${latest.gols_mandante ?? 0} x ${latest.gols_visitante ?? 0}`;
+  }
+
+  type TeamWithStats = Time & {
+    index: number;
+    stats: (typeof homeStats)[number];
   };
 
-  const formatTimeNome = (time: Time) => time.nome;
+  const homeRanking: TeamWithStats[] = timesValidos
+    .map((t, i) => ({ ...t, index: i, stats: homeStats[i] }))
+    .sort((a, b) => {
+      if (b.stats.Pts !== a.stats.Pts) return b.stats.Pts - a.stats.Pts;
+      if (b.stats.SG !== a.stats.SG) return b.stats.SG - a.stats.SG;
+      return a.nome.localeCompare(b.nome);
+    });
+
+  const awayRanking: TeamWithStats[] = timesValidos
+    .map((t, i) => ({ ...t, index: i, stats: awayStats[i] }))
+    .sort((a, b) => {
+      if (b.stats.Pts !== a.stats.Pts) return b.stats.Pts - a.stats.Pts;
+      if (b.stats.SG !== a.stats.SG) return b.stats.SG - a.stats.SG;
+      return a.nome.localeCompare(b.nome);
+    });
+
+  const cardStyle: CSSProperties = {
+    padding: "0.75rem 1rem",
+    borderRadius: "0.5rem",
+    color: "#fff",
+    minWidth: "120px",
+    textAlign: "center",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+  };
+
+  const tableHeaderStyle: CSSProperties = {
+    backgroundColor: "#1e293b",
+    color: "#fff",
+    padding: "0.5rem",
+    border: "1px solid #334155",
+    textAlign: "center",
+    fontWeight: 600,
+  };
+
+  const cellStyle: CSSProperties = {
+    padding: "0.5rem",
+    border: "1px solid #cbd5e1",
+    textAlign: "center",
+    minWidth: "60px",
+  };
 
   return (
-    <div style={{ padding: '24px', fontFamily: 'Bebas Neue, sans-serif', color: 'var(--verde)', backgroundColor: '#0f172a', minHeight: '100vh' }}>
-      <h1 style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '24px', letterSpacing: '1px' }}>
-        CONFRONTOS ENTRE OS TIMES
+    <main style={{ padding: "1.5rem", fontFamily: "system-ui, sans-serif" }}>
+      <h1
+        style={{
+          fontFamily: '"Bebas Neue", sans-serif',
+          fontSize: "2.5rem",
+          marginBottom: "1rem",
+        }}
+      >
+        Confrontos
       </h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-        <div style={{ backgroundColor: '#14532d', padding: '16px', borderRadius: '8px', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{totalJogos}</div>
-          <div style={{ fontSize: '0.9rem', textTransform: 'uppercase' }}>Total de Jogos</div>
+      <div
+        style={{
+          display: "flex",
+          gap: "1rem",
+          flexWrap: "wrap",
+          marginBottom: "1.5rem",
+          fontFamily: '"Bebas Neue", sans-serif',
+        }}
+      >
+        <div style={{ ...cardStyle, backgroundColor: "#3b82f6" }}>
+          <div style={{ fontSize: "1.75rem" }}>{totPart}</div>
+          <div style={{ fontSize: "0.9rem" }}>Partidas</div>
         </div>
-        <div style={{ backgroundColor: '#166534', padding: '16px', borderRadius: '8px', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{totalGols}</div>
-          <div style={{ fontSize: '0.9rem', textTransform: 'uppercase' }}>Total de Gols</div>
+        <div style={{ ...cardStyle, backgroundColor: "#10b981" }}>
+          <div style={{ fontSize: "1.75rem" }}>{totManVit}</div>
+          <div style={{ fontSize: "0.9rem" }}>Vitórias Mandante</div>
         </div>
-        <div style={{ backgroundColor: '#15803d', padding: '16px', borderRadius: '8px', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{mediaGols}</div>
-          <div style={{ fontSize: '0.9rem', textTransform: 'uppercase' }}>Média de Gols</div>
+        <div style={{ ...cardStyle, backgroundColor: "#f59e0b" }}>
+          <div style={{ fontSize: "1.75rem" }}>{totEmp}</div>
+          <div style={{ fontSize: "0.9rem" }}>Empates</div>
         </div>
-        <div style={{ backgroundColor: '#ca8a04', padding: '16px', borderRadius: '8px', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{vitoriasMandante}</div>
-          <div style={{ fontSize: '0.9rem', textTransform: 'uppercase' }}>Vitórias Mandante</div>
+        <div style={{ ...cardStyle, backgroundColor: "#ef4444" }}>
+          <div style={{ fontSize: "1.75rem" }}>{totVisVit}</div>
+          <div style={{ fontSize: "0.9rem" }}>Vitórias Visitante</div>
         </div>
-        <div style={{ backgroundColor: '#6b7280', padding: '16px', borderRadius: '8px', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{empates}</div>
-          <div style={{ fontSize: '0.9rem', textTransform: 'uppercase' }}>Empates</div>
+        <div style={{ ...cardStyle, backgroundColor: "#8b5cf6" }}>
+          <div style={{ fontSize: "1.75rem" }}>{totGols}</div>
+          <div style={{ fontSize: "0.9rem" }}>Gols</div>
         </div>
-        <div style={{ backgroundColor: '#1d4ed8', padding: '16px', borderRadius: '8px', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{vitoriasVisitante}</div>
-          <div style={{ fontSize: '0.9rem', textTransform: 'uppercase' }}>Vitórias Visitante</div>
+        <div style={{ ...cardStyle, backgroundColor: "#06b6d4" }}>
+          <div style={{ fontSize: "1.75rem" }}>{totGolsMan}</div>
+          <div style={{ fontSize: "0.9rem" }}>Gols Mandante</div>
         </div>
-        <div style={{ backgroundColor: '#be123c', padding: '16px', borderRadius: '8px', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{maiorGoleada}</div>
-          <div style={{ fontSize: '0.9rem', textTransform: 'uppercase' }}>Maior Goleada</div>
+        <div style={{ ...cardStyle, backgroundColor: "#f97316" }}>
+          <div style={{ fontSize: "1.75rem" }}>{totGolsVis}</div>
+          <div style={{ fontSize: "0.9rem" }}>Gols Visitante</div>
         </div>
       </div>
 
-      {primeiroJogo && (
-        <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#1e293b', borderRadius: '8px', color: '#e2e8f0' }}>
-          <strong>Primeiro jogo registrado:</strong>{' '}
-          {new Date(primeiroJogo.data).toLocaleDateString('pt-BR')} —{' '}
-          {typeof primeiroJogo.timeA === 'object' ? primeiroJogo.timeA.nome : primeiroJogo.timeA} {primeiroJogo.golsA} x {primeiroJogo.golsB}{' '}
-          {typeof primeiroJogo.timeB === 'object' ? primeiroJogo.timeB.nome : primeiroJogo.timeB}
-        </div>
-      )}
+      <section
+        style={{
+          marginBottom: "1.5rem",
+          padding: "1rem",
+          backgroundColor: "#f8fafc",
+          borderRadius: "0.5rem",
+          border: "1px solid #e2e8f0",
+        }}
+      >
+        <h2
+          style={{
+            fontFamily: '"Bebas Neue", sans-serif',
+            fontSize: "1.5rem",
+            marginBottom: "0.5rem",
+          }}
+        >
+          Legenda
+        </h2>
+        <ul
+          style={{
+            margin: 0,
+            paddingLeft: "1.25rem",
+            lineHeight: 1.6,
+          }}
+        >
+          <li>
+            Cada linha da tabela cruzada representa o time{" "}
+            <strong>mandante</strong>.
+          </li>
+          <li>Cada coluna representa o time <strong>visitante</strong>.</li>
+          <li>
+            O placar exibido é o resultado do <strong>último confronto</strong>{" "}
+            entre mandante e visitante.
+          </li>
+          <li>
+            O degradê azul no fundo indica a recência do mandante: quanto mais
+            intenso, mais recente foi o último jogo em casa contra o adversário.
+          </li>
+          <li>
+            As tabelas de resumo abaixo ordenam os times por pontuação e saldo
+            de gols.
+          </li>
+        </ul>
+      </section>
 
-      <div style={{ overflowX: 'auto', marginBottom: '32px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'Bebas Neue, sans-serif', minWidth: '800px' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid #334155', padding: '10px', backgroundColor: '#064e3b', color: '#fff' }}>Mandante \ Visitante</th>
-              {times.map((time: Time) => (
-                <th key={String(time.id)} style={{ border: '1px solid #334155', padding: '10px', backgroundColor: time.cor, color: '#fff' }}>
-                  {formatTimeNome(time)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {times.map((linha: Time, i: number) => (
-              <tr key={String(linha.id)}>
-                <td style={{ border: '1px solid #334155', padding: '10px', backgroundColor: linha.cor, color: '#fff', fontWeight: 'bold' }}>
-                  {formatTimeNome(linha)}
-                </td>
-                {times.map((coluna: Time, j: number) => {
-                  const ehMandante = i === j;
-                  const bg = ehMandante ? homeShadeBg(linha) : '#1e293b';
-                  return (
+      <section style={{ marginBottom: "2rem" }}>
+        <h2
+          style={{
+            fontFamily: '"Bebas Neue", sans-serif',
+            fontSize: "1.75rem",
+            marginBottom: "0.75rem",
+          }}
+        >
+          Tabela Cruzada
+        </h2>
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              borderCollapse: "collapse",
+              width: "100%",
+              fontSize: "0.85rem",
+            }}
+          >
+            <thead>
+              <tr>
+                <th style={tableHeaderStyle}>Mandante \ Visitante</th>
+                {timesValidos.map((t) => (
+                  <th
+                    key={String(t.id)}
+                    style={{ ...tableHeaderStyle, minWidth: "70px" }}
+                  >
+                    {t.nome}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {timesValidos.map((home, i) => (
+                <tr key={String(home.id)}>
+                  <th style={{ ...tableHeaderStyle, textAlign: "left" }}>
+                    {home.nome}
+                  </th>
+                  {timesValidos.map((away, j) => (
                     <td
-                      key={String(coluna.id)}
+                      key={String(away.id)}
+                      style={{ ...cellStyle, ...homeShadeBg(i, j) }}
+                    >
+                      {i === j ? "—" : latestScore(i, j)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: "2rem",
+        }}
+      >
+        <section>
+          <h2
+            style={{
+              fontFamily: '"Bebas Neue", sans-serif',
+              fontSize: "1.75rem",
+              marginBottom: "0.75rem",
+            }}
+          >
+            Resumo Mandante
+          </h2>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                borderCollapse: "collapse",
+                width: "100%",
+                fontSize: "0.85rem",
+              }}
+            >
+              <thead>
+                <tr>
+                  <th style={tableHeaderStyle}>#</th>
+                  <th style={tableHeaderStyle}>Time</th>
+                  <th style={tableHeaderStyle}>J</th>
+                  <th style={tableHeaderStyle}>V</th>
+                  <th style={tableHeaderStyle}>E</th>
+                  <th style={tableHeaderStyle}>D</th>
+                  <th style={tableHeaderStyle}>GP</th>
+                  <th style={tableHeaderStyle}>GC</th>
+                  <th style={tableHeaderStyle}>SG</th>
+                  <th style={tableHeaderStyle}>Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {homeRanking.map((t, pos) => (
+                  <tr key={String(t.id)}>
+                    <td style={cellStyle}>{pos + 1}</td>
+                    <td
                       style={{
-                        border: '1px solid #334155',
-                        padding: '10px',
-                        textAlign: 'center',
-                        backgroundColor: bg,
-                        color: '#fff',
-                        fontWeight: ehMandante ? 'bold' : 'normal',
+                        ...cellStyle,
+                        textAlign: "left",
+                        fontWeight: 600,
                       }}
                     >
-                      {ehMandante ? '—' : tabelaCruzada[i][j]}
+                      {t.nome}
                     </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    <td style={cellStyle}>{t.stats.J}</td>
+                    <td style={cellStyle}>{t.stats.V}</td>
+                    <td style={cellStyle}>{t.stats.E}</td>
+                    <td style={cellStyle}>{t.stats.D}</td>
+                    <td style={cellStyle}>{t.stats.GP}</td>
+                    <td style={cellStyle}>{t.stats.GC}</td>
+                    <td style={cellStyle}>{t.stats.SG}</td>
+                    <td style={{ ...cellStyle, fontWeight: 700 }}>
+                      {t.stats.Pts}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '12px', color: 'var(--verde)' }}>Resumo como Mandante</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'Bebas Neue, sans-serif' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#064e3b', color: '#fff' }}>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>#</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>Time</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>J</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>V</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>GP</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>GC</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>SG</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resumoMandante.map((item, index) => (
-                <tr key={String(item.time.id)} style={{ backgroundColor: index % 2 === 0 ? '#1e293b' : '#0f172a' }}>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{index + 1}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', color: '#fff' }}>{formatTimeNome(item.time)}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.jogos}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.vitorias}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.golsFeitos}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.golsSofridos}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: item.saldo >= 0 ? '#4ade80' : '#f87171' }}>
-                    {item.saldo > 0 ? `+${item.saldo}` : item.saldo}
-                  </td>
+        <section>
+          <h2
+            style={{
+              fontFamily: '"Bebas Neue", sans-serif',
+              fontSize: "1.75rem",
+              marginBottom: "0.75rem",
+            }}
+          >
+            Resumo Visitante
+          </h2>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                borderCollapse: "collapse",
+                width: "100%",
+                fontSize: "0.85rem",
+              }}
+            >
+              <thead>
+                <tr>
+                  <th style={tableHeaderStyle}>#</th>
+                  <th style={tableHeaderStyle}>Time</th>
+                  <th style={tableHeaderStyle}>J</th>
+                  <th style={tableHeaderStyle}>V</th>
+                  <th style={tableHeaderStyle}>E</th>
+                  <th style={tableHeaderStyle}>D</th>
+                  <th style={tableHeaderStyle}>GP</th>
+                  <th style={tableHeaderStyle}>GC</th>
+                  <th style={tableHeaderStyle}>SG</th>
+                  <th style={tableHeaderStyle}>Pts</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '12px', color: 'var(--verde)' }}>Resumo como Visitante</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'Bebas Neue, sans-serif' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#1e3a8a', color: '#fff' }}>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>#</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>Time</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>J</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>V</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>GP</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>GC</th>
-                <th style={{ border: '1px solid #334155', padding: '8px' }}>SG</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resumoVisitante.map((item, index) => (
-                <tr key={String(item.time.id)} style={{ backgroundColor: index % 2 === 0 ? '#1e293b' : '#0f172a' }}>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{index + 1}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', color: '#fff' }}>{formatTimeNome(item.time)}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.jogos}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.vitorias}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.golsFeitos}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: '#fff' }}>{item.golsSofridos}</td>
-                  <td style={{ border: '1px solid #334155', padding: '8px', textAlign: 'center', color: item.saldo >= 0 ? '#4ade80' : '#f87171' }}>
-                    {item.saldo > 0 ? `+${item.saldo}` : item.saldo}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {awayRanking.map((t, pos) => (
+                  <tr key={String(t.id)}>
+                    <td style={cellStyle}>{pos + 1}</td>
+                    <td
+                      style={{
+                        ...cellStyle,
+                        textAlign: "left",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {t.nome}
+                    </td>
+                    <td style={cellStyle}>{t.stats.J}</td>
+                    <td style={cellStyle}>{t.stats.V}</td>
+                    <td style={cellStyle}>{t.stats.E}</td>
+                    <td style={cellStyle}>{t.stats.D}</td>
+                    <td style={cellStyle}>{t.stats.GP}</td>
+                    <td style={cellStyle}>{t.stats.GC}</td>
+                    <td style={cellStyle}>{t.stats.SG}</td>
+                    <td style={{ ...cellStyle, fontWeight: 700 }}>
+                      {t.stats.Pts}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-
-      <footer style={{ marginTop: '40px', textAlign: 'center', fontSize: '0.85rem', color: '#94a3b8' }}>
-        Dados processados automaticamente a partir de confrontos registrados em @/lib/data.
-      </footer>
-    </div>
+    </main>
   );
 }
