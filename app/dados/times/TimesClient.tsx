@@ -63,6 +63,20 @@ function posColor(posicao: string): string {
   return m[posicao] ?? '#888';
 }
 
+// Retorna uma cor de texto/número visível contra o fundo escuro do site.
+// Times cuja cor principal é preta (ou muito próxima disso) ficariam com o
+// mesmo tom do fundo e o conteúdo desapareceria — nesses casos, usamos branco.
+function corTextoVisivel(hex: string): string {
+  const c = (hex || '').replace('#', '').trim();
+  if (c.length !== 6) return hex;
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return hex;
+  const luminancia = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminancia < 30 ? '#ffffff' : hex;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LÓGICA DO MELHOR TIME
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,7 +125,7 @@ export interface BestTeamResult {
 }
 
 function calcBestTeam(jogadores: JogadorComStats[], totalMinutos: number): BestTeamResult {
-  const limiar = totalMinutos * 0.4;
+  const limiar = totalMinutos * 0.5;
   const com = jogadores.filter(j => j.stats.partidas > 0);
   // Jogadores de linha com >= 50% dos minutos totais do time
   const comLinha = com.filter(j => j.posicao !== 'GOL' && j.stats.minutos >= limiar);
@@ -503,6 +517,9 @@ export function TimesClient({ timesData }: Props) {
 
   const { time, publicoCasa, publicoVisitante, totalMinutos, ativos, foramEmbora, vieram } = data;
   const corTime = time.cor_primaria;
+  // Cor usada especificamente em textos e números — se corTime for preta (ou muito
+  // próxima disso), usamos branco para não sumir contra o fundo escuro do site.
+  const corTimeTexto = corTextoVisivel(corTime);
   const estadiosList = Object.values(publicoCasa.porEstadio).sort((a, b) => b.jogos - a.jogos);
   const jogadoresExibidos = abaJog === 'ativos' ? ativos : abaJog === 'vieram' ? vieram : foramEmbora;
 
@@ -514,7 +531,7 @@ export function TimesClient({ timesData }: Props) {
     borderRadius: 6,
     border: `1px solid ${ativo ? corTime : 'var(--border)'}`,
     background: ativo ? `${corTime}18` : 'transparent',
-    color: ativo ? corTime : 'var(--text-muted)',
+    color: ativo ? corTimeTexto : 'var(--text-muted)',
     cursor: 'pointer',
     transition: 'all .15s',
   });
@@ -535,7 +552,7 @@ export function TimesClient({ timesData }: Props) {
         marginBottom: '2rem',
       }}>
         <div className="container">
-          <p style={{ fontSize: '.75rem', color: corTime, textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, marginBottom: '.4rem' }}>
+          <p style={{ fontSize: '.75rem', color: corTimeTexto, textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, marginBottom: '.4rem' }}>
             Perfil do Time
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
@@ -578,7 +595,7 @@ export function TimesClient({ timesData }: Props) {
                 <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Sem dados</p>
               ) : (
                 <>
-                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2.2rem', color: corTime, lineHeight: 1 }}>
+                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2.2rem', color: corTimeTexto, lineHeight: 1 }}>
                     {fmt(mediaCasa!)}
                   </div>
                   <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '.2rem' }}>
@@ -612,7 +629,7 @@ export function TimesClient({ timesData }: Props) {
                             background: i % 2 === 0 ? 'var(--surface2)' : 'var(--surface)',
                             borderRadius: 5, fontSize: '.75rem',
                           }}>
-                            <span style={{ fontFamily: "'Bebas Neue',sans-serif", color: corTime, minWidth: 28 }}>
+                            <span style={{ fontFamily: "'Bebas Neue',sans-serif", color: corTimeTexto, minWidth: 28 }}>
                               R{jg.rodada}
                             </span>
                             <span style={{ color: 'var(--text-muted)', fontSize: '.68rem' }}>
@@ -621,7 +638,7 @@ export function TimesClient({ timesData }: Props) {
                             <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.9rem', color: 'var(--text)', whiteSpace: 'nowrap' }}>
                               {jg.placar_casa} × {jg.placar_visitante}
                             </span>
-                            <span style={{ color: corTime, fontWeight: 600, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                            <span style={{ color: corTimeTexto, fontWeight: 600, whiteSpace: 'nowrap', textAlign: 'right' }}>
                               {fmt(jg.publico)}
                             </span>
                           </div>
@@ -668,7 +685,7 @@ export function TimesClient({ timesData }: Props) {
                           {est.nome}
                           <span style={{ color: 'var(--text-muted)', fontSize: '.72rem', marginLeft: '.4rem' }}>· {est.jogos}j</span>
                         </span>
-                        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: corTime }}>{fmt(media)}</span>
+                        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: corTimeTexto }}>{fmt(media)}</span>
                       </div>
                       <div style={{ background: 'var(--surface2)', borderRadius: 4, height: 5 }}>
                         <div style={{ width: `${pct}%`, height: '100%', background: corTime, borderRadius: 4, transition: 'width .4s' }} />
@@ -783,7 +800,7 @@ export function TimesClient({ timesData }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
               <span style={{
                 fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.5rem',
-                color: corTime, letterSpacing: '.08em',
+                color: corTimeTexto, letterSpacing: '.08em',
               }}>
                 {formacao}
               </span>
