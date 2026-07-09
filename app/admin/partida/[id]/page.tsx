@@ -58,8 +58,10 @@ function Chips({opcoes, valor, onSelect, corAtivo='var(--verde)', bgAtivo='rgba(
 }
 
 // Componente de seleção de time — dois botões lado a lado
+// `compact` reduz o tamanho dos botões e faz a largura se ajustar ao conteúdo
+// (usado quando o TimePicker precisa ficar ao lado de outros campos, na mesma linha)
 function TimePicker({
-  value, onChange, timeCasaId, timeVisId, timeCasaNome, timeVisNome,
+  value, onChange, timeCasaId, timeVisId, timeCasaNome, timeVisNome, compact = false,
 }: {
   value: string;
   onChange: (id: string) => void;
@@ -67,12 +69,20 @@ function TimePicker({
   timeVisId: string;
   timeCasaNome: string;
   timeVisNome: string;
+  compact?: boolean;
 }) {
-  const btnBase: React.CSSProperties = {
-    flex: 1, padding: '.45rem .75rem', borderRadius: 6, border: '1px solid var(--border)',
-    fontFamily: "'Bebas Neue', sans-serif", fontSize: '.95rem', letterSpacing: '.05em',
-    cursor: 'pointer', transition: 'all .15s', textAlign: 'center' as const,
-  };
+  const btnBase: React.CSSProperties = compact
+    ? {
+        padding: '.32rem .6rem', borderRadius: 6, border: '1px solid var(--border)',
+        fontFamily: "'Bebas Neue', sans-serif", fontSize: '.82rem', letterSpacing: '.04em',
+        cursor: 'pointer', transition: 'all .15s', textAlign: 'center' as const,
+        whiteSpace: 'nowrap' as const,
+      }
+    : {
+        flex: 1, padding: '.45rem .75rem', borderRadius: 6, border: '1px solid var(--border)',
+        fontFamily: "'Bebas Neue', sans-serif", fontSize: '.95rem', letterSpacing: '.05em',
+        cursor: 'pointer', transition: 'all .15s', textAlign: 'center' as const,
+      };
   const btnAtivo: React.CSSProperties = {
     ...btnBase,
     background: 'var(--verde)', borderColor: 'var(--verde)', color: '#fff',
@@ -82,7 +92,7 @@ function TimePicker({
     background: 'var(--surface2)', color: 'var(--text-muted)',
   };
   return (
-    <div style={{ display: 'flex', gap: '.5rem' }}>
+    <div style={{ display: 'flex', gap: compact ? '.35rem' : '.5rem' }}>
       <button type="button" style={value === timeCasaId ? btnAtivo : btnInativo} onClick={() => onChange(timeCasaId)}>
         {timeCasaNome}
       </button>
@@ -156,6 +166,50 @@ export default function AdminPartidaEventos() {
       if(isCasa) u.escalacao_casa=[...u.escalacao_casa,novo]; else u.escalacao_visitante=[...u.escalacao_visitante,novo];
       save(u as Partida);
     };
+
+    // "Completar": adiciona automaticamente jogadores disponíveis como titulares
+    // até atingir 11 titulares para o time selecionado.
+    const completarEscalacao=(isCasa:boolean)=>{
+      const lista=isCasa?jogCasa:jogVis;
+      const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
+      const titularesAtuais=esc.filter(e=>e.titular).length;
+      const faltam=11-titularesAtuais;
+      if(faltam<=0) return flash(false,'Este time já tem 11 titulares.');
+
+      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
+      let temGoleiroTitular=esc.some(e=>e.titular&&e.posicao==='GOL');
+      const disponiveis=lista.filter(j=>!jaAdicionados.has(j.id));
+      if(disponiveis.length===0) return flash(false,'Não há mais jogadores disponíveis para adicionar.');
+
+      const novos:EscalacaoJogador[]=[];
+
+      // Se ainda não há goleiro titular, prioriza adicionar um primeiro
+      if(!temGoleiroTitular){
+        const gol=disponiveis.find(j=>j.posicao==='GOL');
+        if(gol){
+          novos.push({jogador_id:gol.id,numero:gol.numero??0,posicao:gol.posicao??'GOL',titular:true});
+          temGoleiroTitular=true;
+        }
+      }
+
+      for(const j of disponiveis){
+        if(novos.length>=faltam) break;
+        if(novos.some(n=>n.jogador_id===j.id)) continue;
+        if(j.posicao==='GOL'&&temGoleiroTitular) continue; // já tem goleiro titular, não adiciona outro
+        novos.push({jogador_id:j.id,numero:j.numero??0,posicao:j.posicao??'ATA',titular:true});
+      }
+
+      if(novos.length===0) return flash(false,'Não foi possível completar automaticamente (faltam jogadores de linha).');
+
+      const u={...partida};
+      if(isCasa) u.escalacao_casa=[...u.escalacao_casa,...novos];
+      else u.escalacao_visitante=[...u.escalacao_visitante,...novos];
+      save(u as Partida);
+
+      if(novos.length<faltam) flash(true,`${novos.length} jogador(es) adicionado(s). Não há jogadores suficientes para completar 11 titulares.`);
+      else flash(true,`${novos.length} jogador(es) adicionado(s) como titulares!`);
+    };
+
     const updJogador=(isCasa:boolean,idx:number,novoJogadorId:string)=>{
       const jog=jogadores.find(j=>j.id===novoJogadorId);
       const u={...partida};
@@ -196,7 +250,10 @@ export default function AdminPartidaEventos() {
                 {titularesCount}/11 Titulares · {esc.length}/23 Total
               </div>
             </div>
-            <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
+            <div style={{display:'flex',gap:'.5rem'}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>completarEscalacao(isCasa)} title="Preenche automaticamente os titulares que faltam">⚡ Completar</button>
+              <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
+            </div>
           </div>
           {esc.length===0&&<p style={{color:'var(--text-muted)',fontSize:'.85rem'}}>Nenhum jogador adicionado.</p>}
           {esc.map((e,i)=>{
@@ -282,27 +339,30 @@ export default function AdminPartidaEventos() {
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:isEditing?'var(--amarelo)':'var(--verde)'}}>
             {isEditing?'✏️ Editando Gol':'+ Registrar Evento de Gol/Pênalti'}
           </h3>
-          <div className="grid-3">
-            <div className="form-group"><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
-            <div className="form-group"><label>Acréscimo</label><input style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
-            <div className="form-group"><label>Tipo</label>
+
+          {/* Minuto, Acréscimo, Tipo (campos reduzidos) + seletor de time à direita, tudo na mesma linha */}
+          <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
+            <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
+            <div className="form-group" style={{width:70,margin:0}}><label>Acréscimo</label><input style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
+            <div className="form-group" style={{width:150,margin:0}}><label>Tipo</label>
               <select style={selectSt} value={form.tipo} onChange={e=>handleTipoChange(e.target.value)}>
                 {TIPO_GOL.map(t=><option key={t} value={t}>{TIPO_GOL_LABEL[t]}</option>)}
               </select>
             </div>
+            <div className="form-group" style={{margin:0,marginLeft:'auto'}}>
+              <label>Time que ataca</label>
+              <TimePicker
+                compact
+                value={form.time_id}
+                onChange={handleTimeChange}
+                timeCasaId={partida!.time_casa_id}
+                timeVisId={partida!.time_visitante_id}
+                timeCasaNome={timeCasaNome}
+                timeVisNome={timeVisNome}
+              />
+            </div>
           </div>
-          {/* Time que ataca — dois botões */}
-          <div className="form-group">
-            <label>Time que ataca</label>
-            <TimePicker
-              value={form.time_id}
-              onChange={handleTimeChange}
-              timeCasaId={partida!.time_casa_id}
-              timeVisId={partida!.time_visitante_id}
-              timeCasaNome={timeCasaNome}
-              timeVisNome={timeVisNome}
-            />
-          </div>
+
           <div className="grid-3">
             <div className="form-group">
               <label>{isContra?'Jogador que marcou contra *':'Jogador *'}</label>
@@ -433,10 +493,12 @@ export default function AdminPartidaEventos() {
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:isEditing?'var(--amarelo)':'var(--verde)'}}>
             {isEditing?'✏️ Editando Cartão':'+ Registrar Cartão'}
           </h3>
-          <div className="grid-3">
-            <div className="form-group"><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
-            <div className="form-group"><label>Acréscimo</label><input style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
-            <div className="form-group"><label>Tipo</label>
+
+          {/* Minuto, Acréscimo, Tipo (campos reduzidos) + seletor de time à direita, tudo na mesma linha */}
+          <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
+            <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
+            <div className="form-group" style={{width:70,margin:0}}><label>Acréscimo</label><input style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
+            <div className="form-group" style={{width:170,margin:0}}><label>Tipo</label>
               <select style={selectSt} value={form.tipo} onChange={e=>handleTipoCartaoChange(e.target.value)}>
                 <option value="amarelo">🟨 Amarelo</option>
                 <option value="vermelho">🟥 Vermelho</option>
@@ -444,19 +506,20 @@ export default function AdminPartidaEventos() {
                 <option value="vermelho_tecnico">🟥 Vermelho — Técnico</option>
               </select>
             </div>
+            <div className="form-group" style={{margin:0,marginLeft:'auto'}}>
+              <label>Time</label>
+              <TimePicker
+                compact
+                value={form.time_id}
+                onChange={handleTimeChange}
+                timeCasaId={partida!.time_casa_id}
+                timeVisId={partida!.time_visitante_id}
+                timeCasaNome={timeCasaNome}
+                timeVisNome={timeVisNome}
+              />
+            </div>
           </div>
-          {/* Time — dois botões */}
-          <div className="form-group">
-            <label>Time</label>
-            <TimePicker
-              value={form.time_id}
-              onChange={handleTimeChange}
-              timeCasaId={partida!.time_casa_id}
-              timeVisId={partida!.time_visitante_id}
-              timeCasaNome={timeCasaNome}
-              timeVisNome={timeVisNome}
-            />
-          </div>
+
           <div className="grid-3">
             {isTecnico ? (
               <div className="form-group"><label>Técnico *</label>
@@ -562,36 +625,36 @@ export default function AdminPartidaEventos() {
           <h3 style={{fontSize:'1.1rem',marginBottom:'1rem',color:isEditing?'var(--amarelo)':'var(--verde)'}}>
             {isEditing?'✏️ Editando Substituição':'+ Registrar Substituição'}
           </h3>
-          <div className="grid-3">
-            <div className="form-group"><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
-            <div className="form-group" style={{gridColumn:'span 2'}}></div>
-          </div>
-          {/* Time — dois botões */}
-          <div className="form-group">
-            <label>Time</label>
-            <TimePicker
-              value={form.time_id}
-              onChange={handleTimeChange}
-              timeCasaId={partida!.time_casa_id}
-              timeVisId={partida!.time_visitante_id}
-              timeCasaNome={timeCasaNome}
-              timeVisNome={timeVisNome}
-            />
-          </div>
-          <div className="grid-2">
-            <div className="form-group"><label>↑ Entra *</label>
+
+          {/* Minuto, seletor de time, Entra e Sai — tudo na mesma linha */}
+          <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
+            <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
+            <div className="form-group" style={{margin:0}}>
+              <label>Time</label>
+              <TimePicker
+                compact
+                value={form.time_id}
+                onChange={handleTimeChange}
+                timeCasaId={partida!.time_casa_id}
+                timeVisId={partida!.time_visitante_id}
+                timeCasaNome={timeCasaNome}
+                timeVisNome={timeVisNome}
+              />
+            </div>
+            <div className="form-group" style={{flex:1,minWidth:150,margin:0}}><label>↑ Entra *</label>
               <select style={selectSt} value={form.entra_id} onChange={f('entra_id')}>
                 <option value="">Selecione...</option>
                 {quemPodeEntrar.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
-            <div className="form-group"><label>↓ Sai *</label>
+            <div className="form-group" style={{flex:1,minWidth:150,margin:0}}><label>↓ Sai *</label>
               <select style={selectSt} value={form.sai_id} onChange={f('sai_id')}>
                 <option value="">Selecione...</option>
                 {quemPodeSair.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
           </div>
+
           <div style={{display:'flex',gap:'.6rem'}}>
             <button className="btn btn-primary" onClick={salvar}>{isEditing?'💾 Salvar alterações':'🔄 Adicionar Substituição'}</button>
             {isEditing&&<button className="btn btn-ghost" onClick={cancelarEdicao}>Cancelar</button>}
