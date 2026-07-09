@@ -363,8 +363,8 @@ export default function AdminPartidaEventos() {
             </div>
           </div>
 
-          <div className="grid-3">
-            <div className="form-group">
+          <div style={{display:'flex',gap:'.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+            <div className="form-group" style={{width:190,margin:0}}>
               <label>{isContra?'Jogador que marcou contra *':'Jogador *'}</label>
               <select style={selectSt} value={form.jogador_id} onChange={f('jogador_id')}>
                 <option value="">Selecione...</option>
@@ -372,25 +372,25 @@ export default function AdminPartidaEventos() {
               </select>
             </div>
             {!isContra&&!form.tipo.includes('perdido')&&!form.tipo.includes('defendido')&&(
-              <div className="form-group"><label>Assistência</label>
+              <div className="form-group" style={{width:190,margin:0}}><label>Assistência</label>
                 <select style={selectSt} value={form.assistencia_id} onChange={f('assistencia_id')}>
                   <option value="">Sem assistência</option>
                   {escMarcadora.filter(e=>e.jogador_id!==form.jogador_id).map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
                 </select>
               </div>
             )}
-            <div className="form-group">
+            <div className="form-group" style={{width:190,margin:0}}>
               <label>Goleiro adversário</label>
               <select style={selectSt} value={form.goleiro_id} onChange={f('goleiro_id')}>
                 <option value="">Selecione...</option>
                 {goleirosAdv.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
-            <div className="form-group" style={{gridColumn:'1/-1'}}>
-              <label>Descrição</label>
-              <Chips opcoes={sugestoes} valor={form.descricao} onSelect={s=>setForm(v=>({...v,descricao:s}))} />
-              <input style={inputSt} value={form.descricao} onChange={f('descricao')} placeholder="Ou digite uma descrição personalizada..." />
-            </div>
+          </div>
+          <div className="form-group">
+            <label>Descrição</label>
+            <Chips opcoes={sugestoes} valor={form.descricao} onSelect={s=>setForm(v=>({...v,descricao:s}))} />
+            <input style={inputSt} value={form.descricao} onChange={f('descricao')} placeholder="Ou digite uma descrição personalizada..." />
           </div>
           <div style={{display:'flex',gap:'.6rem'}}>
             <button className="btn btn-primary" onClick={salvar}>{isEditing?'💾 Salvar alterações':'Registrar Evento'}</button>
@@ -520,27 +520,27 @@ export default function AdminPartidaEventos() {
             </div>
           </div>
 
-          <div className="grid-3">
+          <div style={{display:'flex',gap:'.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
             {isTecnico ? (
-              <div className="form-group"><label>Técnico *</label>
+              <div className="form-group" style={{width:220,margin:0}}><label>Técnico *</label>
                 <select style={selectSt} value={form.tecnico_id} onChange={f('tecnico_id')}>
                   <option value="">Selecione...</option>
                   {tecnicosDaPartida.map(t=><option key={t.id} value={t.id}>{t.nome} ({t.id===partida!.tecnico_casa_id?timeCasa?.sigla:timeVis?.sigla})</option>)}
                 </select>
               </div>
             ) : (
-              <div className="form-group"><label>Jogador *</label>
+              <div className="form-group" style={{width:220,margin:0}}><label>Jogador *</label>
                 <select style={selectSt} value={form.jogador_id} onChange={f('jogador_id')}>
                   <option value="">Selecione...</option>
                   {(form.time_id===partida!.time_casa_id?escCasa:escVis).map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
                 </select>
               </div>
             )}
-            <div className="form-group" style={{gridColumn:'1/-1'}}>
-              <label>Motivo</label>
-              <Chips opcoes={sugestoes} valor={form.motivo} onSelect={s=>setForm(v=>({...v,motivo:s}))} corAtivo={corChip} bgAtivo={bgChip} borderAtivo={bordChip} />
-              <input style={inputSt} value={form.motivo} onChange={f('motivo')} placeholder="Ou descreva o motivo..." />
-            </div>
+          </div>
+          <div className="form-group">
+            <label>Motivo</label>
+            <Chips opcoes={sugestoes} valor={form.motivo} onSelect={s=>setForm(v=>({...v,motivo:s}))} corAtivo={corChip} bgAtivo={bgChip} borderAtivo={bordChip} />
+            <input style={inputSt} value={form.motivo} onChange={f('motivo')} placeholder="Ou descreva o motivo..." />
           </div>
           <div style={{display:'flex',gap:'.6rem'}}>
             <button className="btn btn-primary" onClick={salvar}>{isEditing?'💾 Salvar alterações':'Adicionar Cartão'}</button>
@@ -641,13 +641,13 @@ export default function AdminPartidaEventos() {
                 timeVisNome={timeVisNome}
               />
             </div>
-            <div className="form-group" style={{flex:1,minWidth:150,margin:0}}><label>↑ Entra *</label>
+            <div className="form-group" style={{width:190,margin:0}}><label>↑ Entra *</label>
               <select style={selectSt} value={form.entra_id} onChange={f('entra_id')}>
                 <option value="">Selecione...</option>
                 {quemPodeEntrar.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
               </select>
             </div>
-            <div className="form-group" style={{flex:1,minWidth:150,margin:0}}><label>↓ Sai *</label>
+            <div className="form-group" style={{width:190,margin:0}}><label>↓ Sai *</label>
               <select style={selectSt} value={form.sai_id} onChange={f('sai_id')}>
                 <option value="">Selecione...</option>
                 {quemPodeSair.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
