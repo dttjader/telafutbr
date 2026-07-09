@@ -124,10 +124,22 @@ export default function AdminPartidas() {
         <div className="card" style={{marginBottom:'2rem'}}>
           <h2 style={{fontSize:'1.3rem',marginBottom:'1.25rem',color:'var(--amarelo)'}}>{editId?'✏️ Editar Partida':'+ Nova Partida'}</h2>
           <form onSubmit={submit}>
+
+            {/* Rodada, Data e Hora — campos reduzidos a ~30% do tamanho original */}
+            <div style={{display:'flex',gap:'.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+              <div className="form-group" style={{width:80,margin:0}}><label>Rodada *</label><input type="number" min={1} max={38} value={form.rodada} onChange={f('rodada')} /></div>
+              <div className="form-group" style={{width:135,margin:0}}><label>Data</label><input type="date" value={form.data} onChange={f('data')} /></div>
+              <div className="form-group" style={{width:100,margin:0}}><label>Hora</label><input type="time" value={form.hora} onChange={f('hora')} /></div>
+            </div>
+
+            {/* Estádio, Mandante, Visitante — nova ordem */}
             <div className="grid-3">
-              <div className="form-group"><label>Rodada *</label><input type="number" min={1} max={38} value={form.rodada} onChange={f('rodada')} /></div>
-              <div className="form-group"><label>Data</label><input type="date" value={form.data} onChange={f('data')} /></div>
-              <div className="form-group"><label>Hora</label><input type="time" value={form.hora} onChange={f('hora')} /></div>
+              <div className="form-group"><label>Estádio *</label>
+                <select value={form.estadio_id} onChange={f('estadio_id')}>
+                  <option value="">Selecione...</option>
+                  {estadios.map(e=><option key={e.id} value={e.id}>{e.nome} — {e.cidade}/{e.estado}</option>)}
+                </select>
+              </div>
               <div className="form-group"><label>Mandante *</label>
                 <select value={form.time_casa_id} onChange={f('time_casa_id')}>
                   <option value="">Selecione...</option>
@@ -140,34 +152,29 @@ export default function AdminPartidas() {
                   {times.filter(t=>t.id!==form.time_casa_id).map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
                 </select>
               </div>
-              <div className="form-group"><label>Estádio *</label>
-                <select value={form.estadio_id} onChange={f('estadio_id')}>
-                  <option value="">Selecione...</option>
-                  {estadios.map(e=><option key={e.id} value={e.id}>{e.nome} — {e.cidade}/{e.estado}</option>)}
-                </select>
-              </div>
-              <div className="form-group"><label>Status</label>
+            </div>
+
+            {/* Status e Público — campos reduzidos a ~30% do tamanho original */}
+            <div style={{display:'flex',gap:'.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+              <div className="form-group" style={{width:130,margin:0}}><label>Status</label>
                 <select value={form.status} onChange={f('status')}>
                   {STATUS_OPTS.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
-              <div className="form-group"><label>Público</label><input type="number" min={0} value={form.publico} onChange={f('publico')} /></div>
+              <div className="form-group" style={{width:100,margin:0}}><label>Público</label><input type="number" min={0} value={form.publico} onChange={f('publico')} /></div>
+            </div>
+
+            <div className="grid-2">
               <div className="form-group"><label>Técnico mandante</label><select value={form.tecnico_casa_id} onChange={f('tecnico_casa_id')}><option value="">Não informado</option>{tecnicos.filter(t=>t.ativo).map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}</select></div>
               <div className="form-group"><label>Técnico visitante</label><select value={form.tecnico_visitante_id} onChange={f('tecnico_visitante_id')}><option value="">Não informado</option>{tecnicos.filter(t=>t.ativo).map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}</select></div>
             </div>
 
             <div style={{background:'var(--surface2)',borderRadius:8,padding:'1rem',marginBottom:'1rem'}}>
-              <p style={{fontSize:'.8rem',color:'var(--text-muted)',marginBottom:'.75rem',textTransform:'uppercase',letterSpacing:'.08em',fontWeight:700}}>Placar & Acréscimos</p>
+              <p style={{fontSize:'.8rem',color:'var(--text-muted)',marginBottom:'.75rem',textTransform:'uppercase',letterSpacing:'.08em',fontWeight:700}}>Acréscimos</p>
+              {/* Gols Casa/Visitante ocultos: o placar agora é atualizado automaticamente pelo registro de gols em "Eventos da Partida" */}
               <div className="grid-2">
-                <div style={{display:'flex',gap:'.5rem'}}>
-                  <div className="form-group" style={{flex:1,margin:0}}><label>Gols Casa</label><input type="number" min={0} value={form.placar_casa} onChange={f('placar_casa')} /></div>
-                  <div style={{alignSelf:'flex-end',padding:'.5rem',fontFamily:"'Bebas Neue',sans-serif",color:'var(--verde)'}}>×</div>
-                  <div className="form-group" style={{flex:1,margin:0}}><label>Gols Visitante</label><input type="number" min={0} value={form.placar_visitante} onChange={f('placar_visitante')} /></div>
-                </div>
-                <div style={{display:'flex',gap:'.5rem'}}>
-                  <div className="form-group" style={{flex:1,margin:0}}><label>Acrésc. 1º tempo</label><input type="number" min={0} value={form.acrescimo_primeiro} onChange={f('acrescimo_primeiro')} /></div>
-                  <div className="form-group" style={{flex:1,margin:0}}><label>Acrésc. 2º tempo</label><input type="number" min={0} value={form.acrescimo_segundo} onChange={f('acrescimo_segundo')} /></div>
-                </div>
+                <div className="form-group" style={{margin:0}}><label>Acrésc. 1º tempo</label><input type="number" min={0} value={form.acrescimo_primeiro} onChange={f('acrescimo_primeiro')} /></div>
+                <div className="form-group" style={{margin:0}}><label>Acrésc. 2º tempo</label><input type="number" min={0} value={form.acrescimo_segundo} onChange={f('acrescimo_segundo')} /></div>
               </div>
             </div>
 
