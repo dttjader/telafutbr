@@ -340,7 +340,7 @@ export default function AdminPartidaEventos() {
             {isEditing?'✏️ Editando Gol':'+ Registrar Evento de Gol/Pênalti'}
           </h3>
 
-          {/* Minuto, Acréscimo, Tipo (campos reduzidos) + seletor de time à direita, tudo na mesma linha */}
+          {/* Minuto, Acréscimo, Tipo, seletor de time e demais campos na mesma linha (igual ao padrão de Subs) */}
           <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
             <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
             <div className="form-group" style={{width:70,margin:0}}><label>Acréscimo</label><input style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
@@ -349,7 +349,7 @@ export default function AdminPartidaEventos() {
                 {TIPO_GOL.map(t=><option key={t} value={t}>{TIPO_GOL_LABEL[t]}</option>)}
               </select>
             </div>
-            <div className="form-group" style={{margin:0,marginLeft:'auto'}}>
+            <div className="form-group" style={{margin:0}}>
               <label>Time que ataca</label>
               <TimePicker
                 compact
@@ -361,9 +361,6 @@ export default function AdminPartidaEventos() {
                 timeVisNome={timeVisNome}
               />
             </div>
-          </div>
-
-          <div style={{display:'flex',gap:'.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
             <div className="form-group" style={{width:190,margin:0}}>
               <label>{isContra?'Jogador que marcou contra *':'Jogador *'}</label>
               <select style={selectSt} value={form.jogador_id} onChange={f('jogador_id')}>
@@ -494,7 +491,7 @@ export default function AdminPartidaEventos() {
             {isEditing?'✏️ Editando Cartão':'+ Registrar Cartão'}
           </h3>
 
-          {/* Minuto, Acréscimo, Tipo (campos reduzidos) + seletor de time à direita, tudo na mesma linha */}
+          {/* Minuto, Acréscimo, Tipo, seletor de time e demais campos na mesma linha (igual ao padrão de Subs) */}
           <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
             <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
             <div className="form-group" style={{width:70,margin:0}}><label>Acréscimo</label><input style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
@@ -506,7 +503,7 @@ export default function AdminPartidaEventos() {
                 <option value="vermelho_tecnico">🟥 Vermelho — Técnico</option>
               </select>
             </div>
-            <div className="form-group" style={{margin:0,marginLeft:'auto'}}>
+            <div className="form-group" style={{margin:0}}>
               <label>Time</label>
               <TimePicker
                 compact
@@ -518,9 +515,6 @@ export default function AdminPartidaEventos() {
                 timeVisNome={timeVisNome}
               />
             </div>
-          </div>
-
-          <div style={{display:'flex',gap:'.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
             {isTecnico ? (
               <div className="form-group" style={{width:220,margin:0}}><label>Técnico *</label>
                 <select style={selectSt} value={form.tecnico_id} onChange={f('tecnico_id')}>
