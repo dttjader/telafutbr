@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 const dadosLinks = [
   { href: '/dados',            label: '📊 Visão Geral',  exact: true  },
   { href: '/dados/artilharia', label: '⚽ Artilharia'               },
+  { href: '/dados/gols',       label: '🥅 Gols'                     },
   { href: '/dados/goleiros',   label: '🧤 Goleiros'                 },
   { href: '/dados/analitico',  label: '🔬 Analítico'                },
   { href: '/dados/times',      label: '🛡️ Times'                    },
