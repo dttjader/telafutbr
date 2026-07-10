@@ -51,6 +51,16 @@ const SubSections = ({ totalJogos, totalGols, totalArbitros, totalArbitrosPrinci
         meta: `${totalGols} gols em ${totalJogos} partidas`,
       },
       {
+        href: '/dados/gols',
+        emoji: '🥅',
+        titulo: 'Gols',
+        desc: 'Por posição/sub-posição, tempo de jogo e número da camisa',
+        cor: '#ef4444',
+        bg: 'rgba(239,68,68,.06)',
+        border: 'rgba(239,68,68,.2)',
+        meta: null,
+      },
+      {
         href: '/dados/goleiros',
         emoji: '🧤',
         titulo: 'Goleiros',
