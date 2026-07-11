@@ -47,7 +47,9 @@ export default async function GolsPage() {
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
 
   // 0. Resumo por tipo de gol / pênaltis não convertidos
-  let golsNormais = 0, golsFalta = 0, golsContra = 0, golsPenalti = 0;
+  // Gols "normais" não são somados — mostramos a lista de descrições padrão e sua contagem
+  const descricaoMap: Record<string, number> = {};
+  let golsFalta = 0, golsContra = 0, golsPenalti = 0;
   let penaltisPerdidos = 0, penaltisDefendidos = 0;
 
   // 1. Ranking por posição/sub-posição
@@ -67,7 +69,10 @@ export default async function GolsPage() {
       // ── Resumo por tipo (inclui pênaltis não convertidos) ─────────────────
       if (tipoStr === 'penalti_perdido') { penaltisPerdidos++; continue; }
       if (tipoStr === 'penalti_defendido') { penaltisDefendidos++; continue; }
-      if (tipoStr === 'normal') golsNormais++;
+      if (tipoStr === 'normal') {
+        const desc = g.descricao?.trim() || 'Sem descrição';
+        descricaoMap[desc] = (descricaoMap[desc] ?? 0) + 1;
+      }
       else if (tipoStr === 'falta') golsFalta++;
       else if (tipoStr === 'contra') golsContra++;
       else if (tipoStr === 'penalti') golsPenalti++;
@@ -127,13 +132,17 @@ export default async function GolsPage() {
 
   const totalGols = categorias.reduce((s, c) => s + c.gols, 0);
 
+  const descricoesGolsNormais = Object.entries(descricaoMap)
+    .map(([descricao, quantidade]) => ({ descricao, quantidade }))
+    .sort((a, b) => b.quantidade - a.quantidade || a.descricao.localeCompare(b.descricao));
+
   return (
     <GolsClient
       categorias={categorias}
       segmentos={segmentos}
       golsPorNumero={golsPorNumero}
       totalGols={totalGols}
-      golsNormais={golsNormais}
+      descricoesGolsNormais={descricoesGolsNormais}
       golsFalta={golsFalta}
       golsContra={golsContra}
       golsPenalti={golsPenalti}
