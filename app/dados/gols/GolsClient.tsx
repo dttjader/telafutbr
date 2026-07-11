@@ -20,12 +20,17 @@ export interface GolPorNumero {
   gols: number;
 }
 
+export interface DescricaoGol {
+  descricao: string;
+  quantidade: number;
+}
+
 interface Props {
   categorias: CategoriaGols[];
   segmentos: SegmentoTempo[];
   golsPorNumero: GolPorNumero[];
   totalGols: number;
-  golsNormais: number;
+  descricoesGolsNormais: DescricaoGol[];
   golsFalta: number;
   golsContra: number;
   golsPenalti: number;
@@ -41,7 +46,7 @@ const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '
 
 export function GolsClient({
   categorias, segmentos, golsPorNumero, totalGols,
-  golsNormais, golsFalta, golsContra, golsPenalti, penaltisPerdidos, penaltisDefendidos,
+  descricoesGolsNormais, golsFalta, golsContra, golsPenalti, penaltisPerdidos, penaltisDefendidos,
 }: Props) {
   const [categoriaAberta, setCategoriaAberta] = useState<CategoriaGols | null>(null);
 
@@ -49,6 +54,7 @@ export function GolsClient({
   const maxSegmentoGols = Math.max(...segmentos.map(s => s.gols), 1);
   const maxSegmentoAst = Math.max(...segmentos.map(s => s.assistencias), 1);
   const maxNumero = Math.max(...golsPorNumero.map(n => n.gols), 1);
+  const maxDescricao = Math.max(...descricoesGolsNormais.map(d => d.quantidade), 1);
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -68,21 +74,54 @@ export function GolsClient({
           <h2 style={{ fontSize: '1.6rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             📌 Resumo por Tipo de Gol
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '1rem' }}>
-            {[
-              { label: 'Gols', valor: golsNormais, cor: 'var(--verde)', emoji: '⚽' },
-              { label: 'Gols de Falta', valor: golsFalta, cor: '#a78bfa', emoji: '🎯' },
-              { label: 'Gols Contra', valor: golsContra, cor: 'var(--rebaixamento)', emoji: '🔴' },
-              { label: 'Gols de Pênalti', valor: golsPenalti, cor: 'var(--amarelo)', emoji: '🥅' },
-              { label: 'Pênaltis Perdidos', valor: penaltisPerdidos, cor: '#f97316', emoji: '❌' },
-              { label: 'Pênaltis Defendidos', valor: penaltisDefendidos, cor: '#60a5fa', emoji: '🧤' },
-            ].map(s => (
-              <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem 1rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.3rem', marginBottom: '.3rem', lineHeight: 1 }}>{s.emoji}</div>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2rem', color: s.cor, lineHeight: 1 }}>{s.valor}</div>
-                <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '.35rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.label}</div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '1.25rem', alignItems: 'start' }}>
+            {/* Gols normais — lista de descrições padrão, sem somatório */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.25rem' }}>
+                <span style={{ fontSize: '1.2rem' }}>⚽</span>
+                <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)', letterSpacing: '.04em' }}>
+                  Gols — por Descrição
+                </span>
               </div>
-            ))}
+              <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Descrições padrão utilizadas no registro de cada gol normal.
+              </p>
+              {descricoesGolsNormais.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Nenhum gol registrado ainda.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                  {descricoesGolsNormais.map(d => (
+                    <div key={d.descricao}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', marginBottom: '.2rem', gap: '.5rem' }}>
+                        <span style={{ color: 'var(--text)' }}>{d.descricao}</span>
+                        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--verde)', flexShrink: 0 }}>{d.quantidade}</span>
+                      </div>
+                      <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 5 }}>
+                        <div style={{ width: `${(d.quantidade / maxDescricao) * 100}%`, height: '100%', background: 'var(--verde)', borderRadius: 3 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Demais tipos — cards simples */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '.75rem', alignContent: 'start' }}>
+              {[
+                { label: 'Gols de Falta', valor: golsFalta, cor: '#a78bfa', emoji: '🎯' },
+                { label: 'Gols Contra', valor: golsContra, cor: 'var(--rebaixamento)', emoji: '🔴' },
+                { label: 'Gols de Pênalti', valor: golsPenalti, cor: 'var(--amarelo)', emoji: '🥅' },
+                { label: 'Pênaltis Perdidos', valor: penaltisPerdidos, cor: '#f97316', emoji: '❌' },
+                { label: 'Pênaltis Defendidos', valor: penaltisDefendidos, cor: '#60a5fa', emoji: '🧤' },
+              ].map(s => (
+                <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem 1rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.3rem', marginBottom: '.3rem', lineHeight: 1 }}>{s.emoji}</div>
+                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2rem', color: s.cor, lineHeight: 1 }}>{s.valor}</div>
+                  <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '.35rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
