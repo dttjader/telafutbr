@@ -25,6 +25,12 @@ interface Props {
   segmentos: SegmentoTempo[];
   golsPorNumero: GolPorNumero[];
   totalGols: number;
+  golsNormais: number;
+  golsFalta: number;
+  golsContra: number;
+  golsPenalti: number;
+  penaltisPerdidos: number;
+  penaltisDefendidos: number;
 }
 
 const POSICAO_COR: Record<string, string> = {
@@ -33,7 +39,10 @@ const POSICAO_COR: Record<string, string> = {
 
 const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
-export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols }: Props) {
+export function GolsClient({
+  categorias, segmentos, golsPorNumero, totalGols,
+  golsNormais, golsFalta, golsContra, golsPenalti, penaltisPerdidos, penaltisDefendidos,
+}: Props) {
   const [categoriaAberta, setCategoriaAberta] = useState<CategoriaGols | null>(null);
 
   const maxCategoria = Math.max(...categorias.map(c => c.gols), 1);
@@ -53,6 +62,29 @@ export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols }: 
       </div>
 
       <div className="container">
+
+        {/* 0. Resumo por tipo de gol */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.6rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            📌 Resumo por Tipo de Gol
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '1rem' }}>
+            {[
+              { label: 'Gols', valor: golsNormais, cor: 'var(--verde)', emoji: '⚽' },
+              { label: 'Gols de Falta', valor: golsFalta, cor: '#a78bfa', emoji: '🎯' },
+              { label: 'Gols Contra', valor: golsContra, cor: 'var(--rebaixamento)', emoji: '🔴' },
+              { label: 'Gols de Pênalti', valor: golsPenalti, cor: 'var(--amarelo)', emoji: '🥅' },
+              { label: 'Pênaltis Perdidos', valor: penaltisPerdidos, cor: '#f97316', emoji: '❌' },
+              { label: 'Pênaltis Defendidos', valor: penaltisDefendidos, cor: '#60a5fa', emoji: '🧤' },
+            ].map(s => (
+              <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem 1rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.3rem', marginBottom: '.3rem', lineHeight: 1 }}>{s.emoji}</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2rem', color: s.cor, lineHeight: 1 }}>{s.valor}</div>
+                <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '.35rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* 1. Ranking por posição/sub-posição */}
         <section style={{ marginBottom: '2.5rem' }}>
