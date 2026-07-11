@@ -46,6 +46,10 @@ export default async function GolsPage() {
 
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
 
+  // 0. Resumo por tipo de gol / pênaltis não convertidos
+  let golsNormais = 0, golsFalta = 0, golsContra = 0, golsPenalti = 0;
+  let penaltisPerdidos = 0, penaltisDefendidos = 0;
+
   // 1. Ranking por posição/sub-posição
   const catMap: Record<string, { posicao: string; gols: number; jogadoresMap: Record<string, number> }> = {};
   // 2. Gols e assistências por parte do tempo
@@ -59,8 +63,14 @@ export default async function GolsPage() {
 
     for (const g of p.gols) {
       const tipoStr = g.tipo as string;
-      // Pênalti perdido/defendido não são gols de verdade — não entram em nenhuma contagem
-      if (tipoStr === 'penalti_perdido' || tipoStr === 'penalti_defendido') continue;
+
+      // ── Resumo por tipo (inclui pênaltis não convertidos) ─────────────────
+      if (tipoStr === 'penalti_perdido') { penaltisPerdidos++; continue; }
+      if (tipoStr === 'penalti_defendido') { penaltisDefendidos++; continue; }
+      if (tipoStr === 'normal') golsNormais++;
+      else if (tipoStr === 'falta') golsFalta++;
+      else if (tipoStr === 'contra') golsContra++;
+      else if (tipoStr === 'penalti') golsPenalti++;
 
       // ── Parte do tempo (conta todo gol válido, incluindo contra) ──────────
       const seg = bucketMinuto(g.minuto, g.acrescimo ?? 0);
@@ -123,6 +133,12 @@ export default async function GolsPage() {
       segmentos={segmentos}
       golsPorNumero={golsPorNumero}
       totalGols={totalGols}
+      golsNormais={golsNormais}
+      golsFalta={golsFalta}
+      golsContra={golsContra}
+      golsPenalti={golsPenalti}
+      penaltisPerdidos={penaltisPerdidos}
+      penaltisDefendidos={penaltisDefendidos}
     />
   );
-    }
+}
