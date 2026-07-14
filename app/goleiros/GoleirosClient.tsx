@@ -6,17 +6,15 @@ import { EscudoTime } from '@/components/EscudoTime';
 export interface CicloGoleiro {
   numero: number;
   duracao: number;
-  // Início do ciclo
   dataInicio: string;
   rodadaInicio: number;
   adversarioInicio: string;
-  minutoInicio: number;       // minuto dentro da partida em que o ciclo começa
-  // Fim do ciclo
-  dataFim: string | null;     // null = aberto
+  minutoInicio: number;
+  dataFim: string | null;
   rodadaFim: number | null;
   adversarioFim: string | null;
-  minutoFim: number | null;   // minuto do gol que encerrou o ciclo (ou último min jogado se aberto)
-  minutoFimAcrescimo: number; // acréscimo do gol que fechou
+  minutoFim: number | null;
+  minutoFimAcrescimo: number;
   aberto: boolean;
 }
 
@@ -47,29 +45,28 @@ interface Props {
 type Ordem = 'ciclo_atual' | 'maior_ciclo' | 'total';
 
 function formatData(d: string) {
-  if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
+  if (!d) return '-';
+  const partes = d.split('-');
+  return partes[2] + '/' + partes[1] + '/' + partes[0];
 }
 
 function formatMin(min: number) {
-  if (min < 90) return `${min}'`;
+  if (min < 90) return min + "'";
   const partidas = Math.floor(min / 90);
   const resto = min % 90;
-  if (resto === 0) return `${min}' (~${partidas}j)`;
-  return `${min}'`;
+  if (resto === 0) return min + "' (~" + partidas + 'j)';
+  return min + "'";
 }
 
 function BarraCiclo({ valor, max, cor }: { valor: number; max: number; cor: string }) {
   const pct = max > 0 ? Math.max((valor / max) * 100, 2) : 0;
   return (
     <div style={{ background: 'var(--surface2)', borderRadius: 4, height: 6, overflow: 'hidden' }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: cor, borderRadius: 4, transition: 'width .4s' }} />
+      <div style={{ width: pct + '%', height: '100%', background: cor, borderRadius: 4, transition: 'width .4s' }} />
     </div>
   );
 }
 
-// Linha compacta: R{rodada} vs ADV · min' / R{rodada} vs ADV · min' (gol)
 function PontoPartida({
   rodada, adversario, minuto, acrescimo, tipo, aberto,
 }: {
@@ -80,28 +77,28 @@ function PontoPartida({
   tipo: 'inicio' | 'fim';
   aberto?: boolean;
 }) {
-  if (!rodada && !adversario) return <span style={{ color: '#444' }}>—</span>;
+  if (!rodada && !adversario) return <span style={{ color: '#444' }}>-</span>;
 
   const minLabel = minuto !== null
-    ? `${minuto}${acrescimo ? `+${acrescimo}` : ''}'`
-    : '—';
+    ? minuto + (acrescimo ? '+' + acrescimo : '') + "'"
+    : '-';
 
   const corTipo = tipo === 'inicio'
     ? 'var(--verde)'
     : aberto ? 'var(--verde)' : 'var(--rebaixamento)';
 
-  const icone = tipo === 'inicio' ? '▶' : aberto ? '…' : '⚽';
+  const icone = tipo === 'inicio' ? String.fromCodePoint(9654) : aberto ? '...' : String.fromCodePoint(9917);
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', flexWrap: 'wrap' }}>
       <span style={{ fontSize: '.7rem', color: corTipo }}>{icone}</span>
       {rodada && (
         <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem', color: 'var(--text-muted)' }}>
-          R{rodada}
+          {'R' + rodada}
         </span>
       )}
       {adversario && (
-        <span style={{ fontSize: '.75rem', color: 'var(--text)' }}>vs {adversario}</span>
+        <span style={{ fontSize: '.75rem', color: 'var(--text)' }}>{'vs ' + adversario}</span>
       )}
       <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.9rem', color: corTipo }}>
         {minLabel}
@@ -120,7 +117,6 @@ export function GoleirosClient({ lista, times }: Props) {
     return b.cicloAtualMin - a.cicloAtualMin;
   });
 
-  const maxCicloAtual = Math.max(...lista.map(s => s.cicloAtualMin), 1);
   const maxMaiorCiclo = Math.max(...lista.map(s => s.maiorCiclo.duracao), 1);
 
   const toggleGoleiro = (id: string) =>
@@ -134,7 +130,6 @@ export function GoleirosClient({ lista, times }: Props) {
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
-      {/* Hero */}
       <div style={{
         background: 'linear-gradient(135deg,#0a0a0a 0%,#071a07 50%,#0a0a0a 100%)',
         borderBottom: '1px solid var(--border)',
@@ -149,20 +144,19 @@ export function GoleirosClient({ lista, times }: Props) {
             Minutos Sem Sofrer Gols
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>
-            Ciclos contínuos de minutos sem tomar gol — calculados sobre o tempo efetivo em campo
+            Ciclos continuos de minutos sem tomar gol - calculados sobre o tempo efetivo em campo
           </p>
         </div>
       </div>
 
       <div className="container">
-        {/* Ordenação */}
         <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginRight: '.25rem' }}>Ordenar por:</span>
           {ordemBtns.map(b => (
             <button
               key={b.key}
               onClick={() => setOrdem(b.key)}
-              className={`btn btn-sm ${ordem === b.key ? 'btn-primary' : 'btn-ghost'}`}
+              className={'btn btn-sm ' + (ordem === b.key ? 'btn-primary' : 'btn-ghost')}
             >
               {b.label}
             </button>
@@ -178,7 +172,6 @@ export function GoleirosClient({ lista, times }: Props) {
           </p>
         )}
 
-        {/* Lista de goleiros */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
           {sorted.map((s, i) => {
             const time = times.find(t => t.id === s.jogador.time_atual);
@@ -188,8 +181,7 @@ export function GoleirosClient({ lista, times }: Props) {
             const valorBarra = ordem === 'maior_ciclo' ? s.maiorCiclo.duracao : s.cicloAtualMin;
 
             return (
-              <div key={s.jogador.id} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${isAberto ? 'rgba(0,168,79,.35)' : 'var(--border)'}`, transition: 'border-color .2s' }}>
-                {/* Linha principal */}
+              <div key={s.jogador.id} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid ' + (isAberto ? 'rgba(0,168,79,.35)' : 'var(--border)'), transition: 'border-color .2s' }}>
                 <button
                   onClick={() => toggleGoleiro(s.jogador.id)}
                   style={{
@@ -210,64 +202,75 @@ export function GoleirosClient({ lista, times }: Props) {
                       {s.jogador.nome}
                       {s.jogador.numero && (
                         <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem', color: 'var(--verde)' }}>
-                          #{s.jogador.numero}
+                          {'#' + s.jogador.numero}
                         </span>
                       )}
                     </div>
                     <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '.1rem' }}>
-                      {s.timeNome} · {s.totalPartidas} partida(s)
+                      {s.timeNome + ' - ' + s.totalPartidas + ' partida(s)'}
                     </div>
                     <div style={{ marginTop: '.4rem' }}>
                       <BarraCiclo valor={valorBarra} max={maxRef} cor={s.timeCor} />
                     </div>
                   </div>
 
-                  {/* Ciclo atual */}
                   <div style={{ textAlign: 'center', minWidth: 90 }}>
                     <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2rem', color: s.cicloAtualMin === 0 ? 'var(--rebaixamento)' : 'var(--verde)', lineHeight: 1 }}>
-                      {s.cicloAtualMin}'
+                      {s.cicloAtualMin}&apos;
                     </div>
                     <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                      Ciclo Atual #{s.numeroCicloAtual}
+                      {'Ciclo Atual #' + s.numeroCicloAtual}
                     </div>
                   </div>
 
                   <div style={{ width: 1, height: 40, background: 'var(--border)', flexShrink: 0 }} />
 
-                  {/* Maior ciclo */}
                   <div style={{ textAlign: 'center', minWidth: 100 }}>
                     <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: 'var(--amarelo)', lineHeight: 1 }}>
-                      {s.maiorCiclo.duracao}'
+                      {s.maiorCiclo.duracao}&apos;
                     </div>
                     <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '.1rem' }}>
-                      Maior Ciclo #{s.maiorCiclo.numero}
+                      {'Maior Ciclo #' + s.maiorCiclo.numero}
                     </div>
                     {maiorCicloEAtual ? (
                       <div style={{ fontSize: '.65rem', color: 'var(--verde)', fontWeight: 700 }}>
-                        ↑ ciclo atual
+                        {String.fromCodePoint(8593) + ' ciclo atual'}
                       </div>
                     ) : (
                       <div style={{ fontSize: '.65rem', color: '#555' }}>
                         {formatData(s.maiorCiclo.dataInicio)}
                         {s.maiorCiclo.dataFim && s.maiorCiclo.dataFim !== s.maiorCiclo.dataInicio
-                          ? ` → ${formatData(s.maiorCiclo.dataFim)}`
+                          ? ' -> ' + formatData(s.maiorCiclo.dataFim)
                           : ''}
                       </div>
                     )}
+                  </div>
+
+                  <div style={{ width: 1, height: 40, background: 'var(--border)', flexShrink: 0 }} />
+
+                  {/* Total de minutos - sempre visivel, independente da ordenacao escolhida */}
+                  <div style={{ textAlign: 'center', minWidth: 90 }}>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: '#60a5fa', lineHeight: 1 }}>
+                      {s.totalMinutos}&apos;
+                    </div>
+                    <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>
+                      Total de Minutos
+                    </div>
                   </div>
 
                   <span style={{
                     color: 'var(--text-muted)', fontSize: '1.1rem',
                     transform: isAberto ? 'rotate(180deg)' : 'none',
                     transition: 'transform .2s', flexShrink: 0,
-                  }}>▾</span>
+                  }}>
+                    {String.fromCodePoint(9662)}
+                  </span>
                 </button>
 
-                {/* Detalhe de ciclos */}
                 {isAberto && (
                   <div style={{ background: 'var(--surface2)', borderTop: '1px solid var(--border)', padding: '1.25rem' }}>
                     <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--amarelo)' }}>
-                      Histórico de Ciclos — {s.jogador.nome}
+                      {'Historico de Ciclos - ' + s.jogador.nome}
                     </h3>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
@@ -286,18 +289,17 @@ export function GoleirosClient({ lista, times }: Props) {
                                 : isMaior
                                   ? 'rgba(255,223,0,.06)'
                                   : 'var(--surface)',
-                              border: `1px solid ${isAtual ? 'rgba(0,168,79,.25)' : isMaior ? 'rgba(255,223,0,.2)' : 'var(--border)'}`,
+                              border: '1px solid ' + (isAtual ? 'rgba(0,168,79,.25)' : isMaior ? 'rgba(255,223,0,.2)' : 'var(--border)'),
                               borderRadius: 8,
                             }}
                           >
-                            {/* Cabeçalho da linha: número + badges + duração */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.55rem', flexWrap: 'wrap' }}>
                               <span style={{
                                 fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem',
                                 color: isAtual ? 'var(--verde)' : isMaior ? 'var(--amarelo)' : 'var(--text-muted)',
                                 minWidth: 28,
                               }}>
-                                #{ciclo.numero}
+                                {'#' + ciclo.numero}
                               </span>
 
                               {isAtual && (
@@ -315,7 +317,6 @@ export function GoleirosClient({ lista, times }: Props) {
                                 }}>RECORDE</span>
                               )}
 
-                              {/* Duração — empurrada para direita */}
                               <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                                 <span style={{
                                   fontFamily: "'Bebas Neue',sans-serif",
@@ -323,7 +324,7 @@ export function GoleirosClient({ lista, times }: Props) {
                                   color: isAtual ? 'var(--verde)' : isMaior ? 'var(--amarelo)' : 'var(--text)',
                                   lineHeight: 1,
                                 }}>
-                                  {ciclo.duracao}'
+                                  {ciclo.duracao}&apos;
                                 </span>
                                 <span style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginLeft: '.3rem' }}>
                                   {formatMin(ciclo.duracao)}
@@ -331,7 +332,6 @@ export function GoleirosClient({ lista, times }: Props) {
                               </div>
                             </div>
 
-                            {/* Início → Fim */}
                             <div style={{
                               display: 'grid',
                               gridTemplateColumns: '1fr auto 1fr',
@@ -339,10 +339,9 @@ export function GoleirosClient({ lista, times }: Props) {
                               gap: '.5rem',
                               marginBottom: '.5rem',
                             }}>
-                              {/* Início */}
                               <div style={{ background: 'rgba(0,168,79,.07)', border: '1px solid rgba(0,168,79,.15)', borderRadius: 6, padding: '.4rem .6rem' }}>
                                 <div style={{ fontSize: '.6rem', color: 'var(--verde)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, marginBottom: '.2rem' }}>
-                                  Início
+                                  Inicio
                                 </div>
                                 <PontoPartida
                                   rodada={ciclo.rodadaInicio}
@@ -355,13 +354,13 @@ export function GoleirosClient({ lista, times }: Props) {
                                 </div>
                               </div>
 
-                              {/* Seta central */}
-                              <div style={{ color: 'var(--text-muted)', fontSize: '.9rem', textAlign: 'center' }}>→</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '.9rem', textAlign: 'center' }}>
+                                {String.fromCodePoint(8594)}
+                              </div>
 
-                              {/* Fim */}
                               <div style={{
                                 background: isAtual ? 'rgba(0,168,79,.07)' : 'rgba(239,68,68,.07)',
-                                border: `1px solid ${isAtual ? 'rgba(0,168,79,.15)' : 'rgba(239,68,68,.15)'}`,
+                                border: '1px solid ' + (isAtual ? 'rgba(0,168,79,.15)' : 'rgba(239,68,68,.15)'),
                                 borderRadius: 6, padding: '.4rem .6rem',
                               }}>
                                 <div style={{ fontSize: '.6rem', color: isAtual ? 'var(--verde)' : 'var(--rebaixamento)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, marginBottom: '.2rem' }}>
@@ -376,15 +375,14 @@ export function GoleirosClient({ lista, times }: Props) {
                                   aberto={isAtual}
                                 />
                                 <div style={{ fontSize: '.65rem', color: '#555', marginTop: '.2rem' }}>
-                                  {isAtual ? 'último jogo registrado' : formatData(ciclo.dataFim ?? '')}
+                                  {isAtual ? 'ultimo jogo registrado' : formatData(ciclo.dataFim ?? '')}
                                 </div>
                               </div>
                             </div>
 
-                            {/* Mini barra */}
                             <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
                               <div style={{
-                                width: `${Math.max((ciclo.duracao / maxDuracao) * 100, 2)}%`,
+                                width: Math.max((ciclo.duracao / maxDuracao) * 100, 2) + '%',
                                 height: '100%',
                                 background: isAtual ? 'var(--verde)' : isMaior ? 'var(--amarelo)' : '#444',
                                 borderRadius: 3,
@@ -395,14 +393,13 @@ export function GoleirosClient({ lista, times }: Props) {
                       })}
                     </div>
 
-                    {/* Resumo */}
                     <div style={{
                       marginTop: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap',
                       padding: '.75rem 1rem', background: 'var(--surface)', borderRadius: 8,
                       border: '1px solid var(--border)', fontSize: '.82rem',
                     }}>
                       <span style={{ color: 'var(--text-muted)' }}>
-                        Total em campo: <strong style={{ color: 'var(--amarelo)' }}>{s.totalMinutos}'</strong>
+                        Total em campo: <strong style={{ color: 'var(--amarelo)' }}>{s.totalMinutos}&apos;</strong>
                       </span>
                       <span style={{ color: 'var(--text-muted)' }}>
                         Ciclos: <strong style={{ color: 'var(--text)' }}>{s.ciclos.length}</strong>
@@ -418,22 +415,21 @@ export function GoleirosClient({ lista, times }: Props) {
           })}
         </div>
 
-        {/* Legenda */}
         <div style={{
           marginTop: '1.5rem', padding: '1rem 1.25rem',
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 8, fontSize: '.72rem', color: 'var(--text-muted)',
           display: 'flex', flexWrap: 'wrap', gap: '.75rem',
         }}>
-          <span><strong style={{ color: 'var(--verde)' }}>Ciclo atual</strong> — minutos sem sofrer gol desde o último gol sofrido</span>
+          <span><strong style={{ color: 'var(--verde)' }}>Ciclo atual</strong> - minutos sem sofrer gol desde o ultimo gol sofrido</span>
           <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
-            <strong style={{ color: 'var(--amarelo)' }}>Maior ciclo</strong> — recorde pessoal de minutos invicto
+            <strong style={{ color: 'var(--amarelo)' }}>Maior ciclo</strong> - recorde pessoal de minutos invicto
           </span>
           <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
-            <strong>▶ Início</strong> = minuto em que o ciclo começou na partida · <strong>⚽ Fim</strong> = minuto do gol sofrido
+            <strong style={{ color: '#60a5fa' }}>Total de minutos</strong> - soma de todo o tempo em que o goleiro esteve em campo
           </span>
           <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
-            Minutos calculados sobre o tempo efetivo (90min + acréscimos por partida)
+            Minutos calculados sobre o tempo efetivo (90min + acrescimos por partida)
           </span>
         </div>
       </div>
