@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export interface CategoriaGols {
   key: string;
@@ -15,14 +15,38 @@ export interface SegmentoTempo {
   assistencias: number;
 }
 
+export interface GolDetalhe {
+  jogadorNome: string;
+  timeSigla: string;
+  adversarioSigla: string;
+  partidaId: string;
+  rodada: number;
+  data: string;
+  placarCasa: number;
+  placarVisitante: number;
+  mandanteSigla: string;
+  visitanteSigla: string;
+  minuto: number;
+  acrescimo: number;
+}
+
 export interface GolPorNumero {
   numero: number;
   gols: number;
+  jogos: GolDetalhe[];
 }
 
 export interface DescricaoGol {
   descricao: string;
   quantidade: number;
+  jogos: GolDetalhe[];
+}
+
+export interface TipoGolResumo {
+  tipo: string;
+  label: string;
+  quantidade: number;
+  jogos: GolDetalhe[];
 }
 
 interface Props {
@@ -31,30 +55,117 @@ interface Props {
   golsPorNumero: GolPorNumero[];
   totalGols: number;
   descricoesGolsNormais: DescricaoGol[];
-  golsFalta: number;
-  golsContra: number;
-  golsPenalti: number;
-  penaltisPerdidos: number;
-  penaltisDefendidos: number;
+  tiposResumo: TipoGolResumo[];
 }
 
 const POSICAO_COR: Record<string, string> = {
   GOL: '#f59e0b', ZAG: '#3b82f6', LAT: '#22c55e', VOL: '#8b5cf6', MEI: '#ec4899', ATA: '#ef4444',
 };
 
+const TIPO_COR: Record<string, string> = {
+  falta: '#a78bfa',
+  contra: 'var(--rebaixamento)',
+  penalti: 'var(--amarelo)',
+  penalti_perdido: '#f97316',
+  penalti_defendido: '#60a5fa',
+};
+
+const TIPO_EMOJI: Record<string, string> = {
+  falta: '🎯',
+  contra: '🔴',
+  penalti: '🥅',
+  penalti_perdido: '❌',
+  penalti_defendido: '🧤',
+};
+
 const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
-export function GolsClient({
-  categorias, segmentos, golsPorNumero, totalGols,
-  descricoesGolsNormais, golsFalta, golsContra, golsPenalti, penaltisPerdidos, penaltisDefendidos,
-}: Props) {
+function formatData(d: string) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+// Lista de gols exibida dentro do modal (jogador + partida: rodada, placar, adversário)
+function ListaDeJogos({ itens }: { itens: GolDetalhe[] }) {
+  if (itens.length === 0) return <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Nenhum registro encontrado.</p>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+      {itens.map((it, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.55rem .75rem', background: 'var(--surface2)', borderRadius: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--verde)', minWidth: 46 }}>
+            {it.minuto}{it.acrescimo > 0 ? `+${it.acrescimo}` : ''}&apos;
+          </span>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontWeight: 600 }}>{it.jogadorNome}</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>
+              {it.timeSigla} vs {it.adversarioSigla} · Rodada {it.rodada} · {formatData(it.data)}
+            </div>
+          </div>
+          <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.95rem', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+            {it.mandanteSigla} {it.placarCasa} × {it.placarVisitante} {it.visitanteSigla}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols, descricoesGolsNormais, tiposResumo }: Props) {
   const [categoriaAberta, setCategoriaAberta] = useState<CategoriaGols | null>(null);
+  const [modalJogos, setModalJogos] = useState<{ titulo: string; itens: GolDetalhe[] } | null>(null);
 
   const maxCategoria = Math.max(...categorias.map(c => c.gols), 1);
-  const maxSegmentoGols = Math.max(...segmentos.map(s => s.gols), 1);
-  const maxSegmentoAst = Math.max(...segmentos.map(s => s.assistencias), 1);
   const maxNumero = Math.max(...golsPorNumero.map(n => n.gols), 1);
   const maxDescricao = Math.max(...descricoesGolsNormais.map(d => d.quantidade), 1);
+
+  // ── Tabela de tempo: totais gerais + agrupamento 1º/2º tempo ────────────────
+  const tempoStats = useMemo(() => {
+    const totalGolsSeg = segmentos.reduce((s, seg) => s + seg.gols, 0);
+    const totalAstSeg = segmentos.reduce((s, seg) => s + seg.assistencias, 0);
+    const pct = (v: number, total: number) => total > 0 ? (v / total) * 100 : 0;
+
+    const primeiroTempo = segmentos.slice(0, 4);
+    const segundoTempo = segmentos.slice(4, 8);
+    const somaGrupo = (grupo: SegmentoTempo[]) => ({
+      gols: grupo.reduce((s, g) => s + g.gols, 0),
+      assistencias: grupo.reduce((s, g) => s + g.assistencias, 0),
+    });
+
+    return {
+      totalGolsSeg, totalAstSeg, pct,
+      primeiroTempo: somaGrupo(primeiroTempo),
+      segundoTempo: somaGrupo(segundoTempo),
+    };
+  }, [segmentos]);
+
+  const linhaSegmento = (seg: SegmentoTempo) => (
+    <tr key={seg.label} style={{ borderBottom: '1px solid #1a1a1a' }}>
+      <td style={{ padding: '.6rem .75rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{seg.label}&apos;</td>
+      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.15rem', color: 'var(--amarelo)' }}>{seg.gols}</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(seg.gols, tempoStats.totalGolsSeg).toFixed(1)}%</div>
+      </td>
+      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.15rem', color: '#60a5fa' }}>{seg.assistencias}</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(seg.assistencias, tempoStats.totalAstSeg).toFixed(1)}%</div>
+      </td>
+    </tr>
+  );
+
+  const linhaGrupo = (label: string, grupo: { gols: number; assistencias: number }) => (
+    <tr key={label} style={{ background: 'rgba(0,168,79,.06)', borderBottom: '2px solid var(--verde)', borderTop: '1px solid var(--verde)' }}>
+      <td style={{ padding: '.6rem .75rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem', color: 'var(--verde)' }}>{label}</td>
+      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.25rem', color: 'var(--verde)' }}>{grupo.gols}</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(grupo.gols, tempoStats.totalGolsSeg).toFixed(1)}%</div>
+      </td>
+      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.25rem', color: 'var(--verde)' }}>{grupo.assistencias}</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(grupo.assistencias, tempoStats.totalAstSeg).toFixed(1)}%</div>
+      </td>
+    </tr>
+  );
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -74,6 +185,9 @@ export function GolsClient({
           <h2 style={{ fontSize: '1.6rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             📌 Resumo por Tipo de Gol
           </h2>
+          <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Clique em um item para ver a lista de jogos.
+          </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '1.25rem', alignItems: 'start' }}>
             {/* Gols normais — lista de descrições padrão, sem somatório */}
@@ -92,7 +206,11 @@ export function GolsClient({
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                   {descricoesGolsNormais.map(d => (
-                    <div key={d.descricao}>
+                    <button
+                      key={d.descricao}
+                      onClick={() => setModalJogos({ titulo: d.descricao, itens: d.jogos })}
+                      style={{ textAlign: 'left', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, font: 'inherit', color: 'inherit' }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', marginBottom: '.2rem', gap: '.5rem' }}>
                         <span style={{ color: 'var(--text)' }}>{d.descricao}</span>
                         <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--verde)', flexShrink: 0 }}>{d.quantidade}</span>
@@ -100,27 +218,32 @@ export function GolsClient({
                       <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 5 }}>
                         <div style={{ width: `${(d.quantidade / maxDescricao) * 100}%`, height: '100%', background: 'var(--verde)', borderRadius: 3 }} />
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Demais tipos — cards simples */}
+            {/* Demais tipos — cards clicáveis */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '.75rem', alignContent: 'start' }}>
-              {[
-                { label: 'Gols de Falta', valor: golsFalta, cor: '#a78bfa', emoji: '🎯' },
-                { label: 'Gols Contra', valor: golsContra, cor: 'var(--rebaixamento)', emoji: '🔴' },
-                { label: 'Gols de Pênalti', valor: golsPenalti, cor: 'var(--amarelo)', emoji: '🥅' },
-                { label: 'Pênaltis Perdidos', valor: penaltisPerdidos, cor: '#f97316', emoji: '❌' },
-                { label: 'Pênaltis Defendidos', valor: penaltisDefendidos, cor: '#60a5fa', emoji: '🧤' },
-              ].map(s => (
-                <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem 1rem', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.3rem', marginBottom: '.3rem', lineHeight: 1 }}>{s.emoji}</div>
-                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2rem', color: s.cor, lineHeight: 1 }}>{s.valor}</div>
-                  <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '.35rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.label}</div>
-                </div>
-              ))}
+              {tiposResumo.map(s => {
+                const cor = TIPO_COR[s.tipo] ?? 'var(--verde)';
+                return (
+                  <button
+                    key={s.tipo}
+                    onClick={() => setModalJogos({ titulo: s.label, itens: s.jogos })}
+                    style={{
+                      textAlign: 'center', cursor: 'pointer', font: 'inherit', color: 'inherit',
+                      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem 1rem',
+                      transition: 'border-color .15s',
+                    }}
+                  >
+                    <div style={{ fontSize: '1.3rem', marginBottom: '.3rem', lineHeight: 1 }}>{TIPO_EMOJI[s.tipo]}</div>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2rem', color: cor, lineHeight: 1 }}>{s.quantidade}</div>
+                    <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '.35rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.label}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -170,40 +293,27 @@ export function GolsClient({
           )}
         </section>
 
-        {/* 2. Gols e assistências por parte do tempo */}
+        {/* 2. Gols e assistências por parte do tempo — tabela */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.6rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             ⏱️ Gols e Assistências por Parte do Tempo
           </h2>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
-            <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1.25rem', fontSize: '.72rem', color: 'var(--text-muted)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--amarelo)', display: 'inline-block' }} />Gols
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: '#60a5fa', display: 'inline-block' }} />Assistências
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.9rem' }}>
-              {segmentos.map(seg => (
-                <div key={seg.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '.8rem', marginBottom: '.3rem', flexWrap: 'wrap', gap: '.3rem' }}>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem' }}>{seg.label}&apos;</span>
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      <strong style={{ color: 'var(--amarelo)' }}>{seg.gols}</strong> gols · <strong style={{ color: '#60a5fa' }}>{seg.assistencias}</strong> assist.
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
-                    <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 7 }}>
-                      <div style={{ width: `${(seg.gols / maxSegmentoGols) * 100}%`, height: '100%', background: 'var(--amarelo)', borderRadius: 3, transition: 'width .3s' }} />
-                    </div>
-                    <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 7 }}>
-                      <div style={{ width: `${(seg.assistencias / maxSegmentoAst) * 100}%`, height: '100%', background: '#60a5fa', borderRadius: 3, transition: 'width .3s' }} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+              <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+                <tr>
+                  {['Parte do Tempo', 'Gols', 'Assistências'].map(h => (
+                    <th key={h} style={{ padding: '.65rem .75rem', textAlign: h === 'Parte do Tempo' ? 'left' : 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.88rem', letterSpacing: '.06em', color: 'var(--text-muted)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {segmentos.slice(0, 4).map(linhaSegmento)}
+                {linhaGrupo('1º Tempo', tempoStats.primeiroTempo)}
+                {segmentos.slice(4, 8).map(linhaSegmento)}
+                {linhaGrupo('2º Tempo', tempoStats.segundoTempo)}
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -213,7 +323,7 @@ export function GolsClient({
             👕 Gols por Número da Camisa
           </h2>
           <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Considera o número usado por cada jogador em cada partida específica (escalação), não o número atual do cadastro.
+            Considera o número usado por cada jogador em cada partida específica (escalação), não o número atual do cadastro. Clique em um número para ver os jogos.
           </p>
           {golsPorNumero.length === 0 ? (
             <p style={{ color: 'var(--text-muted)', padding: '2rem 0' }}>Nenhum gol registrado ainda.</p>
@@ -222,12 +332,16 @@ export function GolsClient({
               {golsPorNumero.map((n, i) => {
                 const destaque = i < 3;
                 return (
-                  <div key={n.numero} style={{
-                    display: 'flex', alignItems: 'center', gap: '.85rem',
-                    background: destaque ? 'rgba(255,223,0,.04)' : 'var(--surface)',
-                    border: `1px solid ${destaque ? 'rgba(255,223,0,.25)' : 'var(--border)'}`,
-                    borderRadius: 10, padding: '.7rem 1rem',
-                  }}>
+                  <button
+                    key={n.numero}
+                    onClick={() => setModalJogos({ titulo: `Camisa ${n.numero}`, itens: n.jogos })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '.85rem', cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left',
+                      background: destaque ? 'rgba(255,223,0,.04)' : 'var(--surface)',
+                      border: `1px solid ${destaque ? 'rgba(255,223,0,.25)' : 'var(--border)'}`,
+                      borderRadius: 10, padding: '.7rem 1rem',
+                    }}
+                  >
                     <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', minWidth: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
                       {medalha(i)}
                     </span>
@@ -246,7 +360,7 @@ export function GolsClient({
                     <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.3rem', color: 'var(--amarelo)', minWidth: 40, textAlign: 'right' }}>
                       {n.gols}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -254,7 +368,7 @@ export function GolsClient({
         </section>
       </div>
 
-      {/* Modal — jogadores da categoria selecionada */}
+      {/* Modal — jogadores da categoria de posição/sub-posição selecionada */}
       {categoriaAberta && (
         <div
           onClick={() => setCategoriaAberta(null)}
@@ -281,6 +395,28 @@ export function GolsClient({
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal — lista de gols (jogador + partida) para tipo/descrição/número da camisa */}
+      {modalJogos && (
+        <div
+          onClick={() => setModalJogos(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: '100%', maxWidth: 520, maxHeight: '80vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.25rem' }}>
+              <h3 style={{ fontSize: '1.3rem', color: 'var(--amarelo)' }}>{modalJogos.titulo}</h3>
+              <button onClick={() => setModalJogos(null)} className="btn btn-ghost btn-sm">✕</button>
+            </div>
+            <p style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              {modalJogos.itens.length} registro(s)
+            </p>
+            <ListaDeJogos itens={modalJogos.itens} />
           </div>
         </div>
       )}
