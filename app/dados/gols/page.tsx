@@ -1,5 +1,14 @@
 import { getJogadores, getPartidas, getTimes } from '@/lib/data';
-import { GolsClient, type CategoriaGols, type SegmentoTempo, type GolPorNumero } from './GolsClient';
+import {
+  GolsClient,
+  type CategoriaGols,
+  type SegmentoTempo,
+  type GolPorNumero,
+  type DescricaoGol,
+  type TipoGolResumo,
+  type GolDetalhe,
+} from './GolsClient';
+import { Partida, Time } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +23,15 @@ const SUBPOS_LABEL: Record<string, string> = {
   MC: 'Meia Central', MO: 'Meia Ofensivo',
   CA: 'Centroavante', PD: 'Ponta Direita', PE: 'Ponta Esquerda',
 };
+
+const TIPO_LABEL: Record<string, string> = {
+  falta: 'Gols de Falta',
+  contra: 'Gols Contra',
+  penalti: 'Gols de Pênalti',
+  penalti_perdido: 'Pênaltis Perdidos',
+  penalti_defendido: 'Pênaltis Defendidos',
+};
+const TIPOS_ORDEM = ['falta', 'contra', 'penalti', 'penalti_perdido', 'penalti_defendido'];
 
 function subChaveValida(posicao: string, subPosicao?: string): string {
   if (subPosicao && subPosicao !== posicao && SUBPOS_LABEL[subPosicao]) return subPosicao;
@@ -40,6 +58,37 @@ function bucketMinuto(minuto: number, acrescimo: number): string {
 
 const SEGMENTOS_ORDEM = ['0-15', '16-30', '31-45', '45+', '46-60', '61-75', '76-90', '90+'];
 
+// Monta os dados de exibição (jogador + partida) de um gol para as listas/modais
+function buildDetalhe(g: Partida['gols'][number], p: Partida, jogadorNome: string, times: Time[]): GolDetalhe {
+  const timeCasa = times.find(t => t.id === p.time_casa_id);
+  const timeVis  = times.find(t => t.id === p.time_visitante_id);
+  const tipoStr = g.tipo as string;
+  const isContra = tipoStr === 'contra';
+  // Em gol contra, g.time_id é o time BENEFICIADO — o time do próprio jogador é o outro lado
+  const meuTimeId = isContra
+    ? (g.time_id === p.time_casa_id ? p.time_visitante_id : p.time_casa_id)
+    : g.time_id;
+  const advTimeId = isContra
+    ? g.time_id
+    : (g.time_id === p.time_casa_id ? p.time_visitante_id : p.time_casa_id);
+  const meuTime = times.find(t => t.id === meuTimeId);
+  const advTime = times.find(t => t.id === advTimeId);
+  return {
+    jogadorNome,
+    timeSigla: meuTime?.sigla ?? meuTimeId,
+    adversarioSigla: advTime?.sigla ?? advTimeId,
+    partidaId: p.id,
+    rodada: p.rodada,
+    data: p.data,
+    placarCasa: p.placar_casa,
+    placarVisitante: p.placar_visitante,
+    mandanteSigla: timeCasa?.sigla ?? p.time_casa_id,
+    visitanteSigla: timeVis?.sigla ?? p.time_visitante_id,
+    minuto: g.minuto,
+    acrescimo: g.acrescimo ?? 0,
+  };
+}
+
 export default async function GolsPage() {
   const [jogadores, partidas, times] = await Promise.all([getJogadores(), getPartidas(), getTimes()]);
   const encerradas = partidas.filter(p => p.status === 'encerrada');
@@ -47,10 +96,10 @@ export default async function GolsPage() {
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
 
   // 0. Resumo por tipo de gol / pênaltis não convertidos
-  // Gols "normais" não são somados — mostramos a lista de descrições padrão e sua contagem
   const descricaoMap: Record<string, number> = {};
-  let golsFalta = 0, golsContra = 0, golsPenalti = 0;
-  let penaltisPerdidos = 0, penaltisDefendidos = 0;
+  const descricaoDetalhes: Record<string, GolDetalhe[]> = {};
+  const tipoContagem: Record<string, number> = {};
+  const tipoDetalhes: Record<string, GolDetalhe[]> = {};
 
   // 1. Ranking por posição/sub-posição
   const catMap: Record<string, { posicao: string; gols: number; jogadoresMap: Record<string, number> }> = {};
@@ -59,23 +108,34 @@ export default async function GolsPage() {
   SEGMENTOS_ORDEM.forEach(s => { segMap[s] = { gols: 0, assistencias: 0 }; });
   // 3. Gols por número da camisa (usado NA PARTIDA, não o cadastro do jogador)
   const numeroMap: Record<number, number> = {};
+  const numeroDetalhes: Record<number, GolDetalhe[]> = {};
 
   for (const p of encerradas) {
     const escTodas = [...p.escalacao_casa, ...p.escalacao_visitante];
 
     for (const g of p.gols) {
       const tipoStr = g.tipo as string;
+      const jogador = jogadorMap.get(g.jogador_id);
+      const jogadorNome = jogador?.nome ?? g.jogador_id;
+      const detalhe = buildDetalhe(g, p, jogadorNome, times);
 
       // ── Resumo por tipo (inclui pênaltis não convertidos) ─────────────────
-      if (tipoStr === 'penalti_perdido') { penaltisPerdidos++; continue; }
-      if (tipoStr === 'penalti_defendido') { penaltisDefendidos++; continue; }
+      if (tipoStr === 'penalti_perdido' || tipoStr === 'penalti_defendido') {
+        tipoContagem[tipoStr] = (tipoContagem[tipoStr] ?? 0) + 1;
+        if (!tipoDetalhes[tipoStr]) tipoDetalhes[tipoStr] = [];
+        tipoDetalhes[tipoStr].push(detalhe);
+        continue;
+      }
       if (tipoStr === 'normal') {
         const desc = g.descricao?.trim() || 'Sem descrição';
         descricaoMap[desc] = (descricaoMap[desc] ?? 0) + 1;
+        if (!descricaoDetalhes[desc]) descricaoDetalhes[desc] = [];
+        descricaoDetalhes[desc].push(detalhe);
+      } else if (tipoStr === 'falta' || tipoStr === 'contra' || tipoStr === 'penalti') {
+        tipoContagem[tipoStr] = (tipoContagem[tipoStr] ?? 0) + 1;
+        if (!tipoDetalhes[tipoStr]) tipoDetalhes[tipoStr] = [];
+        tipoDetalhes[tipoStr].push(detalhe);
       }
-      else if (tipoStr === 'falta') golsFalta++;
-      else if (tipoStr === 'contra') golsContra++;
-      else if (tipoStr === 'penalti') golsPenalti++;
 
       // ── Parte do tempo (conta todo gol válido, incluindo contra) ──────────
       const seg = bucketMinuto(g.minuto, g.acrescimo ?? 0);
@@ -85,7 +145,6 @@ export default async function GolsPage() {
       if (tipoStr === 'contra') continue; // gol contra não conta para o autor, posição ou número
 
       // ── Posição / sub-posição (cadastro atual do jogador) ─────────────────
-      const jogador = jogadorMap.get(g.jogador_id);
       if (jogador) {
         const subChave = subChaveValida(jogador.posicao, jogador.sub_posicao);
         const key = `${jogador.posicao}::${subChave}`;
@@ -98,6 +157,8 @@ export default async function GolsPage() {
       const esc = escTodas.find(e => e.jogador_id === g.jogador_id);
       if (esc && esc.numero) {
         numeroMap[esc.numero] = (numeroMap[esc.numero] ?? 0) + 1;
+        if (!numeroDetalhes[esc.numero]) numeroDetalhes[esc.numero] = [];
+        numeroDetalhes[esc.numero].push(detalhe);
       }
     }
   }
@@ -127,14 +188,23 @@ export default async function GolsPage() {
   }));
 
   const golsPorNumero: GolPorNumero[] = Object.entries(numeroMap)
-    .map(([numero, gols]) => ({ numero: +numero, gols }))
+    .map(([numero, gols]) => ({ numero: +numero, gols, jogos: (numeroDetalhes[+numero] ?? []).sort(ordenarDetalhe) }))
     .sort((a, b) => b.gols - a.gols || a.numero - b.numero);
 
-  const totalGols = categorias.reduce((s, c) => s + c.gols, 0);
-
-  const descricoesGolsNormais = Object.entries(descricaoMap)
-    .map(([descricao, quantidade]) => ({ descricao, quantidade }))
+  const descricoesGolsNormais: DescricaoGol[] = Object.entries(descricaoMap)
+    .map(([descricao, quantidade]) => ({
+      descricao, quantidade, jogos: (descricaoDetalhes[descricao] ?? []).sort(ordenarDetalhe),
+    }))
     .sort((a, b) => b.quantidade - a.quantidade || a.descricao.localeCompare(b.descricao));
+
+  const tiposResumo: TipoGolResumo[] = TIPOS_ORDEM.map(tipo => ({
+    tipo,
+    label: TIPO_LABEL[tipo],
+    quantidade: tipoContagem[tipo] ?? 0,
+    jogos: (tipoDetalhes[tipo] ?? []).sort(ordenarDetalhe),
+  }));
+
+  const totalGols = categorias.reduce((s, c) => s + c.gols, 0);
 
   return (
     <GolsClient
@@ -143,11 +213,11 @@ export default async function GolsPage() {
       golsPorNumero={golsPorNumero}
       totalGols={totalGols}
       descricoesGolsNormais={descricoesGolsNormais}
-      golsFalta={golsFalta}
-      golsContra={golsContra}
-      golsPenalti={golsPenalti}
-      penaltisPerdidos={penaltisPerdidos}
-      penaltisDefendidos={penaltisDefendidos}
+      tiposResumo={tiposResumo}
     />
   );
 }
+
+function ordenarDetalhe(a: GolDetalhe, b: GolDetalhe): number {
+  return a.rodada - b.rodada || a.data.localeCompare(b.data);
+    }
