@@ -3,6 +3,10 @@ import { TimesClient } from './TimesClient';
 
 export const dynamic = 'force-dynamic';
 
+// Data de corte usada em "Vieram": fim da 1ª rodada — chegadas registradas
+// depois dessa data são consideradas reforços "no meio da temporada".
+const CORTE_RODADA_1 = '2026-01-29';
+
 export default async function TimesPage() {
   const [partidas, times, estadios, jogadores] = await Promise.all([
     getPartidas(), getTimes(), getEstadios(), getJogadores(),
@@ -91,6 +95,7 @@ export default async function TimesPage() {
     cartoes_vermelhos: number;
     minutos: number;
     partidas: number;
+    ultimoJogoRodada: number | null;
   }
 
   const jogadorStatsMap: Record<string, JogadorStats> = {};
@@ -98,7 +103,7 @@ export default async function TimesPage() {
     jogadorStatsMap[j.id] = {
       jogador_id: j.id, gols: 0, gols_contra: 0, gols_sofridos: 0,
       assistencias: 0, cartoes_amarelos: 0, cartoes_vermelhos: 0,
-      minutos: 0, partidas: 0,
+      minutos: 0, partidas: 0, ultimoJogoRodada: null,
     };
   });
 
@@ -130,6 +135,10 @@ export default async function TimesPage() {
       }
       s.partidas++;
       s.minutos += mins;
+      // Última rodada em que o jogador de fato esteve em campo
+      if (s.ultimoJogoRodada === null || p.rodada > s.ultimoJogoRodada) {
+        s.ultimoJogoRodada = p.rodada;
+      }
     }
 
     for (const g of p.gols) {
@@ -150,6 +159,11 @@ export default async function TimesPage() {
     }
   }
 
+  const nomeTimeOuVazio = (timeId: string | null | undefined): string | null => {
+    if (!timeId || timeId === 'outros') return null;
+    return times.find(t => t.id === timeId)?.nome ?? null;
+  };
+
   // ── Montar timesData ───────────────────────────────────────────────────────
   const timesData = times.map(t => {
     const pub = publicoMap[t.id] ?? {
@@ -161,26 +175,31 @@ export default async function TimesPage() {
     // Ativos: time_atual === t.id
     const ativos = jogadores.filter(j => j.time_atual === t.id);
 
-    // "Vieram para cá": jogadores cujo SEGUNDO (ou posterior) registro de transferência
-    // aponta para este time, ou seja, já tinham estado em outro clube antes.
-    // Exclui quem ainda está ativo no time (esses aparecem em Ativos).
-    const vieramParaCa = jogadores.filter(j => {
-      if (j.time_atual === t.id) return false; // está ativo → não aparece aqui
+    // "Vieram" — combina dois grupos:
+    // (A) jogadores que já passaram por aqui (2º clube ou posterior), mas já saíram
+    // (B) qualquer jogador (ativo ou não) cuja chegada mais recente a este time
+    //     ocorreu depois do fim da 1ª rodada (reforço no meio da temporada)
+    const vieramExistentes = jogadores.filter(j => {
+      if (j.time_atual === t.id) return false;
       const idx = j.transferencias.findIndex(tr => tr.time_id === t.id);
-      if (idx < 0) return false; // nunca passou pelo time
-      // só conta como "veio para cá" se havia um registro anterior (não foi o primeiro clube)
+      if (idx < 0) return false;
       return idx > 0;
     });
+    const idsVieramExistentes = new Set(vieramExistentes.map(j => j.id));
 
-    // "Foram embora": jogadores cujo PRIMEIRO registro aponta para este time
-    // (eram originalmente do clube) mas o time_atual é diferente ou inativo.
-    const foramEmbora = jogadores.filter(j => {
-      if (j.time_atual === t.id) return false; // ainda está ativo
+    const vieramRecentes = jogadores.filter(j => {
+      if (idsVieramExistentes.has(j.id)) return false; // evita duplicar
+      const transferenciasAqui = j.transferencias.filter(tr => tr.time_id === t.id);
+      if (transferenciasAqui.length === 0) return false;
+      const chegadaMaisRecente = [...transferenciasAqui].sort((a, b) => b.data.localeCompare(a.data))[0];
+      return chegadaMaisRecente.data > CORTE_RODADA_1;
+    });
+
+    // "Foram embora" — passaram por aqui e já não estão mais no time
+    const foramEmboraBase = jogadores.filter(j => {
+      if (j.time_atual === t.id) return false;
       const idx = j.transferencias.findIndex(tr => tr.time_id === t.id);
-      if (idx < 0) return false; // nunca passou pelo time
-      // "saiu daqui": tinha este time no histórico E tem um registro posterior
-      // (indica que saiu para outro clube ou ficou inativo)
-      return j.transferencias.length > idx + 1 || j.time_atual !== t.id;
+      return idx >= 0;
     });
 
     return {
@@ -189,11 +208,49 @@ export default async function TimesPage() {
       publicoVisitante: pub.visitante,
       totalMinutos: pub.totalMinutos,
       ativos: ativos.map(j => ({ ...j, stats: jogadorStatsMap[j.id] })),
-      foramEmbora: foramEmbora.map(j => ({ ...j, stats: jogadorStatsMap[j.id] })),
-      vieram: vieramParaCa.map(j => {
-        const trans = j.transferencias.filter(tr => tr.time_id === t.id);
-        return { ...j, stats: jogadorStatsMap[j.id], transferencias_aqui: trans };
+      foramEmbora: foramEmboraBase.map(j => {
+        // Última passagem (stint) por este time — para o caso de idas e vindas
+        let idxUltimaPassagem = -1;
+        j.transferencias.forEach((tr, i) => { if (tr.time_id === t.id) idxUltimaPassagem = i; });
+        const proximoRegistro = idxUltimaPassagem >= 0 ? j.transferencias[idxUltimaPassagem + 1] : undefined;
+
+        let destinoId: string | null = proximoRegistro?.time_id ?? null;
+        let dataDestino: string | null = proximoRegistro?.data ?? null;
+
+        // Sem registro explícito de saída, mas o cadastro já aponta outro time atual
+        if (!proximoRegistro && j.time_atual && j.time_atual !== t.id) {
+          destinoId = j.time_atual;
+          dataDestino = null; // data exata desconhecida sem um registro de transferência
+        }
+
+        return {
+          ...j,
+          stats: jogadorStatsMap[j.id],
+          destino: nomeTimeOuVazio(destinoId),
+          dataDestino,
+        };
       }),
+      vieram: [
+        ...vieramExistentes.map(j => {
+          const trans = j.transferencias.filter(tr => tr.time_id === t.id);
+          const origemId = j.transferencias[0]?.time_id ?? null;
+          return {
+            ...j,
+            stats: jogadorStatsMap[j.id],
+            transferencias_aqui: trans,
+            origem: nomeTimeOuVazio(origemId),
+          };
+        }),
+        ...vieramRecentes.map(j => {
+          const trans = j.transferencias.filter(tr => tr.time_id === t.id);
+          return {
+            ...j,
+            stats: jogadorStatsMap[j.id],
+            transferencias_aqui: trans,
+            origem: null, // origem em branco para reforços incluídos apenas pelo critério de data
+          };
+        }),
+      ],
     };
   });
 
