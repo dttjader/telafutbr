@@ -13,11 +13,15 @@ interface JogadorStats {
   cartoes_vermelhos: number;
   minutos: number;
   partidas: number;
+  ultimoJogoRodada: number | null;
 }
 
 interface JogadorComStats extends Jogador {
   stats: JogadorStats;
   transferencias_aqui?: { time_id: string; data: string }[];
+  origem?: string | null;
+  destino?: string | null;
+  dataDestino?: string | null;
 }
 
 interface JogoPublico {
@@ -54,6 +58,13 @@ const SUB_POS_LABEL: Record<string, string> = {
 };
 
 function fmt(n: number) { return n.toLocaleString('pt-BR'); }
+
+function formatData(d: string | null | undefined) {
+  if (!d) return '—';
+  const partes = d.split('-');
+  if (partes.length !== 3) return d;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
 
 function posColor(posicao: string): string {
   const m: Record<string, string> = {
@@ -541,6 +552,12 @@ export function TimesClient({ timesData }: Props) {
     ? `1-${bestTeam.nDef}-${bestTeam.nMei}-${bestTeam.nAta}`
     : '';
 
+  // Colunas extras (à direita das estatísticas) que variam por aba
+  const colunasExtras: string[] =
+    abaJog === 'ativos' ? ['Desde', 'Últ. Jogo'] :
+    abaJog === 'vieram' ? ['Chegou', 'Origem'] :
+    ['Foi em', 'Destino'];
+
   return (
     <div style={{ paddingBottom: '4rem' }}>
 
@@ -728,9 +745,7 @@ export function TimesClient({ timesData }: Props) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
                 <thead style={{ background: 'var(--surface2)', borderBottom: `2px solid ${corTime}` }}>
                   <tr>
-                    {['#', 'Jogador', 'Pos.', 'P', 'Min', '⚽', 'Ast.', '🟨', '🟥',
-                      abaJog === 'vieram' ? 'Chegou' : abaJog === 'foramEmbora' ? 'Passou por aqui' : 'Desde'
-                    ].map(h => (
+                    {['#', 'Jogador', 'Pos.', 'P', 'Min', '⚽', 'Ast.', '🟨', '🟥', ...colunasExtras].map(h => (
                       <th key={h} style={{
                         padding: '.55rem .65rem',
                         textAlign: h === 'Jogador' ? 'left' : 'center',
@@ -746,9 +761,17 @@ export function TimesClient({ timesData }: Props) {
                     const s = j.stats;
                     const subPosicao = j.sub_posicao && SUB_POS_LABEL[j.sub_posicao] ? SUB_POS_LABEL[j.sub_posicao] : null;
                     const cor = posColor(j.posicao);
-                    const ultimaTransf = abaJog === 'vieram'
-                      ? j.transferencias_aqui?.sort((a, b) => b.data.localeCompare(a.data))[0]
-                      : j.transferencias.filter(tr => tr.time_id === time.id).sort((a, b) => b.data.localeCompare(a.data))[0];
+
+                    // Data exibida na penúltima coluna, específica por aba
+                    let dataExibida: string | null | undefined;
+                    if (abaJog === 'vieram') {
+                      dataExibida = j.transferencias_aqui?.sort((a, b) => b.data.localeCompare(a.data))[0]?.data;
+                    } else if (abaJog === 'foramEmbora') {
+                      dataExibida = j.dataDestino;
+                    } else {
+                      dataExibida = j.transferencias.filter(tr => tr.time_id === time.id).sort((a, b) => b.data.localeCompare(a.data))[0]?.data;
+                    }
+
                     return (
                       <tr key={j.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
                         <td style={{ padding: '.5rem .65rem', textAlign: 'center', color: 'var(--text-muted)', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>
@@ -779,9 +802,34 @@ export function TimesClient({ timesData }: Props) {
                         <td style={{ textAlign: 'center', padding: '.5rem .5rem', color: s.cartoes_vermelhos > 0 ? '#ef4444' : 'var(--text-muted)' }}>
                           {s.cartoes_vermelhos || '—'}
                         </td>
+
+                        {/* Coluna de data — específica por aba */}
                         <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontSize: '.75rem', color: 'var(--text-muted)' }}>
-                          {ultimaTransf?.data ?? '—'}
+                          {formatData(dataExibida)}
                         </td>
+
+                        {/* Segunda coluna extra — específica por aba */}
+                        {abaJog === 'ativos' && (
+                          <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>
+                            {s.ultimoJogoRodada != null ? (
+                              <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.95rem', color: 'var(--verde)' }}>
+                                R{s.ultimoJogoRodada}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)' }}>—</span>
+                            )}
+                          </td>
+                        )}
+                        {abaJog === 'vieram' && (
+                          <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontSize: '.75rem', color: 'var(--text-muted)' }}>
+                            {j.origem ?? ''}
+                          </td>
+                        )}
+                        {abaJog === 'foramEmbora' && (
+                          <td style={{ textAlign: 'center', padding: '.5rem .5rem', fontSize: '.75rem', color: 'var(--text-muted)' }}>
+                            {j.destino ?? ''}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -880,6 +928,22 @@ export function TimesClient({ timesData }: Props) {
             Nenhuma partida encerrada com jogadores deste time para montar o melhor time.
           </div>
         )}
+
+        {/* Legenda das colunas por aba */}
+        <div style={{
+          marginTop: '1.5rem', padding: '1rem 1.25rem',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 8, fontSize: '.72rem', color: 'var(--text-muted)',
+          display: 'flex', flexWrap: 'wrap', gap: '.75rem',
+        }}>
+          <span><strong style={{ color: 'var(--verde)' }}>Últ. Jogo</strong> — última rodada em que o jogador esteve efetivamente em campo</span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            <strong style={{ color: 'var(--verde)' }}>Origem</strong> — time em que o jogador estava antes de chegar aqui (vazio quando chegou após o início da temporada e a origem não é considerada)
+          </span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            <strong style={{ color: 'var(--verde)' }}>Destino</strong> — time para onde o jogador foi ao sair (vazio se ficou inativo/transferido sem clube definido)
+          </span>
+        </div>
 
       </div>
     </div>
