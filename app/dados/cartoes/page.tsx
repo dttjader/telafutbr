@@ -3,6 +3,7 @@ import {
   CartoesClient,
   type TipoCartaoResumo,
   type CartaoDetalhe,
+  type DescricaoCartao,
   type PendenteItem,
   type SuspensoItem,
   type RankingCartaoItem,
@@ -12,12 +13,12 @@ import { Partida, Time } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 const TIPO_LABEL: Record<string, string> = {
-  amarelo: 'Cartões Amarelos',
-  vermelho: 'Cartões Vermelhos',
   amarelo_tecnico: 'Amarelos (Técnicos)',
   vermelho_tecnico: 'Vermelhos (Técnicos)',
 };
-const TIPOS_ORDEM = ['amarelo', 'vermelho', 'amarelo_tecnico', 'vermelho_tecnico'];
+// Amarelo e vermelho de jogador agora são detalhados por descrição (ver abaixo);
+// aqui ficam apenas os tipos exibidos como cards simples
+const TIPOS_ORDEM = ['amarelo_tecnico', 'vermelho_tecnico'];
 
 interface EventoCartao {
   partidaId: string;
@@ -61,9 +62,13 @@ export default async function CartoesPage() {
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
   const tecnicoMap = new Map(tecnicos.map(tc => [tc.id, tc]));
 
-  // 0. Resumo por tipo de cartão
+  // 0. Resumo por tipo de cartão (técnicos) + descrição (amarelo/vermelho de jogador)
   const tipoContagem: Record<string, number> = {};
   const tipoDetalhes: Record<string, CartaoDetalhe[]> = {};
+  const descAmareloMap: Record<string, number> = {};
+  const descAmareloDetalhes: Record<string, CartaoDetalhe[]> = {};
+  const descVermelhoMap: Record<string, number> = {};
+  const descVermelhoDetalhes: Record<string, CartaoDetalhe[]> = {};
 
   // Histórico de cartões amarelos/vermelhos por jogador e por técnico (para pendurados/suspensos e ranking)
   const jogadorCartoes: Record<string, { amarelos: EventoCartao[]; vermelhos: EventoCartao[] }> = {};
@@ -80,8 +85,18 @@ export default async function CartoesPage() {
 
       const detalhe = buildDetalheCartao(c, p, nome, times);
       tipoContagem[tipoStr] = (tipoContagem[tipoStr] ?? 0) + 1;
-      if (!tipoDetalhes[tipoStr]) tipoDetalhes[tipoStr] = [];
-      tipoDetalhes[tipoStr].push(detalhe);
+
+      if (tipoStr === 'amarelo' || tipoStr === 'vermelho') {
+        const desc = c.motivo?.trim() || 'Sem descrição';
+        const mapa = tipoStr === 'amarelo' ? descAmareloMap : descVermelhoMap;
+        const detalhesMap = tipoStr === 'amarelo' ? descAmareloDetalhes : descVermelhoDetalhes;
+        mapa[desc] = (mapa[desc] ?? 0) + 1;
+        if (!detalhesMap[desc]) detalhesMap[desc] = [];
+        detalhesMap[desc].push(detalhe);
+      } else {
+        if (!tipoDetalhes[tipoStr]) tipoDetalhes[tipoStr] = [];
+        tipoDetalhes[tipoStr].push(detalhe);
+      }
 
       const evento: EventoCartao = { partidaId: p.id, rodada: p.rodada, data: p.data, minuto: c.minuto };
 
@@ -107,6 +122,18 @@ export default async function CartoesPage() {
     quantidade: tipoContagem[tipo] ?? 0,
     jogos: (tipoDetalhes[tipo] ?? []).sort(ordenarDetalhe),
   }));
+
+  const descricoesAmarelo: DescricaoCartao[] = Object.entries(descAmareloMap)
+    .map(([descricao, quantidade]) => ({
+      descricao, quantidade, jogos: (descAmareloDetalhes[descricao] ?? []).sort(ordenarDetalhe),
+    }))
+    .sort((a, b) => b.quantidade - a.quantidade || a.descricao.localeCompare(b.descricao));
+
+  const descricoesVermelho: DescricaoCartao[] = Object.entries(descVermelhoMap)
+    .map(([descricao, quantidade]) => ({
+      descricao, quantidade, jogos: (descVermelhoDetalhes[descricao] ?? []).sort(ordenarDetalhe),
+    }))
+    .sort((a, b) => b.quantidade - a.quantidade || a.descricao.localeCompare(b.descricao));
 
   // 1. Última partida disputada por cada time (por data, com rodada como desempate)
   const ultimaPartidaPorTime: Record<string, Partida> = {};
@@ -197,6 +224,8 @@ export default async function CartoesPage() {
   return (
     <CartoesClient
       tiposResumo={tiposResumo}
+      descricoesAmarelo={descricoesAmarelo}
+      descricoesVermelho={descricoesVermelho}
       pendurados={pendurados}
       suspensos={suspensos}
       rankingAmarelos={rankingAmarelos}
@@ -204,4 +233,4 @@ export default async function CartoesPage() {
       times={times}
     />
   );
-          }
+}
