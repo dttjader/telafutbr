@@ -71,6 +71,16 @@ const SubSections = ({ totalJogos, totalGols, totalArbitros, totalArbitrosPrinci
         meta: null,
       },
       {
+        href: '/dados/cartoes',
+        emoji: '🟨',
+        titulo: 'Cartões',
+        desc: 'Pendurados, suspensos e rankings de amarelos/vermelhos',
+        cor: '#f59e0b',
+        bg: 'rgba(245,158,11,.06)',
+        border: 'rgba(245,158,11,.2)',
+        meta: null,
+      },
+      {
         href: '/dados/analitico',
         emoji: '🔬',
         titulo: 'Analítico',
