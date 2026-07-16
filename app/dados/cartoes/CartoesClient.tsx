@@ -25,6 +25,12 @@ export interface TipoCartaoResumo {
   jogos: CartaoDetalhe[];
 }
 
+export interface DescricaoCartao {
+  descricao: string;
+  quantidade: number;
+  jogos: CartaoDetalhe[];
+}
+
 export interface PendenteItem {
   nome: string;
   tipo: 'Jogador' | 'Técnico';
@@ -50,6 +56,8 @@ export interface RankingCartaoItem {
 
 interface Props {
   tiposResumo: TipoCartaoResumo[];
+  descricoesAmarelo: DescricaoCartao[];
+  descricoesVermelho: DescricaoCartao[];
   pendurados: PendenteItem[];
   suspensos: SuspensoItem[];
   rankingAmarelos: RankingCartaoItem[];
@@ -151,7 +159,55 @@ function RankingCol({ titulo, dados, cor, times }: {
   );
 }
 
-export function CartoesClient({ tiposResumo, pendurados, suspensos, rankingAmarelos, rankingVermelhos, times }: Props) {
+function BlocoDescricao({
+  titulo, emoji, cor, itens, onSelecionar,
+}: {
+  titulo: string;
+  emoji: string;
+  cor: string;
+  itens: DescricaoCartao[];
+  onSelecionar: (titulo: string, itens: CartaoDetalhe[]) => void;
+}) {
+  const max = Math.max(...itens.map(d => d.quantidade), 1);
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.25rem' }}>
+        <span style={{ fontSize: '1.2rem' }}>{emoji}</span>
+        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: cor, letterSpacing: '.04em' }}>
+          {titulo}
+        </span>
+      </div>
+      <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+        Motivos padrão utilizados no registro de cada cartão.
+      </p>
+      {itens.length === 0 ? (
+        <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Nenhum cartão registrado ainda.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {itens.map(d => (
+            <button
+              key={d.descricao}
+              onClick={() => onSelecionar(`${titulo} — ${d.descricao}`, d.jogos)}
+              style={{ textAlign: 'left', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, font: 'inherit', color: 'inherit' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', marginBottom: '.2rem', gap: '.5rem' }}>
+                <span style={{ color: 'var(--text)' }}>{d.descricao}</span>
+                <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: cor, flexShrink: 0 }}>{d.quantidade}</span>
+              </div>
+              <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 5 }}>
+                <div style={{ width: `${(d.quantidade / max) * 100}%`, height: '100%', background: cor, borderRadius: 3 }} />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CartoesClient({
+  tiposResumo, descricoesAmarelo, descricoesVermelho, pendurados, suspensos, rankingAmarelos, rankingVermelhos, times,
+}: Props) {
   const [modalJogos, setModalJogos] = useState<{ titulo: string; itens: CartaoDetalhe[] } | null>(null);
 
   return (
@@ -174,6 +230,26 @@ export function CartoesClient({ tiposResumo, pendurados, suspensos, rankingAmare
           <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
             Clique em um item para ver a lista de jogos.
           </p>
+
+          {/* Amarelos e Vermelhos de jogador — detalhados por descrição */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+            <BlocoDescricao
+              titulo="Cartões Amarelos"
+              emoji="🟨"
+              cor="#f59e0b"
+              itens={descricoesAmarelo}
+              onSelecionar={(titulo, itens) => setModalJogos({ titulo, itens })}
+            />
+            <BlocoDescricao
+              titulo="Cartões Vermelhos"
+              emoji="🟥"
+              cor="var(--rebaixamento)"
+              itens={descricoesVermelho}
+              onSelecionar={(titulo, itens) => setModalJogos({ titulo, itens })}
+            />
+          </div>
+
+          {/* Amarelo/Vermelho de técnico — cards simples, como antes */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '1rem' }}>
             {tiposResumo.map(s => {
               const cor = TIPO_COR[s.tipo] ?? 'var(--amarelo)';
