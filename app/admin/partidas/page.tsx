@@ -10,8 +10,9 @@ const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_
 const PSEUDO_IDS = new Set(['outros']);
 const filtrarTimesReais = (times: Time[]) => times.filter(t => !PSEUDO_IDS.has(t.id));
 
-// Rodada completa = 10 partidas que NÃO sejam adiadas
+// Rodada completa = 10 partidas com status ENCERRADA (agendada/ao_vivo não contam)
 const PARTIDAS_POR_RODADA = 10;
+const TOTAL_RODADAS = 38;
 
 export default function AdminPartidas() {
   const router = useRouter();
@@ -36,6 +37,15 @@ export default function AdminPartidas() {
 
   const flash=(ok:boolean,t:string)=>{if(ok)setMsg(t);else setError(t);setTimeout(()=>{setMsg('');setError('');},3500);};
   const f=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setForm(v=>({...v,[k]:e.target.value}));
+
+  // Lista de rodadas (1 a 38) disponíveis para escolher no cadastro/edição de partida.
+  // Uma rodada só some da lista quando já tem 10 partidas registradas (com qualquer
+  // status) — exceto a rodada que já está selecionada na partida em edição, que
+  // continua aparecendo mesmo estando "cheia".
+  const rodadasDisponiveis = Array.from({length: TOTAL_RODADAS}, (_, i) => i + 1).filter(r => {
+    const totalNaRodada = partidas.filter(p => p.rodada === r && p.id !== editId).length;
+    return totalNaRodada < PARTIDAS_POR_RODADA;
+  });
 
   const submit = async (ev:React.FormEvent) => {
     ev.preventDefault();
@@ -89,8 +99,8 @@ export default function AdminPartidas() {
     if (partidas.length > 0 && Object.keys(openRodadas).length === 0) {
       const init: Record<number, boolean> = {};
       rodadas.forEach(rod => {
-        // Apenas partidas não-adiadas contam para completude
-        const count = partidas.filter(p => p.rodada === rod && p.status !== 'adiada').length;
+        // Só considera COMPLETA quando há 10 partidas de fato ENCERRADAS
+        const count = partidas.filter(p => p.rodada === rod && p.status === 'encerrada').length;
         init[rod] = count < PARTIDAS_POR_RODADA;
       });
       setOpenRodadas(init);
@@ -125,9 +135,14 @@ export default function AdminPartidas() {
           <h2 style={{fontSize:'1.3rem',marginBottom:'1.25rem',color:'var(--amarelo)'}}>{editId?'✏️ Editar Partida':'+ Nova Partida'}</h2>
           <form onSubmit={submit}>
 
-            {/* Rodada, Data e Hora — campos reduzidos a ~30% do tamanho original */}
+            {/* Rodada (lista 1-38, ocultando as já completas), Data e Hora — campos reduzidos a ~30% do tamanho original */}
             <div style={{display:'flex',gap:'.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
-              <div className="form-group" style={{width:80,margin:0}}><label>Rodada *</label><input type="number" min={1} max={38} value={form.rodada} onChange={f('rodada')} /></div>
+              <div className="form-group" style={{width:90,margin:0}}><label>Rodada *</label>
+                <select value={form.rodada} onChange={f('rodada')}>
+                  <option value="">Sel.</option>
+                  {rodadasDisponiveis.map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
               <div className="form-group" style={{width:135,margin:0}}><label>Data</label><input type="date" value={form.data} onChange={f('data')} /></div>
               <div className="form-group" style={{width:100,margin:0}}><label>Hora</label><input type="time" value={form.hora} onChange={f('hora')} /></div>
             </div>
@@ -197,15 +212,15 @@ export default function AdminPartidas() {
 
       {rodadas.map(rod=>{
         const ps=partidas.filter(p=>p.rodada===rod);
-        // Rodada completa apenas quando há 10 partidas não-adiadas
-        const countValidas = ps.filter(p => p.status !== 'adiada').length;
-        const completa = countValidas >= PARTIDAS_POR_RODADA;
+        // Só considera COMPLETA quando há 10 partidas de fato ENCERRADAS
+        const countEncerradas = ps.filter(p => p.status === 'encerrada').length;
+        const completa = countEncerradas >= PARTIDAS_POR_RODADA;
         const isOpen=openRodadas[rod]??false;
         return (
           <section key={rod} style={{marginBottom:'1rem'}}>
             <button onClick={()=>toggleRodada(rod)} style={{width:'100%',display:'flex',alignItems:'center',gap:'1rem',background:isOpen?'var(--surface)':'var(--surface2)',border:'1px solid var(--border)',borderRadius:isOpen?'10px 10px 0 0':10,padding:'.8rem 1.25rem',cursor:'pointer',textAlign:'left'}}>
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.5rem',color:'var(--text)'}}>{rod}ª Rodada</span>
-              <span style={{fontSize:'.75rem',color:'var(--text-muted)',flex:1}}>{ps.length} partida(s)</span>
+              <span style={{fontSize:'.75rem',color:'var(--text-muted)',flex:1}}>{ps.length} partida(s) · {countEncerradas} encerrada(s)</span>
               {completa&&<span style={{fontSize:'.68rem',background:'rgba(0,168,79,.12)',color:'var(--verde)',border:'1px solid rgba(0,168,79,.25)',borderRadius:4,padding:'.15rem .5rem',fontWeight:700}}>COMPLETA</span>}
               <span style={{color:'var(--text-muted)',fontSize:'1.1rem',transform:isOpen?'rotate(180deg)':'none',transition:'transform .2s'}}>▾</span>
             </button>
@@ -240,4 +255,4 @@ export default function AdminPartidas() {
       {partidas.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'3rem'}}>Nenhuma partida cadastrada.</p>}
     </div>
   );
-        }
+                  }
