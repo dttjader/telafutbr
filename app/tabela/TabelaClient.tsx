@@ -32,13 +32,33 @@ const zonaRowBg: Record<string, string> = {
   rebaixamento: 'rgba(239,68,68,.04)', neutro: 'transparent',
 };
 
-// Distinct colors for each team line in chart
-const LINE_COLORS = [
-  '#22c55e','#3b82f6','#ef4444','#f59e0b','#8b5cf6','#ec4899',
-  '#14b8a6','#f97316','#84cc16','#06b6d4','#a855f7','#e879f9',
-  '#fb923c','#4ade80','#60a5fa','#c084fc','#f472b6','#34d399',
-  '#fbbf24','#a78bfa',
-];
+// ── Cores das linhas do gráfico: cada time usa sua própria cor primária ──────
+// Quando duas ou mais equipes têm a mesma cor primária (ou muito parecida),
+// misturamos progressivamente com a cor SECUNDÁRIA do próprio time para
+// diferenciar as linhas sem perder a identidade visual de cada clube.
+function hexParaRgb(hex: string): { r: number; g: number; b: number } {
+  const c = (hex || '').replace('#', '').trim();
+  const valido = /^[0-9a-fA-F]{6}$/.test(c);
+  if (!valido) return { r: 136, g: 136, b: 136 };
+  return {
+    r: parseInt(c.substring(0, 2), 16),
+    g: parseInt(c.substring(2, 4), 16),
+    b: parseInt(c.substring(4, 6), 16),
+  };
+}
+function rgbParaHex(r: number, g: number, b: number): string {
+  const h = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+function misturarCores(corA: string, corB: string, peso: number): string {
+  const a = hexParaRgb(corA);
+  const b = hexParaRgb(corB);
+  return rgbParaHex(
+    a.r + (b.r - a.r) * peso,
+    a.g + (b.g - a.g) * peso,
+    a.b + (b.b - a.b) * peso,
+  );
+}
 
 export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada, formaTime, timesRecentes }: Props) {
   const [showChart, setShowChart] = useState(false);
@@ -47,8 +67,23 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
 
   // Times with at least 1 match in chart
   const timesComDados = tabela.map(r => r.time_id);
+
+  // Monta o mapa de cores: cor primária do time e, em caso de repetição entre
+  // times diferentes, mistura gradualmente com a cor secundária (25%, 50%, 75%)
   const timeColorMap: Record<string, string> = {};
-  timesComDados.forEach((id, i) => { timeColorMap[id] = LINE_COLORS[i % LINE_COLORS.length]; });
+  const ocorrenciasPorCor: Record<string, number> = {};
+  timesComDados.forEach(id => {
+    const time = times.find(t => t.id === id);
+    const primaria = time?.cor_primaria ?? '#888888';
+    const secundaria = time?.cor_secundaria ?? '#ffffff';
+    const chave = primaria.toLowerCase();
+    const ocorrencia = ocorrenciasPorCor[chave] ?? 0;
+    ocorrenciasPorCor[chave] = ocorrencia + 1;
+
+    timeColorMap[id] = ocorrencia === 0
+      ? primaria
+      : misturarCores(primaria, secundaria, Math.min(0.25 * ocorrencia, 0.75));
+  });
 
   // Chart dimensions
   const W = 900, H = 340, PAD_L = 32, PAD_R = 16, PAD_T = 16, PAD_B = 28;
@@ -56,6 +91,7 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
   const chartH = H - PAD_T - PAD_B;
   const maxPos = timesComDados.length || 20;
   const nRodadas = rodadas.length;
+  const rowHeight = chartH / (maxPos - 1);
 
   const xScale = (i: number) => PAD_L + (nRodadas <= 1 ? chartW / 2 : (i / (nRodadas - 1)) * chartW);
   const yScale = (pos: number) => PAD_T + ((pos - 1) / (maxPos - 1)) * chartH;
@@ -191,19 +227,23 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
                   </g>
                 ))}
 
-                {/* Zona libertadores background */}
+                {/* Zona libertadores background — topo do gráfico até a metade
+                    do caminho entre a última vaga e a primeira posição neutra */}
                 {(() => {
                   const y1 = yScale(1);
                   const y2 = yScale(config.libertadores.vagas_tabela);
-                  return <rect x={PAD_L} y={y1} width={chartW} height={y2 - y1 + chartH / (maxPos - 1) / 2}
+                  return <rect x={PAD_L} y={y1} width={chartW} height={y2 - y1 + rowHeight / 2}
                     fill="rgba(34,197,94,.04)" />;
                 })()}
 
-                {/* Zona rebaixamento background */}
+                {/* Zona rebaixamento background — mesma lógica da zona de
+                    libertadores, mas espelhada: a borda de cima (que faz divisa
+                    com a zona neutra) fica no meio do caminho entre as posições,
+                    e a borda de baixo vai até o fim do gráfico */}
                 {(() => {
-                  const y1 = yScale(maxPos - config.rebaixamento.vagas + 1);
+                  const y1 = yScale(maxPos - config.rebaixamento.vagas + 1) - rowHeight / 2;
                   const y2 = yScale(maxPos);
-                  return <rect x={PAD_L} y={y1} width={chartW} height={y2 - y1 + chartH / (maxPos - 1) / 2}
+                  return <rect x={PAD_L} y={y1} width={chartW} height={y2 - y1}
                     fill="rgba(239,68,68,.04)" />;
                 })()}
 
