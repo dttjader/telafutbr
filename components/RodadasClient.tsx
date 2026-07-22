@@ -4,7 +4,8 @@ import { Partida, Time, Estadio } from '@/lib/types';
 import { CardPartida } from './CardPartida';
 import { EscudoTime } from './EscudoTime';
 
-// Considera rodada completa apenas com 10 partidas não-adiadas
+// Considera rodada completa apenas com 10 partidas de fato ENCERRADAS
+// (agendada, ao vivo e adiada não contam para a rodada estar "fechada")
 const PARTIDAS_POR_RODADA = 10;
 
 interface Props {
@@ -14,14 +15,14 @@ interface Props {
 }
 
 export function RodadasClient({ partidas, times, estadios }: Props) {
-  const sorted = useMemo(() => [...partidas].sort((a, b) => a.rodada - b.rodada || (a.data || '').localeCompare(b.data || '')), [partidas]);
+  const sorted = useMemo(() => [...partidas].sort((a, b) => a.rodada - b.rodada || (a.data || '').localeCompare(b.data)), [partidas]);
   const rodadas = useMemo(() => [...new Set(sorted.map(p => p.rodada))].sort((a, b) => b - a), [sorted]);
 
   const rodadaAtual = useMemo(() => {
     const rodsAsc = [...rodadas].sort((a, b) => a - b);
     return rodsAsc.reduce((atual, rod) => {
-      // Apenas partidas não-adiadas contam para "completa"
-      const count = sorted.filter(p => p.rodada === rod && p.status !== 'adiada').length;
+      // Só conta partidas realmente encerradas para considerar a rodada completa
+      const count = sorted.filter(p => p.rodada === rod && p.status === 'encerrada').length;
       if (count < PARTIDAS_POR_RODADA) return rod;
       return atual;
     }, rodsAsc[rodsAsc.length - 1]);
@@ -30,7 +31,7 @@ export function RodadasClient({ partidas, times, estadios }: Props) {
   const initialOpen = useMemo(() => {
     const init: Record<number, boolean> = {};
     for (const rod of rodadas) {
-      const count = sorted.filter(p => p.rodada === rod && p.status !== 'adiada').length;
+      const count = sorted.filter(p => p.rodada === rod && p.status === 'encerrada').length;
       const completa = count >= PARTIDAS_POR_RODADA;
       init[rod] = !completa || rod === rodadaAtual;
     }
@@ -138,11 +139,11 @@ export function RodadasClient({ partidas, times, estadios }: Props) {
 
         {rodadas.map(rod => {
           const ps = sorted.filter(p => p.rodada === rod);
-          // Rodada completa = 10 partidas que NÃO sejam adiadas
-          const countValidas = ps.filter(p => p.status !== 'adiada').length;
-          const completa = countValidas >= PARTIDAS_POR_RODADA;
+          // Rodada completa = 10 partidas de fato ENCERRADAS
+          const countEncerradas = ps.filter(p => p.status === 'encerrada').length;
+          const completa = countEncerradas >= PARTIDAS_POR_RODADA;
           const isOpen = open[rod] ?? true;
-          const encerradas = ps.filter(p => p.status === 'encerrada').length;
+          const encerradas = countEncerradas;
           const emAndamento = ps.filter(p => p.status === 'ao_vivo').length;
           const adiadas = ps.filter(p => p.status === 'adiada').length;
 
