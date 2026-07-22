@@ -187,3 +187,114 @@ export function zonaClassificacao(pos: number) {
   if (pos >= 17) return 'rebaixamento';
   return 'neutro';
 }
+// ── Peso dos gols na pontuação da partida ────────────────────────────────
+// Cada gol "vale" a fração dos pontos que o resultado deu ao time, dividida
+// entre todos os gols que aquele time marcou naquela partida. Ex: vitória
+// por 2x0 → 3 pontos / 2 gols = 1,5 por gol. Empate 2x2 → 1 ponto / 2 gols
+// = 0,5 por gol. Gols do time perdedor valem 0.
+// Um pênalti defendido não altera o placar, mas "salva" a diferença de
+// pontos que o time do goleiro perderia caso o pênalti tivesse sido
+// convertido (ex: empate 1x1 que seria 1x2 se convertido → o goleiro
+// resgata 1 ponto, a diferença entre o empate (1) e a derrota hipotética (0)).
+export interface PesoGolItem {
+  id: string;
+  rodada: number;
+  partidaId: string;
+  mandanteSigla: string;
+  visitanteSigla: string;
+  placarCasa: number;
+  placarVisitante: number;
+  data: string;
+  tipo: 'gol' | 'penalti_defendido';
+  jogadorNome: string;
+  timeSigla: string;
+  timeId: string;
+  minuto: number;
+  acrescimo: number;
+  peso: number;
+}
+
+function pontosPorResultado(golsTime: number, golsAdversario: number): number {
+  if (golsTime > golsAdversario) return 3;
+  if (golsTime === golsAdversario) return 1;
+  return 0;
+}
+
+export function calcularPesoGols(partidas: Partida[], jogadores: Jogador[], times: Time[]): PesoGolItem[] {
+  const nomeJog = (id: string) => jogadores.find(j => j.id === id)?.nome ?? id;
+  const siglaTime = (id: string) => times.find(t => t.id === id)?.sigla ?? id;
+  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const itens: PesoGolItem[] = [];
+
+  for (const p of encerradas) {
+    // Gols que de fato contam para o placar (exclui pênaltis perdidos/defendidos)
+    const golsValidos = p.gols.filter(g => {
+      const t = g.tipo as string;
+      return t !== 'penalti_perdido' && t !== 'penalti_defendido';
+    });
+
+    const golsPorTime: Record<string, number> = {};
+    for (const g of golsValidos) golsPorTime[g.time_id] = (golsPorTime[g.time_id] ?? 0) + 1;
+
+    for (const g of golsValidos) {
+      const timeId = g.time_id;
+      const timeGols = timeId === p.time_casa_id ? p.placar_casa : p.placar_visitante;
+      const advGols = timeId === p.time_casa_id ? p.placar_visitante : p.placar_casa;
+      const pontos = pontosPorResultado(timeGols, advGols);
+      const totalGolsTime = golsPorTime[timeId] ?? 0;
+      const peso = totalGolsTime > 0 ? pontos / totalGolsTime : 0;
+
+      itens.push({
+        id: g.id,
+        rodada: p.rodada,
+        partidaId: p.id,
+        mandanteSigla: siglaTime(p.time_casa_id),
+        visitanteSigla: siglaTime(p.time_visitante_id),
+        placarCasa: p.placar_casa,
+        placarVisitante: p.placar_visitante,
+        data: p.data,
+        tipo: 'gol',
+        jogadorNome: nomeJog(g.jogador_id),
+        timeSigla: siglaTime(timeId),
+        timeId,
+        minuto: g.minuto,
+        acrescimo: g.acrescimo ?? 0,
+        peso,
+      });
+    }
+
+    // Pênaltis defendidos: o "atacante" (time_id) é quem bateu e perdeu;
+    // o goleiro (goleiro_id) pertence ao time adversário do atacante.
+    const defendidos = p.gols.filter(g => (g.tipo as string) === 'penalti_defendido');
+    for (const g of defendidos) {
+      const timeAtacanteId = g.time_id;
+      const timeGoleiroId = timeAtacanteId === p.time_casa_id ? p.time_visitante_id : p.time_casa_id;
+      const atacanteGols = timeAtacanteId === p.time_casa_id ? p.placar_casa : p.placar_visitante;
+      const goleiroGols  = timeAtacanteId === p.time_casa_id ? p.placar_visitante : p.placar_casa;
+
+      const pontosAtual = pontosPorResultado(goleiroGols, atacanteGols);
+      const pontosHipotetico = pontosPorResultado(goleiroGols, atacanteGols + 1);
+      const peso = Math.max(0, pontosAtual - pontosHipotetico);
+
+      itens.push({
+        id: g.id,
+        rodada: p.rodada,
+        partidaId: p.id,
+        mandanteSigla: siglaTime(p.time_casa_id),
+        visitanteSigla: siglaTime(p.time_visitante_id),
+        placarCasa: p.placar_casa,
+        placarVisitante: p.placar_visitante,
+        data: p.data,
+        tipo: 'penalti_defendido',
+        jogadorNome: nomeJog(g.goleiro_id),
+        timeSigla: siglaTime(timeGoleiroId),
+        timeId: timeGoleiroId,
+        minuto: g.minuto,
+        acrescimo: (g as { acrescimo?: number }).acrescimo ?? 0,
+        peso,
+      });
+    }
+  }
+
+  return itens.sort((a, b) => b.peso - a.peso || b.rodada - a.rodada || a.data.localeCompare(b.data));
+}
