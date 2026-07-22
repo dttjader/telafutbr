@@ -1,7 +1,6 @@
-import { getJogadores, getPartidas, getTimes } from '@/lib/data';
-import { Partida, Jogador } from '@/lib/types';
-import { AnaliticoClient } from '@/app/analitico/AnaliticoClient';
-import { StatJogador } from '@/app/analitico/page';
+import { getJogadores, getPartidas, getTimes, calcularPesoGols } from '@/lib/data';
+import { Partida } from '@/lib/types';
+import { AnaliticoClient, StatJogador } from './AnaliticoClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,5 +90,7 @@ export default async function AnaliticoPage() {
     .filter(s => s.partidas > 0)
     .sort((a, b) => b.minutos - a.minutos || b.partidas - a.partidas);
 
-  return <AnaliticoClient lista={lista} totalPartidas={encerradas.length} times={times} />;
+  const pesoGols = calcularPesoGols(partidas, jogadores, times);
+
+  return <AnaliticoClient lista={lista} totalPartidas={encerradas.length} times={times} pesoGols={pesoGols} />;
 }
