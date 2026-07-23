@@ -1,4 +1,4 @@
-import { getJogadores, getPartidas, getTimes, calcularPesoGols } from '@/lib/data';
+import { getJogadores, getPartidas, getTimes, calcularPesoGols, somaPesoGolsPorJogador } from '@/lib/data';
 import { Partida } from '@/lib/types';
 import { AnaliticoClient, StatJogador } from './AnaliticoClient';
 
@@ -37,6 +37,11 @@ export default async function AnaliticoPage() {
   ]);
   const encerradas = partidas.filter(p => p.status === 'encerrada');
 
+  // Peso dos gols/pênaltis defendidos na pontuação, somado por jogador
+  // (usado na coluna "Pts" das tabelas abaixo)
+  const pesoGols = calcularPesoGols(partidas, jogadores, times);
+  const pontuacaoPorJogador = somaPesoGolsPorJogador(pesoGols);
+
   const statsMap: Record<string, StatJogador> = {};
   for (const j of jogadores) {
     const time = times.find(t => t.id === j.time_atual);
@@ -50,6 +55,7 @@ export default async function AnaliticoPage() {
       gols: 0, gols_contra: 0, gols_sofridos: 0,
       assistencias: 0, cartoes_amarelos: 0, cartoes_vermelhos: 0,
       minutos_com_amarelo: 0,
+      pontuacao_gols: pontuacaoPorJogador[j.id] ?? 0,
     };
   }
 
@@ -89,8 +95,6 @@ export default async function AnaliticoPage() {
   const lista = Object.values(statsMap)
     .filter(s => s.partidas > 0)
     .sort((a, b) => b.minutos - a.minutos || b.partidas - a.partidas);
-
-  const pesoGols = calcularPesoGols(partidas, jogadores, times);
 
   return <AnaliticoClient lista={lista} totalPartidas={encerradas.length} times={times} pesoGols={pesoGols} />;
 }

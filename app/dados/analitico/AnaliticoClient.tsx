@@ -22,6 +22,7 @@ export interface StatJogador {
   cartoes_amarelos: number;
   cartoes_vermelhos: number;
   minutos_com_amarelo: number;
+  pontuacao_gols: number; // soma do peso dos gols/pênaltis defendidos na pontuação
 }
 
 const POSICAO_LABEL: Record<string, string> = {
@@ -78,6 +79,96 @@ interface Props {
 
 type OrdenarPor = 'minutos' | 'partidas' | 'gols' | 'assistencias' | 'amarelos' | 'vermelhos';
 
+// ── Sub-componente: tabela de uma faixa de peso ──────────────────────────────
+// Hoisted (fora do componente principal) para não ser recriado a cada
+// re-render do AnaliticoClient.
+function GrupoPesoTable({
+  titulo, faixaDesc, cor, itens, expandido, onToggle,
+}: {
+  titulo: string;
+  faixaDesc: string;
+  cor: string;
+  itens: PesoGolItem[];
+  expandido: boolean;
+  onToggle: () => void;
+}) {
+  const LIMITE = 15;
+  const exibidos = expandido ? itens : itens.slice(0, LIMITE);
+
+  return (
+    <div style={{ marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '.6rem', marginBottom: '.6rem', flexWrap: 'wrap' }}>
+        <h3 style={{ fontSize: '1.15rem', color: cor }}>{titulo}</h3>
+        <span style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{faixaDesc} · {itens.length} registro(s)</span>
+      </div>
+
+      {itens.length === 0 ? (
+        <p style={{ color: 'var(--text-muted)', fontSize: '.82rem', padding: '.5rem 0 1rem' }}>Nenhum registro nesta faixa.</p>
+      ) : (
+        <>
+          <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
+              <thead style={{ background: 'var(--surface2)', borderBottom: `2px solid ${cor}` }}>
+                <tr>
+                  {['Peso', 'Rodada', 'Partida', 'Jogador', 'Time', 'Tipo', 'Min.'].map(h => (
+                    <th key={h} style={{
+                      padding: '.55rem .75rem',
+                      textAlign: h === 'Jogador' ? 'left' : 'center',
+                      fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem',
+                      letterSpacing: '.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {exibidos.map((it, i) => (
+                  <tr key={`${it.tipo}-${it.id}-${it.jogadorId}`} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                    <td style={{
+                      textAlign: 'center', padding: '.5rem .5rem',
+                      fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem',
+                      color: cor,
+                    }}>
+                      {it.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '.5rem' }}>{it.rodada}</td>
+                    <td style={{ textAlign: 'center', padding: '.5rem', whiteSpace: 'nowrap' }}>
+                      <Link href={`/partida/${it.partidaId}`} style={{ color: 'var(--text)', textDecoration: 'none', borderBottom: '1px solid var(--verde)' }}>
+                        {it.mandanteSigla} {it.placarCasa}×{it.placarVisitante} {it.visitanteSigla}
+                      </Link>
+                    </td>
+                    <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>{it.jogadorNome}</td>
+                    <td style={{ textAlign: 'center', padding: '.5rem', color: 'var(--text-muted)' }}>{it.timeSigla}</td>
+                    <td style={{ textAlign: 'center', padding: '.5rem' }}>
+                      <span style={{
+                        fontSize: '.68rem', padding: '.15rem .45rem', borderRadius: 4,
+                        background: it.tipo === 'penalti_defendido' ? 'rgba(96,165,250,.12)' : 'rgba(255,223,0,.1)',
+                        color: it.tipo === 'penalti_defendido' ? '#60a5fa' : 'var(--amarelo)',
+                        border: `1px solid ${it.tipo === 'penalti_defendido' ? 'rgba(96,165,250,.3)' : 'rgba(255,223,0,.25)'}`,
+                      }}>
+                        {it.tipo === 'penalti_defendido' ? '🧤 Defesa' : '⚽ Gol'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '.5rem', color: 'var(--text-muted)' }}>
+                      {it.minuto}{it.acrescimo > 0 ? `+${it.acrescimo}` : ''}&apos;
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {itens.length > LIMITE && (
+            <div style={{ textAlign: 'center', marginTop: '.75rem' }}>
+              <button className="btn btn-ghost btn-sm" onClick={onToggle}>
+                {expandido ? 'Mostrar menos' : `Mostrar todos (${itens.length})`}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props) {
   const [filtroTime, setFiltroTime] = useState('');
   const [filtroNac, setFiltroNac] = useState('');
@@ -91,13 +182,26 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
 
   // ── Peso dos Gols na Pontuação ────────────────────────────────────────────
   const [filtroTipoPeso, setFiltroTipoPeso] = useState<'todos' | 'gol' | 'penalti_defendido'>('todos');
-  const [mostrarTodosPeso, setMostrarTodosPeso] = useState(false);
+  const [expandidoGrupo, setExpandidoGrupo] = useState<Record<string, boolean>>({});
+  const toggleGrupo = (key: string) => setExpandidoGrupo(e => ({ ...e, [key]: !e[key] }));
 
-  const pesoFiltrado = useMemo(() => {
+  const pesoPorTipo = useMemo(() => {
     return filtroTipoPeso === 'todos' ? pesoGols : pesoGols.filter(it => it.tipo === filtroTipoPeso);
   }, [pesoGols, filtroTipoPeso]);
 
-  const pesoExibido = mostrarTodosPeso ? pesoFiltrado : pesoFiltrado.slice(0, 25);
+  const gruposPeso = useMemo(() => {
+    const alta: PesoGolItem[] = [];
+    const media: PesoGolItem[] = [];
+    const baixa: PesoGolItem[] = [];
+    const zero: PesoGolItem[] = [];
+    for (const it of pesoPorTipo) {
+      if (it.peso === 0) zero.push(it);
+      else if (it.peso > 1.5) alta.push(it);
+      else if (it.peso === 1.5 || it.peso === 1) media.push(it);
+      else baixa.push(it);
+    }
+    return { alta, media, baixa, zero };
+  }, [pesoPorTipo]);
 
   const filtrada = useMemo(() => {
     return lista.filter(s => {
@@ -196,6 +300,9 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
             <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{s.reserva}</td>
             <td style={{ textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--amarelo)' }}>{s.minutos}</td>
             <td style={{ textAlign: 'center', fontWeight: 600, color: s.gols > 0 ? 'var(--libertadores)' : 'var(--text-muted)' }}>{s.gols}</td>
+            <td style={{ textAlign: 'center', fontWeight: 600, color: s.pontuacao_gols > 0 ? '#a78bfa' : 'var(--text-muted)' }}>
+              {s.pontuacao_gols > 0 ? s.pontuacao_gols.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+            </td>
             <td style={{ textAlign: 'center', color: s.gols_contra > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)' }}>{s.gols_contra || '—'}</td>
             {s.jogador.posicao === 'GOL' ? (
               <>
@@ -231,7 +338,7 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
             {[
               ['Jogador', 'left'], ['Time', 'left'], ['Nac.', 'center'], ['Idade', 'center'],
               ['P', 'center'], ['T', 'center'], ['R', 'center'], ['Min', 'center'],
-              ['Gols', 'center'], ['GC', 'center'], ['GS', 'center'], ['GS/90', 'center'],
+              ['Gols', 'center'], ['Pts', 'center'], ['GC', 'center'], ['GS', 'center'], ['GS/90', 'center'],
               ['Ast.', 'center'], ['G/90', 'center'], ['🟨', 'center'], ['🟥', 'center'], ["Min🟨", 'center'],
             ].map(([h, align]) => (
               <th key={h} onClick={() => {
@@ -254,7 +361,7 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
         </thead>
         <tbody>
           {dados.length === 0
-            ? <tr><td colSpan={17} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador encontrado com esses filtros.</td></tr>
+            ? <tr><td colSpan={18} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador encontrado com esses filtros.</td></tr>
             : <TabelaRows dados={dados} />
           }
         </tbody>
@@ -368,6 +475,7 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
           <span><strong style={{ color: 'var(--verde)' }}>T</strong> Titular</span>
           <span><strong style={{ color: 'var(--text)' }}>R</strong> Reserva</span>
           <span><strong style={{ color: 'var(--amarelo)' }}>Min</strong> Minutos (45+acréscimos)</span>
+          <span><strong style={{ color: '#a78bfa' }}>Pts</strong> Soma do peso dos gols/pênaltis defendidos na pontuação das partidas</span>
           <span><strong>GC</strong> Gols Contra</span>
           <span><strong>GS</strong> Gols Sofridos</span>
           <span><strong>GS/90</strong> Gols Sofridos por 90min</span>
@@ -391,7 +499,7 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
             Mede o quanto cada gol (ou pênalti defendido) valeu na pontuação da partida. Numa vitória, os gols do time vencedor dividem entre si os 3 pontos; num empate, cada time divide seu 1 ponto entre os próprios gols; gols do perdedor valem 0. Um pênalti defendido não altera o placar, mas &quot;resgata&quot; a diferença de pontos que o time do goleiro perderia se o pênalti tivesse sido convertido.
           </p>
 
-          <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             {[
               ['todos', 'Todos'],
               ['gol', '⚽ Gols'],
@@ -406,71 +514,42 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
               </button>
             ))}
             <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-              {pesoFiltrado.length} registro(s)
+              {pesoPorTipo.length} registro(s) no total
             </span>
           </div>
 
-          <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
-              <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
-                <tr>
-                  {['Peso', 'Rodada', 'Partida', 'Jogador', 'Time', 'Tipo', 'Min.'].map(h => (
-                    <th key={h} style={{
-                      padding: '.55rem .75rem',
-                      textAlign: h === 'Jogador' ? 'left' : 'center',
-                      fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem',
-                      letterSpacing: '.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pesoExibido.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum registro encontrado.</td></tr>
-                )}
-                {pesoExibido.map((it, i) => (
-                  <tr key={`${it.tipo}-${it.id}`} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                    <td style={{
-                      textAlign: 'center', padding: '.5rem .5rem',
-                      fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem',
-                      color: it.tipo === 'penalti_defendido' ? '#60a5fa' : 'var(--amarelo)',
-                    }}>
-                      {it.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td style={{ textAlign: 'center', padding: '.5rem' }}>{it.rodada}</td>
-                    <td style={{ textAlign: 'center', padding: '.5rem', whiteSpace: 'nowrap' }}>
-                      <Link href={`/partida/${it.partidaId}`} style={{ color: 'var(--text)', textDecoration: 'none', borderBottom: '1px solid var(--verde)' }}>
-                        {it.mandanteSigla} {it.placarCasa}×{it.placarVisitante} {it.visitanteSigla}
-                      </Link>
-                    </td>
-                    <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>{it.jogadorNome}</td>
-                    <td style={{ textAlign: 'center', padding: '.5rem', color: 'var(--text-muted)' }}>{it.timeSigla}</td>
-                    <td style={{ textAlign: 'center', padding: '.5rem' }}>
-                      <span style={{
-                        fontSize: '.68rem', padding: '.15rem .45rem', borderRadius: 4,
-                        background: it.tipo === 'penalti_defendido' ? 'rgba(96,165,250,.12)' : 'rgba(255,223,0,.1)',
-                        color: it.tipo === 'penalti_defendido' ? '#60a5fa' : 'var(--amarelo)',
-                        border: `1px solid ${it.tipo === 'penalti_defendido' ? 'rgba(96,165,250,.3)' : 'rgba(255,223,0,.25)'}`,
-                      }}>
-                        {it.tipo === 'penalti_defendido' ? '🧤 Defesa' : '⚽ Gol'}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center', padding: '.5rem', color: 'var(--text-muted)' }}>
-                      {it.minuto}{it.acrescimo > 0 ? `+${it.acrescimo}` : ''}&apos;
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {pesoFiltrado.length > 25 && (
-            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setMostrarTodosPeso(v => !v)}>
-                {mostrarTodosPeso ? 'Mostrar menos' : `Mostrar todos (${pesoFiltrado.length})`}
-              </button>
-            </div>
-          )}
+          <GrupoPesoTable
+            titulo="🔥 Alto Impacto"
+            faixaDesc="peso acima de 1,50 até 3,00"
+            cor="#ef4444"
+            itens={gruposPeso.alta}
+            expandido={!!expandidoGrupo.alta}
+            onToggle={() => toggleGrupo('alta')}
+          />
+          <GrupoPesoTable
+            titulo="⚡ Impacto Médio"
+            faixaDesc="peso de 1,00 ou 1,50"
+            cor="var(--amarelo)"
+            itens={gruposPeso.media}
+            expandido={!!expandidoGrupo.media}
+            onToggle={() => toggleGrupo('media')}
+          />
+          <GrupoPesoTable
+            titulo="🔹 Baixo Impacto"
+            faixaDesc="peso entre 0,10 e 1,00"
+            cor="#60a5fa"
+            itens={gruposPeso.baixa}
+            expandido={!!expandidoGrupo.baixa}
+            onToggle={() => toggleGrupo('baixa')}
+          />
+          <GrupoPesoTable
+            titulo="⚪ Sem Impacto"
+            faixaDesc="peso 0,00 (gol do time perdedor)"
+            cor="var(--text-muted)"
+            itens={gruposPeso.zero}
+            expandido={!!expandidoGrupo.zero}
+            onToggle={() => toggleGrupo('zero')}
+          />
         </section>
       </div>
     </div>
