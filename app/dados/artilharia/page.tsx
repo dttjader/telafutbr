@@ -1,15 +1,29 @@
-import { calcularArtilharia, getJogadores, getTimes, getTecnicos, getPartidas } from '@/lib/data';
+import { calcularArtilharia, getJogadores, getTimes, getTecnicos, getPartidas, calcularPesoGols, somaPesoGolsPorJogador } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 
 export const dynamic = 'force-dynamic';
 
+const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
+
 export default async function ArtilhariaPage() {
-  const [artilharia, jogadores, times, tecnicos, partidas] = await Promise.all([
+  const [artilhariaBase, jogadores, times, tecnicos, partidas] = await Promise.all([
     calcularArtilharia(), getJogadores(), getTimes(), getTecnicos(), getPartidas()
   ]);
 
   const encerradas = partidas.filter(p => p.status === 'encerrada');
 
+  // Peso dos gols/pênaltis defendidos na pontuação — usado como critério de
+  // desempate na artilharia (jogadores com o mesmo nº de gols) e no ranking
+  // dos 20 maiores pontuadores, ao final da página.
+  const pesoGols = calcularPesoGols(partidas, jogadores, times);
+  const pontuacaoPorJogador = somaPesoGolsPorJogador(pesoGols);
+
+  // Artilharia com a pontuação anexada e desempate: gols > pontuação
+  const artilharia = artilhariaBase
+    .map(a => ({ ...a, pontuacao: pontuacaoPorJogador[a.jogador_id] ?? 0 }))
+    .sort((a, b) => b.quantidade - a.quantidade || b.pontuacao - a.pontuacao);
+
+  // Calcular assistências
   const assistMap: Record<string, { jogador_id: string; time_id: string; quantidade: number }> = {};
   for (const p of encerradas) {
     for (const g of p.gols) {
@@ -20,6 +34,7 @@ export default async function ArtilhariaPage() {
   }
   const assistencias = Object.values(assistMap).sort((a, b) => b.quantidade - a.quantidade);
 
+  // Calcular G/90
   const statsJogMap: Record<string, { nome: string; time_id: string; gols: number; minutos: number }> = {};
   for (const j of jogadores) {
     statsJogMap[j.id] = { nome: j.nome, time_id: j.time_atual, gols: 0, minutos: 0 };
@@ -59,13 +74,22 @@ export default async function ArtilhariaPage() {
     .sort((a, b) => b.g90 - a.g90)
     .slice(0, 20);
 
+  // Ranking dos 20 maiores pontuadores de gols (soma do peso na pontuação)
+  const rankingPontuacao = Object.entries(pontuacaoPorJogador)
+    .map(([jogador_id, pontuacao]) => {
+      const jog = jogadores.find(j => j.id === jogador_id);
+      return { jogador_id, nome: jog?.nome ?? jogador_id, time_id: jog?.time_atual ?? '', pontuacao };
+    })
+    .filter(j => j.pontuacao > 0)
+    .sort((a, b) => b.pontuacao - a.pontuacao)
+    .slice(0, 20);
+
   const nomeJog = (id: string) => jogadores.find(j => j.id === id)?.nome ?? id;
   const nomeTime = (id: string) => times.find(t => t.id === id)?.nome ?? id;
-  const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
   const RankingCol = ({ titulo, dados, valorLabel, cor }: {
     titulo: string;
-    dados: { jogador_id: string; time_id: string; quantidade: number }[];
+    dados: { jogador_id: string; time_id: string; quantidade: number; pontuacao?: number }[];
     valorLabel: string;
     cor: string;
   }) => (
@@ -91,6 +115,11 @@ export default async function ArtilhariaPage() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: isPrimeiro ? '1rem' : '.9rem' }}>{nomeJog(a.jogador_id)}</div>
                 <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{nomeTime(a.time_id)}</div>
+                {a.pontuacao !== undefined && (
+                  <div style={{ fontSize: '.68rem', color: '#a78bfa', marginTop: '.15rem' }}>
+                    ⚖️ {a.pontuacao.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pts na pontuação
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: isPrimeiro ? '2rem' : '1.6rem', color: cor, lineHeight: 1 }}>{a.quantidade}</div>
@@ -118,11 +147,13 @@ export default async function ArtilhariaPage() {
       </div>
 
       <div className="container">
+        {/* Linha 1: Artilharia + Assistências */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2.5rem' }}>
           <RankingCol titulo="⚽ Artilharia" dados={artilharia} valorLabel="gols" cor="var(--amarelo)" />
           <RankingCol titulo="🎯 Assistências" dados={assistencias} valorLabel="assist." cor="#60a5fa" />
         </div>
 
+        {/* G/90 */}
         <div style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             ⚡ Gols por 90 minutos <span style={{ fontSize: '.9rem', fontFamily: 'Barlow,sans-serif', fontWeight: 400, color: 'var(--text-muted)' }}>(mín. 90min jogados)</span>
@@ -135,7 +166,8 @@ export default async function ArtilhariaPage() {
               const isPrimeiro = i === 0;
               return (
                 <div key={j.nome + i} style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '.75rem',
+                  display: 'flex', flexDirection: 'column', alignItems: 'stretch',
+                  gap: '.75rem',
                   padding: isPrimeiro ? '1rem 1.25rem' : '.75rem 1rem',
                   background: isPrimeiro ? 'rgba(255,223,0,.04)' : 'var(--surface)',
                   border: `1px solid ${isPrimeiro ? 'rgba(255,223,0,.25)' : 'var(--border)'}`,
@@ -161,7 +193,51 @@ export default async function ArtilhariaPage() {
             })}
           </div>
         </div>
+
+        {/* 🏅 20 Maiores Pontuadores de Gols */}
+        <div style={{ marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            🏅 20 Maiores Pontuadores de Gols
+            <span style={{ fontSize: '.9rem', fontFamily: 'Barlow,sans-serif', fontWeight: 400, color: 'var(--text-muted)' }}> (soma do peso dos gols/pênaltis defendidos na pontuação)</span>
+          </h2>
+          {rankingPontuacao.length === 0 && <p style={{ color: 'var(--text-muted)', padding: '2rem 0' }}>Sem dados suficientes.</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: '.6rem' }}>
+            {rankingPontuacao.map((j, i) => {
+              const time = times.find(t => t.id === j.time_id);
+              const maxPontuacao = rankingPontuacao[0]?.pontuacao ?? 1;
+              const isPrimeiro = i === 0;
+              return (
+                <div key={j.jogador_id} style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'stretch',
+                  gap: '.75rem',
+                  padding: isPrimeiro ? '1rem 1.25rem' : '.75rem 1rem',
+                  background: isPrimeiro ? 'rgba(167,139,250,.06)' : 'var(--surface)',
+                  border: `1px solid ${isPrimeiro ? 'rgba(167,139,250,.3)' : 'var(--border)'}`,
+                  borderRadius: 10,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--verde)', minWidth: 28 }}>{medalha(i)}</span>
+                    <EscudoTime time={time ?? undefined} size={isPrimeiro ? 40 : 30} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: isPrimeiro ? '1rem' : '.9rem' }}>{j.nome}</div>
+                      <div style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{nomeTime(j.time_id)}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: isPrimeiro ? '2rem' : '1.6rem', color: '#a78bfa', lineHeight: 1 }}>
+                        {j.pontuacao.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>pts</div>
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 4, marginTop: '.4rem' }}>
+                    <div style={{ width: `${(j.pontuacao / maxPontuacao) * 100}%`, height: '100%', background: '#a78bfa', borderRadius: 3 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
-      }
+}
