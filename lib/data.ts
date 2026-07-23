@@ -187,17 +187,22 @@ export function zonaClassificacao(pos: number) {
   if (pos >= 17) return 'rebaixamento';
   return 'neutro';
 }
+
 // ── Peso dos gols na pontuação da partida ────────────────────────────────
 // Cada gol "vale" a fração dos pontos que o resultado deu ao time, dividida
 // entre todos os gols que aquele time marcou naquela partida. Ex: vitória
 // por 2x0 → 3 pontos / 2 gols = 1,5 por gol. Empate 2x2 → 1 ponto / 2 gols
 // = 0,5 por gol. Gols do time perdedor valem 0.
-// Um pênalti defendido não altera o placar, mas "salva" a diferença de
-// pontos que o time do goleiro perderia caso o pênalti tivesse sido
-// convertido (ex: empate 1x1 que seria 1x2 se convertido → o goleiro
-// resgata 1 ponto, a diferença entre o empate (1) e a derrota hipotética (0)).
+//
+// Pênalti defendido: não altera o placar, mas "resgata" a diferença entre
+// os pontos reais do time do goleiro e os pontos que ele teria se o pênalti
+// tivesse sido convertido:
+//  - Evita um empate virando derrota → mantém a vitória → peso = 3 - 1 = 2
+//  - Evita uma derrota virando empate → mantém o empate  → peso = 1 - 0 = 1
+//  - Defesa "sem impacto" no resultado (ex: vencendo por 2+ gols) → peso = 0
 export interface PesoGolItem {
   id: string;
+  jogadorId: string;
   rodada: number;
   partidaId: string;
   mandanteSigla: string;
@@ -246,6 +251,7 @@ export function calcularPesoGols(partidas: Partida[], jogadores: Jogador[], time
 
       itens.push({
         id: g.id,
+        jogadorId: g.jogador_id,
         rodada: p.rodada,
         partidaId: p.id,
         mandanteSigla: siglaTime(p.time_casa_id),
@@ -278,6 +284,7 @@ export function calcularPesoGols(partidas: Partida[], jogadores: Jogador[], time
 
       itens.push({
         id: g.id,
+        jogadorId: g.goleiro_id,
         rodada: p.rodada,
         partidaId: p.id,
         mandanteSigla: siglaTime(p.time_casa_id),
@@ -297,4 +304,14 @@ export function calcularPesoGols(partidas: Partida[], jogadores: Jogador[], time
   }
 
   return itens.sort((a, b) => b.peso - a.peso || b.rodada - a.rodada || a.data.localeCompare(b.data));
+}
+
+// Soma o peso de todos os gols/pênaltis defendidos de cada jogador — usado
+// como coluna "Pts" no Analítico e como critério de desempate na Artilharia.
+export function somaPesoGolsPorJogador(itens: PesoGolItem[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const it of itens) {
+    map[it.jogadorId] = (map[it.jogadorId] ?? 0) + it.peso;
+  }
+  return map;
 }
