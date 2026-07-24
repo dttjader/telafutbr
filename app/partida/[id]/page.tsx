@@ -6,6 +6,16 @@ export const dynamic = 'force-dynamic';
 
 const TIPO_GOL: Record<string,string> = {normal:'Gol',penalti:'Pênalti',falta:'Falta',contra:'Contra'};
 
+interface EventoLinha {
+  minuto: number;
+  acrescimo: number;
+  tipo: 'gol' | 'gol_contra' | 'penalti_perdido' | 'penalti_defendido' | 'cartao_amarelo' | 'cartao_vermelho' | 'substituicao';
+  isCasa: boolean;
+  icone: string;
+  cor: string;
+  texto: string;
+}
+
 export default async function PartidaPage({params}:{params:Promise<{id:string}>}) {
   const {id} = await params;
   const [partida, times, jogadores, estadios, tecnicos] = await Promise.all([
@@ -22,6 +32,98 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
 
   const sS={background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'1.5rem',marginBottom:'1rem'};
   const sT={fontSize:'1.1rem',color:'var(--amarelo)',marginBottom:'1rem',paddingBottom:'.75rem',borderBottom:'1px solid var(--border)'};
+
+  // ── Linha do Tempo: combina gols, cartões e substituições em uma única
+  // lista cronológica, com marcadores empilhados quando há mais de um
+  // registro no mesmo minuto (ex: dupla substituição).
+  const acr1 = partida.acrescimo_primeiro ?? 0;
+  const acr2 = partida.acrescimo_segundo ?? 0;
+  const totalPartidaMin = 45 + acr1 + 45 + acr2;
+
+  const eventosLinha: EventoLinha[] = [];
+
+  for (const g of partida.gols as any[]) {
+    const tipoStr = g.tipo as string;
+    const isCasa = g.time_id === partida.time_casa_id;
+
+    if (tipoStr === 'penalti_defendido') {
+      eventosLinha.push({
+        minuto: g.minuto,
+        acrescimo: g.acrescimo ?? 0,
+        tipo: 'penalti_defendido',
+        isCasa,
+        icone: '🧤',
+        cor: '#60a5fa',
+        texto: `${nomeJog(g.jogador_id)} cobrou · defendido por ${nomeJog(g.goleiro_id)}`,
+      });
+      continue;
+    }
+    if (tipoStr === 'penalti_perdido') {
+      eventosLinha.push({
+        minuto: g.minuto,
+        acrescimo: g.acrescimo ?? 0,
+        tipo: 'penalti_perdido',
+        isCasa,
+        icone: '❌',
+        cor: '#f97316',
+        texto: `${nomeJog(g.jogador_id)} perdeu o pênalti${g.descricao ? ` · ${g.descricao}` : ''}`,
+      });
+      continue;
+    }
+
+    const isContra = tipoStr === 'contra';
+    eventosLinha.push({
+      minuto: g.minuto,
+      acrescimo: g.acrescimo ?? 0,
+      tipo: isContra ? 'gol_contra' : 'gol',
+      isCasa,
+      icone: isContra ? '🔴' : '⚽',
+      cor: isContra ? 'var(--rebaixamento)' : '#fbbf24',
+      texto: `${nomeJog(g.jogador_id)}${!isContra && g.assistencia_id ? ` · assist. ${nomeJog(g.assistencia_id)}` : ''} (${TIPO_GOL[tipoStr] ?? tipoStr})`,
+    });
+  }
+
+  for (const c of partida.cartoes as any[]) {
+    const isCasa = c.time_id === partida.time_casa_id;
+    const isVermelho = c.tipo === 'vermelho' || c.tipo === 'vermelho_tecnico';
+    const isTecnico = c.tipo === 'amarelo_tecnico' || c.tipo === 'vermelho_tecnico';
+    const nomePunido = isTecnico && c.tecnico_id ? nomeTecnico(c.tecnico_id) : nomeJog(c.jogador_id);
+    eventosLinha.push({
+      minuto: c.minuto,
+      acrescimo: c.acrescimo ?? 0,
+      tipo: isVermelho ? 'cartao_vermelho' : 'cartao_amarelo',
+      isCasa,
+      icone: isVermelho ? '🟥' : '🟨',
+      cor: isVermelho ? 'var(--rebaixamento)' : '#f59e0b',
+      texto: `${nomePunido}${c.motivo ? ` · ${c.motivo}` : ''}${isTecnico ? ' (Técnico)' : ''}`,
+    });
+  }
+
+  for (const s of partida.substituicoes as any[]) {
+    const isCasa = s.time_id === partida.time_casa_id;
+    eventosLinha.push({
+      minuto: s.minuto,
+      acrescimo: 0,
+      tipo: 'substituicao',
+      isCasa,
+      icone: '🔄',
+      cor: '#94a3b8',
+      texto: `${nomeJog(s.entra_id)} ↑ / ${nomeJog(s.sai_id)} ↓`,
+    });
+  }
+
+  eventosLinha.sort((a, b) => (a.minuto + a.acrescimo * 0.01) - (b.minuto + b.acrescimo * 0.01));
+
+  // Empilhamento: quando dois ou mais eventos caem exatamente no mesmo minuto
+  // (+acréscimo), cada um recebe um índice para ser desenhado um abaixo do outro.
+  const contagemPorMinuto: Record<string, number> = {};
+  const eventosComOffset = eventosLinha.map(ev => {
+    const chave = `${ev.minuto}-${ev.acrescimo}`;
+    const indice = contagemPorMinuto[chave] ?? 0;
+    contagemPorMinuto[chave] = indice + 1;
+    return { ...ev, offsetIndice: indice };
+  });
+  const maiorEmpilhamento = Math.max(1, ...Object.values(contagemPorMinuto));
 
   return (
     <div style={{paddingBottom:'4rem'}}>
@@ -154,6 +256,83 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
           </div>
         )}
 
+        {/* 🕒 Linha do Tempo — gols, cartões e substituições em ordem cronológica */}
+        {eventosComOffset.length>0&&(
+          <div style={sS}><h3 style={sT}>🕒 Linha do Tempo</h3>
+
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:'.68rem',color:'var(--text-muted)',marginBottom:'.4rem'}}>
+              <span>0&apos;</span>
+              <span>45+{acr1}&apos;</span>
+              <span>90+{acr2}&apos;</span>
+            </div>
+
+            <div style={{
+              position:'relative', height:8, background:'#222', borderRadius:4,
+              marginBottom: 12 + (maiorEmpilhamento - 1) * 20,
+            }}>
+              <div style={{position:'absolute',left:'45.45%',top:-2,width:1,height:12,background:'#444',zIndex:1}} />
+              {eventosComOffset.map((ev,i)=>{
+                const pos = Math.min((ev.minuto / totalPartidaMin) * 100, 98);
+                const topOffset = ev.offsetIndice * 20;
+                const timeSigla = ev.isCasa ? tc?.sigla : tv?.sigla;
+                return (
+                  <div
+                    key={i}
+                    title={`${ev.minuto}${ev.acrescimo>0?`+${ev.acrescimo}`:''}' · ${timeSigla} · ${ev.texto}`}
+                    style={{
+                      position:'absolute',
+                      left:`${pos}%`,
+                      top:`calc(50% + ${topOffset}px)`,
+                      transform:'translate(-50%, -50%)',
+                      width:16, height:16,
+                      borderRadius:'50%',
+                      background:ev.cor,
+                      border:`2px solid ${ev.isCasa?'var(--verde)':'var(--amarelo)'}`,
+                      zIndex:2,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:8,
+                      cursor:'default',
+                    }}
+                  >
+                    {ev.icone}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{display:'flex',gap:'1rem',fontSize:'.7rem',color:'var(--text-muted)',marginBottom:'1rem',flexWrap:'wrap'}}>
+              <span style={{display:'flex',alignItems:'center',gap:'.3rem'}}>
+                <span style={{width:10,height:10,borderRadius:'50%',border:'2px solid var(--verde)',display:'inline-block'}} /> {tc?.sigla} (mandante)
+              </span>
+              <span style={{display:'flex',alignItems:'center',gap:'.3rem'}}>
+                <span style={{width:10,height:10,borderRadius:'50%',border:'2px solid var(--amarelo)',display:'inline-block'}} /> {tv?.sigla} (visitante)
+              </span>
+            </div>
+
+            <div style={{display:'flex',flexWrap:'wrap',gap:'.5rem'}}>
+              {eventosComOffset.map((ev,i)=>{
+                const timeSigla = ev.isCasa ? tc?.sigla : tv?.sigla;
+                return (
+                  <div key={i} style={{
+                    display:'flex', alignItems:'center', gap:'.4rem',
+                    background:'var(--surface2)', border:`1px solid ${ev.cor}33`,
+                    borderRadius:6, padding:'.3rem .65rem', fontSize:'.8rem',
+                  }}>
+                    <span>{ev.icone}</span>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",color:ev.cor,fontSize:'.95rem'}}>
+                      {ev.minuto}{ev.acrescimo>0?`+${ev.acrescimo}`:''}&apos;
+                    </span>
+                    <span style={{fontSize:'.68rem',color:ev.isCasa?'var(--verde)':'var(--amarelo)',fontWeight:700}}>
+                      {timeSigla}
+                    </span>
+                    <span style={{color:'var(--text-muted)'}}>{ev.texto}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div style={sS}><h3 style={sT}>🧑‍💼 Técnicos</h3>
           {[['Mandante',partida.tecnico_casa_id],['Visitante',partida.tecnico_visitante_id]].map(([lado,tid]:any)=>(
             <div key={lado} style={{display:'flex',justifyContent:'space-between',padding:'.45rem .75rem',background:'var(--surface2)',borderRadius:6,marginBottom:'.3rem',fontSize:'.875rem'}}>
@@ -171,4 +350,4 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
       </div>
     </div>
   );
-                  }
+}
