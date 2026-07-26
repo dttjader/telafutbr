@@ -112,17 +112,24 @@ export function RodadasClient({ partidas, times, estadios }: Props) {
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    {ps.map(p => (
-                      <div key={p.id} style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem', minWidth: 30 }}>{p.hora}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flex: 1 }}>
-                          <EscudoTime time={times.find(t => t.id === p.time_casa_id)} size={14} />
-                          <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>{p.placar_casa}×{p.placar_visitante}</span>
-                          <EscudoTime time={times.find(t => t.id === p.time_visitante_id)} size={14} />
+                    {ps.map(p => {
+                      // Só mostra o placar de fato para jogos em andamento/encerrados;
+                      // agendados (e adiados) exibem apenas "×", sem 0x0 enganoso
+                      const mostrarPlacar = p.status === 'encerrada' || p.status === 'ao_vivo';
+                      return (
+                        <div key={p.id} style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem', minWidth: 30 }}>{p.hora}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flex: 1 }}>
+                            <EscudoTime time={times.find(t => t.id === p.time_casa_id)} size={14} />
+                            <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                              {mostrarPlacar ? `${p.placar_casa}×${p.placar_visitante}` : '×'}
+                            </span>
+                            <EscudoTime time={times.find(t => t.id === p.time_visitante_id)} size={14} />
+                          </div>
+                          <span style={{ color: 'var(--amarelo)', fontSize: '0.6rem', fontWeight: 700 }}>R{p.rodada}</span>
                         </div>
-                        <span style={{ color: 'var(--amarelo)', fontSize: '0.6rem', fontWeight: 700 }}>R{p.rodada}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
