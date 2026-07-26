@@ -155,6 +155,45 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
       </div>
 
       <div className="container">
+        {(partida.escalacao_casa.length>0||partida.escalacao_visitante.length>0)&&(
+          <div style={sS}><h3 style={sT}>👕 Escalações</h3>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}}>
+              {[{time:tc,esc:partida.escalacao_casa},{time:tv,esc:partida.escalacao_visitante}].map(({time,esc})=>(
+                <div key={time?.id}>
+                  <div style={{display:'flex',alignItems:'center',gap:'.6rem',marginBottom:'.75rem'}}>
+                    <EscudoTime time={time} size={32} />
+                    <strong style={{fontSize:'.95rem'}}>{time?.nome}</strong>
+                  </div>
+                  {['Titulares','Reservas'].map(grupo=>{
+                    const lista=(esc as any[]).filter(e=>grupo==='Titulares'?e.titular:!e.titular);
+                    if(lista.length===0) return null;
+                    return (
+                      <div key={grupo} style={{marginBottom:'.75rem'}}>
+                        <p style={{fontSize:'.65rem',textTransform:'uppercase',letterSpacing:'.1em',color:'var(--text-muted)',marginBottom:'.3rem',fontWeight:700}}>{grupo}</p>
+                        {lista.map((e:any,i:number)=>(
+                          <div key={i} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.3rem .5rem',background:'var(--surface2)',borderRadius:4,marginBottom:'.2rem',fontSize:'.82rem'}}>
+                            <span style={{fontFamily:"'Bebas Neue',sans-serif",color:'var(--verde)',minWidth:26}}>#{e.numero}</span>
+                            <span style={{flex:1}}>{nomeJog(e.jogador_id)}</span>
+                            <span style={{fontSize:'.68rem',background:'var(--surface)',color:'var(--text-muted)',padding:'.1rem .3rem',borderRadius:3}}>{e.posicao}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={sS}><h3 style={sT}>🧑‍💼 Técnicos</h3>
+          {[['Mandante',partida.tecnico_casa_id],['Visitante',partida.tecnico_visitante_id]].map(([lado,tid]:any)=>(
+            <div key={lado} style={{display:'flex',justifyContent:'space-between',padding:'.45rem .75rem',background:'var(--surface2)',borderRadius:6,marginBottom:'.3rem',fontSize:'.875rem'}}>
+              <span style={{color:'var(--text-muted)'}}>{lado}</span><strong>{nomeTecnico(tid)}</strong>
+            </div>
+          ))}
+        </div>
+
         {partida.gols.length>0&&(
           <div style={sS}><h3 style={sT}>⚽ Gols</h3>
             {partida.gols.map((g:any)=>{
@@ -222,37 +261,6 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {(partida.escalacao_casa.length>0||partida.escalacao_visitante.length>0)&&(
-          <div style={sS}><h3 style={sT}>👕 Escalações</h3>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}}>
-              {[{time:tc,esc:partida.escalacao_casa},{time:tv,esc:partida.escalacao_visitante}].map(({time,esc})=>(
-                <div key={time?.id}>
-                  <div style={{display:'flex',alignItems:'center',gap:'.6rem',marginBottom:'.75rem'}}>
-                    <EscudoTime time={time} size={32} />
-                    <strong style={{fontSize:'.95rem'}}>{time?.nome}</strong>
-                  </div>
-                  {['Titulares','Reservas'].map(grupo=>{
-                    const lista=(esc as any[]).filter(e=>grupo==='Titulares'?e.titular:!e.titular);
-                    if(lista.length===0) return null;
-                    return (
-                      <div key={grupo} style={{marginBottom:'.75rem'}}>
-                        <p style={{fontSize:'.65rem',textTransform:'uppercase',letterSpacing:'.1em',color:'var(--text-muted)',marginBottom:'.3rem',fontWeight:700}}>{grupo}</p>
-                        {lista.map((e:any,i:number)=>(
-                          <div key={i} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.3rem .5rem',background:'var(--surface2)',borderRadius:4,marginBottom:'.2rem',fontSize:'.82rem'}}>
-                            <span style={{fontFamily:"'Bebas Neue',sans-serif",color:'var(--verde)',minWidth:26}}>#{e.numero}</span>
-                            <span style={{flex:1}}>{nomeJog(e.jogador_id)}</span>
-                            <span style={{fontSize:'.68rem',background:'var(--surface)',color:'var(--text-muted)',padding:'.1rem .3rem',borderRadius:3}}>{e.posicao}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
@@ -333,13 +341,6 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
           </div>
         )}
 
-        <div style={sS}><h3 style={sT}>🧑‍💼 Técnicos</h3>
-          {[['Mandante',partida.tecnico_casa_id],['Visitante',partida.tecnico_visitante_id]].map(([lado,tid]:any)=>(
-            <div key={lado} style={{display:'flex',justifyContent:'space-between',padding:'.45rem .75rem',background:'var(--surface2)',borderRadius:6,marginBottom:'.3rem',fontSize:'.875rem'}}>
-              <span style={{color:'var(--text-muted)'}}>{lado}</span><strong>{nomeTecnico(tid)}</strong>
-            </div>
-          ))}
-        </div>
         <div style={sS}><h3 style={sT}>🟢 Arbitragem</h3>
           {[['Árbitro principal',partida.arbitragem.principal],['Assistente 1',partida.arbitragem.assistente1],['Assistente 2',partida.arbitragem.assistente2],['4º árbitro',partida.arbitragem.quarto],['VAR',partida.arbitragem.var]].map(([label,nome]:any)=>nome?(
             <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'.45rem .75rem',background:'var(--surface2)',borderRadius:6,marginBottom:'.3rem',fontSize:'.875rem'}}>
