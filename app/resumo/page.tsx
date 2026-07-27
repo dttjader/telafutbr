@@ -16,13 +16,13 @@ interface DiaResumo {
   jogos: Partida[];
 }
 
-// Gera os 11 dias da linha do tempo: 5 no passado, hoje, 5 no futuro
+// Gera os 7 dias da linha do tempo: 3 no passado, hoje, 3 no futuro
 function gerarDias(partidas: Partida[]): DiaResumo[] {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
   const dias: DiaResumo[] = [];
-  for (let offset = -5; offset <= 5; offset++) {
+  for (let offset = -3; offset <= 3; offset++) {
     const d = new Date(hoje);
     d.setDate(d.getDate() + offset);
     const y = d.getFullYear();
