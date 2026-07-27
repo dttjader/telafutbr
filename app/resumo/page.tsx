@@ -125,6 +125,38 @@ export default async function ResumoPage() {
   const ultimaPartida = (jogos: Partida[]) =>
     [...jogos].sort((a, b) => b.data.localeCompare(a.data) || b.rodada - a.rodada)[0] ?? null;
 
+  // Posição como mandante / visitante — mesma lógica de ordenação usada na
+  // tela Confrontos (pts desc, depois saldo desc), mas calculada isoladamente
+  // para cada recorte (só entre times que já jogaram nessa condição).
+  const posicaoMandante: Record<string, number> = {};
+  [...times]
+    .filter(t => mandanteMap[t.id].jogos.length > 0)
+    .sort((a, b) => {
+      const ma = mandanteMap[a.id]; const mb = mandanteMap[b.id];
+      return mb.pontos - ma.pontos || (mb.golsPro - mb.golsContra) - (ma.golsPro - ma.golsContra);
+    })
+    .forEach((t, i) => { posicaoMandante[t.id] = i + 1; });
+
+  const posicaoVisitante: Record<string, number> = {};
+  [...times]
+    .filter(t => visitanteMap[t.id].jogos.length > 0)
+    .sort((a, b) => {
+      const ma = visitanteMap[a.id]; const mb = visitanteMap[b.id];
+      return mb.pontos - ma.pontos || (mb.golsPro - mb.golsContra) - (ma.golsPro - ma.golsContra);
+    })
+    .forEach((t, i) => { posicaoVisitante[t.id] = i + 1; });
+
+  // Cards — mesmos 7 indicadores da tela Confrontos
+  let totPart = 0, totManVit = 0, totEmp = 0, totVisVit = 0, totGols = 0, totGolsMan = 0, totGolsVis = 0;
+  for (const p of encerradas) {
+    totPart++;
+    totGols += p.placar_casa + p.placar_visitante;
+    totGolsMan += p.placar_casa; totGolsVis += p.placar_visitante;
+    if (p.placar_casa > p.placar_visitante) totManVit++;
+    else if (p.placar_casa < p.placar_visitante) totVisVit++;
+    else totEmp++;
+  }
+
   const tabela = Object.values(baseMap)
     .filter(t => t.jogos > 0)
     .sort((a, b) => b.pontos - a.pontos || (b.gols_pro - b.gols_contra) - (a.gols_pro - a.gols_contra) || b.gols_pro - a.gols_pro)
@@ -142,6 +174,7 @@ export default async function ResumoPage() {
         forma: formaMap[t.time_id] ?? [],
         mandante: {
           pontos: mc.pontos, vitorias: mc.vitorias, saldo: mc.golsPro - mc.golsContra,
+          posicao: posicaoMandante[t.time_id] ?? null,
           ultima: ultMandante ? {
             placarCasa: ultMandante.placar_casa, placarVisitante: ultMandante.placar_visitante,
             adversarioSigla: times.find(tm => tm.id === ultMandante.time_visitante_id)?.sigla ?? ultMandante.time_visitante_id,
@@ -149,6 +182,7 @@ export default async function ResumoPage() {
         },
         visitante: {
           pontos: mv.pontos, vitorias: mv.vitorias, saldo: mv.golsPro - mv.golsContra,
+          posicao: posicaoVisitante[t.time_id] ?? null,
           ultima: ultVisitante ? {
             placarCasa: ultVisitante.placar_casa, placarVisitante: ultVisitante.placar_visitante,
             adversarioSigla: times.find(tm => tm.id === ultVisitante.time_casa_id)?.sigla ?? ultVisitante.time_casa_id,
@@ -222,6 +256,26 @@ export default async function ResumoPage() {
           </div>
         </section>
 
+        {/* 🔢 Cards resumidos (os 7 indicadores da tela Confrontos) */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 8 }}>
+            {[
+              { l: 'Partidas', v: totPart },
+              { l: 'Vit. mandante', v: totManVit, cor: '#1a7a40' },
+              { l: 'Empates', v: totEmp },
+              { l: 'Vit. visitante', v: totVisVit, cor: '#a81a1a' },
+              { l: 'Total de gols', v: totGols },
+              { l: 'Gols mandante', v: totGolsMan },
+              { l: 'Gols visitante', v: totGolsVis },
+            ].map(s => (
+              <div key={s.l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>{s.l}</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: s.cor ?? 'var(--amarelo)', lineHeight: 1 }}>{s.v}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* 📊 Classificação (resumida) */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
@@ -235,18 +289,20 @@ export default async function ResumoPage() {
                   <th rowSpan={2} style={th('left', { borderBottom: '2px solid var(--verde)' })}>Time</th>
                   <th colSpan={3} style={th('center', { borderBottom: '1px solid var(--border)' })}>Geral</th>
                   <th rowSpan={2} style={th('center', { borderBottom: '2px solid var(--verde)' })}>Forma</th>
-                  <th colSpan={4} style={th('center', { borderBottom: '1px solid var(--border)', color: 'var(--verde)' })}>Como Mandante</th>
-                  <th colSpan={4} style={th('center', { borderBottom: '1px solid var(--border)', color: 'var(--amarelo)' })}>Como Visitante</th>
+                  <th colSpan={5} style={th('center', { borderBottom: '1px solid var(--border)', color: 'var(--verde)' })}>Como Mandante</th>
+                  <th colSpan={5} style={th('center', { borderBottom: '1px solid var(--border)', color: 'var(--amarelo)' })}>Como Visitante</th>
                 </tr>
                 <tr>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>Pts</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>V</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>SG</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>Pts</th>
+                  <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>#</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>V</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>SG</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>Última</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>Pts</th>
+                  <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>#</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>V</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>SG</th>
                   <th style={th('center', { borderBottom: '2px solid var(--verde)' })}>Última</th>
@@ -254,7 +310,7 @@ export default async function ResumoPage() {
               </thead>
               <tbody>
                 {tabela.length === 0 && (
-                  <tr><td colSpan={14} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhuma partida encerrada ainda.</td></tr>
+                  <tr><td colSpan={16} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhuma partida encerrada ainda.</td></tr>
                 )}
                 {tabela.map((row, i) => {
                   const t = times.find(t => t.id === row.time_id);
@@ -288,6 +344,7 @@ export default async function ResumoPage() {
                       </td>
                       {/* Mandante */}
                       <td style={{ textAlign: 'center', color: 'var(--verde)', fontWeight: 600 }}>{row.mandante.pontos}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{row.mandante.posicao ?? '—'}</td>
                       <td style={{ textAlign: 'center' }}>{row.mandante.vitorias}</td>
                       <td style={{ textAlign: 'center', color: row.mandante.saldo > 0 ? 'var(--libertadores)' : row.mandante.saldo < 0 ? 'var(--rebaixamento)' : 'inherit' }}>
                         {row.mandante.saldo > 0 ? `+${row.mandante.saldo}` : row.mandante.saldo}
@@ -295,6 +352,7 @@ export default async function ResumoPage() {
                       <td style={{ textAlign: 'center', fontSize: '.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{ultimaTexto(row.mandante.ultima)}</td>
                       {/* Visitante */}
                       <td style={{ textAlign: 'center', color: 'var(--amarelo)', fontWeight: 600 }}>{row.visitante.pontos}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{row.visitante.posicao ?? '—'}</td>
                       <td style={{ textAlign: 'center' }}>{row.visitante.vitorias}</td>
                       <td style={{ textAlign: 'center', color: row.visitante.saldo > 0 ? 'var(--libertadores)' : row.visitante.saldo < 0 ? 'var(--rebaixamento)' : 'inherit' }}>
                         {row.visitante.saldo > 0 ? `+${row.visitante.saldo}` : row.visitante.saldo}
