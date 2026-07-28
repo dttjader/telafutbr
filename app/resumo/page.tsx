@@ -65,7 +65,7 @@ const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '
 // app/dados/goleiros, mas retornando só o recorde — usado no Top 5 do Resumo).
 function calcularTopCiclos(encerradas: Partida[], jogadores: Jogador[], times: Time[], limite = 5) {
   const goleiros = jogadores.filter(j => j.posicao === 'GOL');
-  const resultados: { jogador_id: string; nome: string; timeSigla: string; maiorCiclo: number }[] = [];
+  const resultados: { jogador_id: string; nome: string; time_id: string; timeSigla: string; maiorCiclo: number }[] = [];
 
   for (const goleiro of goleiros) {
     const time = times.find(t => t.id === goleiro.time_atual);
@@ -151,7 +151,7 @@ function calcularTopCiclos(encerradas: Partida[], jogadores: Jogador[], times: T
     const cicloAtualMin = minutosAcumulados - inicioCicloMin;
     if (cicloAtualMin > maiorCiclo) maiorCiclo = cicloAtualMin;
 
-    resultados.push({ jogador_id: goleiro.id, nome: goleiro.nome, timeSigla: time?.sigla ?? '—', maiorCiclo });
+    resultados.push({ jogador_id: goleiro.id, nome: goleiro.nome, time_id: goleiro.time_atual, timeSigla: time?.sigla ?? '—', maiorCiclo });
   }
 
   return resultados.sort((a, b) => b.maiorCiclo - a.maiorCiclo).slice(0, limite);
@@ -539,7 +539,7 @@ export default async function ResumoPage() {
           <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             🏅 Top 5
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 210px))', gap: '1rem', justifyContent: 'flex-start' }}>
 
             {/* Top 5 Placares */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
@@ -604,15 +604,17 @@ export default async function ResumoPage() {
               <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🧤 Top 5 Goleiros (Maior Ciclo)</h3>
               {top5Ciclos.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Ciclos.map((g, i) => (
-                  <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                    <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>
-                      {g.nome} <span style={{ color: 'var(--text-muted)', fontSize: '.7rem' }}>({g.timeSigla})</span>
-                    </span>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>{g.maiorCiclo}&apos;</span>
-                  </div>
-                ))}
+                {top5Ciclos.map((g, i) => {
+                  const time = times.find(t => t.id === g.time_id);
+                  return (
+                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={time} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>{g.maiorCiclo}&apos;</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
