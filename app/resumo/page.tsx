@@ -1,6 +1,6 @@
-import { getPartidas, getTimes } from '@/lib/data';
+import { getPartidas, getTimes, getJogadores, getTecnicos } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
-import { Partida } from '@/lib/types';
+import { Partida, Jogador, Time } from '@/lib/types';
 
 // Página oculta — não aparece em nenhum menu, acessada apenas via /resumo.
 // Serve como painel resumido, alimentado por versões condensadas das outras
@@ -59,9 +59,107 @@ function th(align: 'left' | 'center', extra?: React.CSSProperties): React.CSSPro
   };
 }
 
+const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
+
+// Maior ciclo de minutos sem sofrer gols de cada goleiro (mesma lógica de
+// app/dados/goleiros, mas retornando só o recorde — usado no Top 5 do Resumo).
+function calcularTopCiclos(encerradas: Partida[], jogadores: Jogador[], times: Time[], limite = 5) {
+  const goleiros = jogadores.filter(j => j.posicao === 'GOL');
+  const resultados: { jogador_id: string; nome: string; timeSigla: string; maiorCiclo: number }[] = [];
+
+  for (const goleiro of goleiros) {
+    const time = times.find(t => t.id === goleiro.time_atual);
+
+    const eventos: {
+      minutosJogados: number;
+      golsSofridos: { minuto: number }[];
+      minutoEntrada: number;
+      minutoSaida: number;
+    }[] = [];
+
+    for (const p of encerradas) {
+      const todosEsc = [
+        ...p.escalacao_casa.map(e => ({ ...e })),
+        ...p.escalacao_visitante.map(e => ({ ...e })),
+      ];
+      const esc = todosEsc.find(e => e.jogador_id === goleiro.id);
+      if (!esc) continue;
+
+      const acr1 = p.acrescimo_primeiro ?? 0;
+      const acr2 = p.acrescimo_segundo ?? 0;
+      const totalPartida = 45 + acr1 + 45 + acr2;
+
+      const vermelho = p.cartoes.find(c => c.jogador_id === goleiro.id && c.tipo === 'vermelho');
+      const minutoVermelho = vermelho?.minuto ?? Infinity;
+
+      let minutoEntrada = 0;
+      let minutoSaida = Math.min(minutoVermelho, totalPartida);
+
+      if (esc.titular) {
+        const sub = p.substituicoes.find(s => s.sai_id === goleiro.id);
+        minutoSaida = Math.min(sub?.minuto ?? totalPartida, minutoVermelho, totalPartida);
+      } else {
+        const entrada = p.substituicoes.find(s => s.entra_id === goleiro.id);
+        if (!entrada) continue;
+        minutoEntrada = entrada.minuto;
+        const saida = p.substituicoes.find(s => s.sai_id === goleiro.id);
+        minutoSaida = Math.min(saida?.minuto ?? totalPartida, minutoVermelho, totalPartida);
+      }
+
+      const minutosJogados = Math.max(0, minutoSaida - minutoEntrada);
+      if (minutosJogados === 0) continue;
+
+      const golsSofridos: { minuto: number }[] = [];
+      for (const g of p.gols) {
+        if (g.goleiro_id !== goleiro.id) continue;
+        if (g.minuto < minutoEntrada || g.minuto > minutoSaida) continue;
+        golsSofridos.push({ minuto: g.minuto });
+      }
+
+      eventos.push({
+        minutosJogados,
+        golsSofridos: golsSofridos.sort((a, b) => a.minuto - b.minuto),
+        minutoEntrada,
+        minutoSaida,
+      });
+    }
+
+    if (eventos.length === 0) continue;
+
+    let minutosAcumulados = 0;
+    let inicioCicloMin = 0;
+    let maiorCiclo = 0;
+
+    for (const ev of eventos) {
+      if (ev.golsSofridos.length === 0) {
+        minutosAcumulados += ev.minutosJogados;
+      } else {
+        let cursorLocal = ev.minutoEntrada;
+        for (const gol of ev.golsSofridos) {
+          const minutosAteGol = gol.minuto - cursorLocal;
+          minutosAcumulados += Math.max(0, minutosAteGol);
+          const duracaoCiclo = minutosAcumulados - inicioCicloMin;
+          if (duracaoCiclo > maiorCiclo) maiorCiclo = duracaoCiclo;
+          inicioCicloMin = minutosAcumulados;
+          cursorLocal = gol.minuto;
+        }
+        const minutosRestantes = ev.minutoSaida - cursorLocal;
+        minutosAcumulados += Math.max(0, minutosRestantes);
+      }
+    }
+    // Ciclo em aberto (desde o último gol sofrido até o fim dos dados)
+    const cicloAtualMin = minutosAcumulados - inicioCicloMin;
+    if (cicloAtualMin > maiorCiclo) maiorCiclo = cicloAtualMin;
+
+    resultados.push({ jogador_id: goleiro.id, nome: goleiro.nome, timeSigla: time?.sigla ?? '—', maiorCiclo });
+  }
+
+  return resultados.sort((a, b) => b.maiorCiclo - a.maiorCiclo).slice(0, limite);
+}
+
 export default async function ResumoPage() {
-  const [partidas, times] = await Promise.all([
-    getPartidas(), getTimes(),
+  const [partidas, times, jogadores, tecnicos] = await Promise.all([
+    getPartidas(), getTimes(), getJogadores(), getTecnicos(),
   ]);
 
   const dias = gerarDias(partidas);
@@ -156,6 +254,76 @@ export default async function ResumoPage() {
     else if (p.placar_casa < p.placar_visitante) totVisVit++;
     else totEmp++;
   }
+
+  // ── Top 5 (abaixo da Classificação) ───────────────────────────────────────
+
+  // Top 5 Placares mais frequentes
+  const placarMap: Record<string, { count: number; vitVisitante: number; empates: number }> = {};
+  for (const p of encerradas) {
+    const casaVenceu = p.placar_casa > p.placar_visitante;
+    const visVenceu = p.placar_visitante > p.placar_casa;
+    const empate = p.placar_casa === p.placar_visitante;
+    const [a, b] = casaVenceu ? [p.placar_casa, p.placar_visitante] : [p.placar_visitante, p.placar_casa];
+    const key = `${a}x${b}`;
+    if (!placarMap[key]) placarMap[key] = { count: 0, vitVisitante: 0, empates: 0 };
+    placarMap[key].count++;
+    if (visVenceu) placarMap[key].vitVisitante++;
+    if (empate) placarMap[key].empates++;
+  }
+  const top5Placares = Object.entries(placarMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([placar, d]) => ({
+      placar: placar.replace('x', '\u00d7'),
+      count: d.count,
+      vitVisitante: d.vitVisitante,
+      isEmpate: d.empates === d.count,
+    }));
+
+  // Top 5 Artilheiros / Assistências (só gols válidos: exclui contra e pênaltis não convertidos)
+  const artMap: Record<string, { jogador_id: string; time_id: string; quantidade: number }> = {};
+  const assistMap: Record<string, { jogador_id: string; time_id: string; quantidade: number }> = {};
+  for (const p of encerradas) {
+    for (const g of p.gols) {
+      const tipoStr = g.tipo as string;
+      if (tipoStr === 'contra' || tipoStr === 'penalti_perdido' || tipoStr === 'penalti_defendido') continue;
+      if (!artMap[g.jogador_id]) artMap[g.jogador_id] = { jogador_id: g.jogador_id, time_id: g.time_id, quantidade: 0 };
+      artMap[g.jogador_id].quantidade++;
+      if (g.assistencia_id) {
+        if (!assistMap[g.assistencia_id]) assistMap[g.assistencia_id] = { jogador_id: g.assistencia_id, time_id: g.time_id, quantidade: 0 };
+        assistMap[g.assistencia_id].quantidade++;
+      }
+    }
+  }
+  const top5Artilheiros = Object.values(artMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
+  const top5Assist = Object.values(assistMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
+
+  // Top 5 Goleiros (maior ciclo sem sofrer gol)
+  const top5Ciclos = calcularTopCiclos(encerradas, jogadores, times);
+
+  // Top 5 Técnicos por aproveitamento — só entre os que já dirigiram em mais
+  // da metade das rodadas disputadas até aqui
+  const totalRodadas = new Set(encerradas.map(p => p.rodada)).size;
+  const limiar50 = Math.ceil(totalRodadas * 0.5);
+  const tecnicoMap: Record<string, { tecnico_id: string; j: number; v: number; e: number }> = {};
+  for (const p of encerradas) {
+    const processar = (tecnicoId: string | null, isCasa: boolean) => {
+      if (!tecnicoId) return;
+      if (!tecnicoMap[tecnicoId]) tecnicoMap[tecnicoId] = { tecnico_id: tecnicoId, j: 0, v: 0, e: 0 };
+      const r = tecnicoMap[tecnicoId];
+      const gf = isCasa ? p.placar_casa : p.placar_visitante;
+      const gc = isCasa ? p.placar_visitante : p.placar_casa;
+      r.j++;
+      if (gf > gc) r.v++; else if (gf === gc) r.e++;
+    };
+    processar(p.tecnico_casa_id, true);
+    processar(p.tecnico_visitante_id, false);
+  }
+  const top5Tecnicos = Object.values(tecnicoMap)
+    .map(r => ({ ...r, aproveitamento: r.j > 0 ? Math.round((r.v * 3 + r.e) / (r.j * 3) * 100) : 0 }))
+    .filter(r => r.j >= limiar50)
+    .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v)
+    .slice(0, 5);
 
   const tabela = Object.values(baseMap)
     .filter(t => t.jogos > 0)
@@ -363,6 +531,114 @@ export default async function ResumoPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        {/* 🏅 Top 5 */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            🏅 Top 5
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+
+            {/* Top 5 Placares */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>🏆 Top 5 Placares</h3>
+              {top5Placares.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5Placares.map((d, i) => (
+                  <div key={d.placar} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.3rem' }}>{d.placar}</span>
+                    <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--verde)' }}>{d.count}×</div>
+                      <div style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>{d.isEmpate ? 'Empate' : `${d.vitVisitante} vit. visitante`}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top 5 Artilheiros */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>⚽ Top 5 Artilheiros</h3>
+              {top5Artilheiros.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5Artilheiros.map((a, i) => {
+                  const jog = jogadores.find(j => j.id === a.jogador_id);
+                  const time = times.find(t => t.id === a.time_id);
+                  return (
+                    <div key={a.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={time} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{jog?.nome ?? a.jogador_id}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--amarelo)' }}>{a.quantidade}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Top 5 Assistências */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: '#60a5fa', marginBottom: '.75rem' }}>🎯 Top 5 Assistências</h3>
+              {top5Assist.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5Assist.map((a, i) => {
+                  const jog = jogadores.find(j => j.id === a.jogador_id);
+                  const time = times.find(t => t.id === a.time_id);
+                  return (
+                    <div key={a.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={time} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{jog?.nome ?? a.jogador_id}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#60a5fa' }}>{a.quantidade}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Top 5 Goleiros (Maior Ciclo) */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🧤 Top 5 Goleiros (Maior Ciclo)</h3>
+              {top5Ciclos.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5Ciclos.map((g, i) => (
+                  <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                    <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>
+                      {g.nome} <span style={{ color: 'var(--text-muted)', fontSize: '.7rem' }}>({g.timeSigla})</span>
+                    </span>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>{g.maiorCiclo}&apos;</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top 5 Técnicos (%) */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.4rem' }}>🧑‍💼 Top 5 Técnicos</h3>
+              <p style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
+                Só entre quem dirigiu {limiar50}+ partidas (mais da metade das {totalRodadas} rodadas)
+              </p>
+              {top5Tecnicos.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados suficientes.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5Tecnicos.map((r, i) => {
+                  const tec = tecnicos.find(t => t.id === r.tecnico_id);
+                  const timeAtual = tec?.time_atual ? times.find(t => t.id === tec.time_atual) : undefined;
+                  return (
+                    <div key={r.tecnico_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={timeAtual} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{tec?.nome ?? r.tecnico_id}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#a78bfa' }}>{r.aproveitamento}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         </section>
       </div>
