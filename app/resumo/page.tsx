@@ -424,25 +424,52 @@ export default async function ResumoPage() {
           </div>
         </section>
 
-        {/* 🔢 Cards resumidos (os 7 indicadores da tela Confrontos) */}
+        {/* 🔢 Cards resumidos (os 7 indicadores da tela Confrontos, agrupados) */}
         <section style={{ marginBottom: '2.5rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 8 }}>
-            {[
-              { l: 'Partidas', v: totPart },
-              { l: 'Vit. mandante', v: totManVit, cor: '#1a7a40' },
-              { l: 'Empates', v: totEmp },
-              { l: 'Vit. visitante', v: totVisVit, cor: '#a81a1a' },
-              { l: 'Total de gols', v: totGols },
-              { l: 'Gols mandante', v: totGolsMan },
-              { l: 'Gols visitante', v: totGolsVis },
-            ].map(s => (
-              <div key={s.l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 6px', textAlign: 'center' }}>
-                <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>{s.l}</div>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: s.cor ?? 'var(--amarelo)', lineHeight: 1 }}>{s.v}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '.75rem' }}>
+
+            {/* Coluna 1: Partidas + Vit. mandante | Empates | Vit. visitante */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>Partidas</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: 'var(--amarelo)', lineHeight: 1 }}>{totPart}</div>
               </div>
-            ))}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex' }}>
+                {[
+                  { l: 'Vit. mandante', v: totManVit, cor: '#1a7a40' },
+                  { l: 'Empates', v: totEmp, cor: 'var(--amarelo)' },
+                  { l: 'Vit. visitante', v: totVisVit, cor: '#a81a1a' },
+                ].map((s, i, arr) => (
+                  <div key={s.l} style={{ flex: 1, textAlign: 'center', padding: '10px 6px', borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>{s.l}</div>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: s.cor, lineHeight: 1 }}>{s.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Coluna 2: Total de gols + Gols mandante | Gols visitante */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>Total de gols</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: 'var(--amarelo)', lineHeight: 1 }}>{totGols}</div>
+              </div>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex' }}>
+                {[
+                  { l: 'Gols mandante', v: totGolsMan },
+                  { l: 'Gols visitante', v: totGolsVis },
+                ].map((s, i, arr) => (
+                  <div key={s.l} style={{ flex: 1, textAlign: 'center', padding: '10px 6px', borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>{s.l}</div>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: 'var(--amarelo)', lineHeight: 1 }}>{s.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
         </section>
+
 
         {/* 📊 Classificação (resumida) */}
         <section style={{ marginBottom: '2.5rem' }}>
