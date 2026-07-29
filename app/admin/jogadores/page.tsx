@@ -64,6 +64,7 @@ const emptyForm = () => ({
   time_atual: '', novoTime: '',
   dataTransferencia: new Date().toISOString().slice(0, 10),
   registro: '',
+  aliasOpta: '',
 });
 
 export default function AdminJogadores() {
@@ -124,6 +125,7 @@ export default function AdminJogadores() {
         time_atual: novoTimeId,
         transferencias,
         registro: form.registro ? +form.registro : undefined,
+        aliasOpta: form.aliasOpta.trim() || undefined,
       });
       flash(true, editId ? 'Jogador atualizado!' : 'Jogador cadastrado!');
       setForm(emptyForm()); setEditId(null); load();
@@ -143,6 +145,7 @@ export default function AdminJogadores() {
       novoTime: '',
       dataTransferencia: new Date().toISOString().slice(0, 10),
       registro: j.registro?.toString() ?? '',
+      aliasOpta: j.alias_opta ?? '',
     });
     setEditId(j.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -206,6 +209,14 @@ export default function AdminJogadores() {
                 <select value={form.posicao} onChange={e => handlePosicaoChange(e.target.value)}>
                   {POSICOES.map(p => <option key={p} value={p}>{POS_LABEL[p]}</option>)}
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Alias Opta</label>
+                <input
+                  value={form.aliasOpta}
+                  onChange={e => setForm(f => ({ ...f, aliasOpta: e.target.value }))}
+                  placeholder="Nome usado para identificar o jogador no Opta Stats"
+                />
               </div>
             </div>
 
