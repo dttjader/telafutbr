@@ -47,7 +47,7 @@ export interface Jogador {
   time_atual: string;
   transferencias: Transferencia[];
   registro?: number; // Código numérico único
-  alias_opta?: string;
+  alias_opta?: string; // Nome usado para identificar o jogador no Opta Stats
 }
 
 export interface Arbitragem {
@@ -102,6 +102,24 @@ export interface EscalacaoJogador {
   titular: boolean;
 }
 
+// Estatísticas individuais por jogador em uma partida (fonte: Opta Stats).
+// Todos os campos são numéricos, de 0 a 30, e editáveis apenas na aba
+// "Stats" da tela de eventos da partida (admin/partida/[id]).
+export interface StatsJogador {
+  jogador_id: string;
+  S: number;    // Finalizações
+  SoT: number;  // Finalizações no Alvo
+  SB: number;   // Finalizações Bloqueadas
+  P: number;    // Passes
+  C: number;    // Cruzamentos
+  Crn: number;  // Escanteios a favor
+  Tk: number;   // Desarmes
+  Off: number;  // Impedimentos
+  FC: number;   // Faltas Cometidas
+  FS: number;   // Faltas Sofridas
+  Sav: number;  // Defesas
+}
+
 export interface Partida {
   id: string;
   rodada: number;
@@ -124,6 +142,7 @@ export interface Partida {
   gols: Gol[];
   cartoes: Cartao[];
   substituicoes: Substituicao[];
+  stats_jogadores: StatsJogador[];
 }
 
 export interface TabelaEntry {
