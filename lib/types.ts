@@ -47,6 +47,7 @@ export interface Jogador {
   time_atual: string;
   transferencias: Transferencia[];
   registro?: number; // Código numérico único
+  alias_opta?: string;
 }
 
 export interface Arbitragem {
