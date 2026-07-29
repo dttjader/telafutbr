@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Partida, Time, Jogador, Tecnico, Gol, Cartao, Substituicao, EscalacaoJogador } from '@/lib/types';
+import { Partida, Time, Jogador, Tecnico, Gol, Cartao, Substituicao, EscalacaoJogador, StatsJogador } from '@/lib/types';
 import { clientGetPartida, clientGetTimes, clientGetJogadores, clientUpsertPartida, clientGetTecnicos, uid } from '@/lib/client';
 
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
@@ -552,6 +552,118 @@ function SubsTab({
   );
 }
 
+// ── STATS (Opta) ─────────────────────────────────────────────────────────────
+// Aba somente-leitura para escalação e alias, com campos numéricos (0-30)
+// editáveis para cada estatística individual do jogador na partida.
+const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id'>; label: string; title: string }[] = [
+  { key: 'S',   label: 'S',   title: 'Finalizações' },
+  { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo' },
+  { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas' },
+  { key: 'P',   label: 'P',   title: 'Passes' },
+  { key: 'C',   label: 'C',   title: 'Cruzamentos' },
+  { key: 'Crn', label: 'Crn', title: 'Escanteios a favor' },
+  { key: 'Tk',  label: 'Tk',  title: 'Desarmes' },
+  { key: 'Off', label: 'Off', title: 'Impedimentos' },
+  { key: 'FC',  label: 'FC',  title: 'Faltas Cometidas' },
+  { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas' },
+  { key: 'Sav', label: 'Sav', title: 'Defesas' },
+];
+
+const OPCOES_0_30 = Array.from({ length: 31 }, (_, i) => i);
+
+const statsVazio = (jogador_id: string): StatsJogador => ({
+  jogador_id, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0,
+});
+
+function StatsTab({
+  partida, timeCasaNome, timeVisNome, jogadores, save,
+}: {
+  partida: Partida;
+  timeCasaNome: string;
+  timeVisNome: string;
+  jogadores: Jogador[];
+  save: (updated: Partida) => Promise<void> | void;
+}) {
+  const statsAtuais = partida.stats_jogadores ?? [];
+
+  const getStats = (jogador_id: string): StatsJogador =>
+    statsAtuais.find(s => s.jogador_id === jogador_id) ?? statsVazio(jogador_id);
+
+  const updStat = (jogador_id: string, campo: keyof Omit<StatsJogador, 'jogador_id'>, valor: number) => {
+    const existente = getStats(jogador_id);
+    const atualizado: StatsJogador = { ...existente, [campo]: valor };
+    const semEste = statsAtuais.filter(s => s.jogador_id !== jogador_id);
+    save({ ...partida, stats_jogadores: [...semEste, atualizado] });
+  };
+
+  const nomeJog = (jid: string) => jogadores.find(j => j.id === jid)?.nome ?? jid;
+  const aliasOpta = (jid: string) => jogadores.find(j => j.id === jid)?.alias_opta ?? '';
+
+  const todasEscalacoes = [
+    ...partida.escalacao_casa.map(e => ({ esc: e, isCasa: true })),
+    ...partida.escalacao_visitante.map(e => ({ esc: e, isCasa: false })),
+  ];
+
+  if (todasEscalacoes.length === 0) {
+    return <p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Cadastre a escalação primeiro na aba Escalação.</p>;
+  }
+
+  return (
+    <div>
+      <p style={{fontSize:'.78rem',color:'var(--text-muted)',marginBottom:'1rem'}}>
+        Estatísticas por jogador (fonte: Opta). Escalação e alias não são editáveis aqui — para alterá-los, use a aba Escalação e o cadastro de Jogadores.
+      </p>
+      <div style={{overflowX:'auto',borderRadius:10,border:'1px solid var(--border)'}}>
+        <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
+          <thead style={{background:'var(--surface2)',borderBottom:'2px solid var(--verde)'}}>
+            <tr>
+              <th style={{padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Jogador</th>
+              <th style={{padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Alias Opta</th>
+              {STAT_COLS.map(col=>(
+                <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help'}}>
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {todasEscalacoes.map(({esc,isCasa})=>{
+              const s = getStats(esc.jogador_id);
+              return (
+                <tr key={esc.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
+                  <td style={{padding:'.5rem .6rem',whiteSpace:'nowrap',borderLeft:`3px solid ${isCasa?'var(--verde)':'var(--amarelo)'}`}}>
+                    <div style={{fontWeight:600}}>{nomeJog(esc.jogador_id)}</div>
+                    <div style={{fontSize:'.68rem',color:'var(--text-muted)'}}>
+                      {isCasa?timeCasaNome:timeVisNome} · #{esc.numero} · {esc.posicao}
+                    </div>
+                  </td>
+                  <td style={{padding:'.5rem .6rem',fontSize:'.8rem',color:aliasOpta(esc.jogador_id)?'var(--text)':'#555'}}>
+                    {aliasOpta(esc.jogador_id) || '—'}
+                  </td>
+                  {STAT_COLS.map(col=>(
+                    <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center'}}>
+                      <select
+                        value={s[col.key]}
+                        onChange={e=>updStat(esc.jogador_id,col.key,+e.target.value)}
+                        style={{
+                          width:54, background:'var(--surface2)', border:'1px solid var(--border)',
+                          borderRadius:4, color:'var(--text)', padding:'.3rem .2rem', textAlign:'center', fontSize:'.85rem',
+                        }}
+                      >
+                        {OPCOES_0_30.map(n=><option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPartidaEventos() {
   const {id} = useParams<{id:string}>();
   const [partida, setPartida] = useState<Partida|null>(null);
@@ -559,7 +671,7 @@ export default function AdminPartidaEventos() {
   const [jogadores, setJogadores] = useState<Jogador[]>([]);
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [msg, setMsg] = useState(''); const [error, setError] = useState('');
-  const [tab, setTab] = useState<'escalacao'|'gols'|'cartoes'|'subs'>('escalacao');
+  const [tab, setTab] = useState<'escalacao'|'gols'|'cartoes'|'subs'|'stats'>('escalacao');
 
   const flash=(ok:boolean,t:string)=>{if(ok)setMsg(t);else setError(t);setTimeout(()=>{setMsg('');setError('');},3500);};
 
@@ -758,11 +870,12 @@ export default function AdminPartidaEventos() {
       {msg&&<div className="toast toast-success">{msg}</div>}
       {error&&<div className="toast toast-error">{error}</div>}
 
-      <div style={{display:'flex',gap:'.5rem',marginBottom:'1.5rem',borderBottom:'1px solid var(--border)',paddingBottom:'1rem'}}>
+      <div style={{display:'flex',gap:'.5rem',marginBottom:'1.5rem',borderBottom:'1px solid var(--border)',paddingBottom:'1rem',flexWrap:'wrap'}}>
         <button className={`btn ${tab==='escalacao'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('escalacao')}>📋 Escalação</button>
         <button className={`btn ${tab==='gols'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('gols')}>⚽ Gols ({partida.gols.length})</button>
         <button className={`btn ${tab==='cartoes'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('cartoes')}>🟨 Cartões ({partida.cartoes.length})</button>
         <button className={`btn ${tab==='subs'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('subs')}>🔄 Subs ({partida.substituicoes.length})</button>
+        <button className={`btn ${tab==='stats'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('stats')}>📈 Stats</button>
       </div>
 
       {tab==='escalacao'&&<EscalacaoTab/>}
@@ -786,6 +899,13 @@ export default function AdminPartidaEventos() {
           partida={partida}
           timeCasaNome={timeCasaNome} timeVisNome={timeVisNome}
           nomeJog={nomeJog} save={save} flash={flash}
+        />
+      )}
+      {tab==='stats'&&(
+        <StatsTab
+          partida={partida}
+          timeCasaNome={timeCasaNome} timeVisNome={timeVisNome}
+          jogadores={jogadores} save={save}
         />
       )}
     </div>
