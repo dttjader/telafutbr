@@ -255,7 +255,12 @@ export default async function ResumoPage() {
     else totEmp++;
   }
 
-  // ── Top 5 (abaixo da Classificação) ───────────────────────────────────────
+  // Médias de gols (mesma lógica da tela Dados: total ÷ partidas)
+  const formatarMedia = (v: number) =>
+    totPart > 0 ? (v / totPart).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+  const mediaGeral = formatarMedia(totGols);
+  const mediaGolsMandante = formatarMedia(totGolsMan);
+  const mediaGolsVisitante = formatarMedia(totGolsVis);
 
   // Top 5 Placares mais frequentes
   const placarMap: Record<string, { count: number; vitVisitante: number; empates: number }> = {};
@@ -452,16 +457,20 @@ export default async function ResumoPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 6px', textAlign: 'center' }}>
                 <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>Total de gols</div>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: 'var(--amarelo)', lineHeight: 1 }}>{totGols}</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: 'var(--amarelo)', lineHeight: 1 }}>
+                  {totGols} <span style={{ fontFamily: 'Barlow,sans-serif', fontSize: '.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>({mediaGeral})</span>
+                </div>
               </div>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex' }}>
                 {[
                   { l: 'Gols mandante', v: totGolsMan },
+                  { l: 'Média Gols Mandante', v: mediaGolsMandante },
                   { l: 'Gols visitante', v: totGolsVis },
+                  { l: 'Média Gols Visitante', v: mediaGolsVisitante },
                 ].map((s, i, arr) => (
-                  <div key={s.l} style={{ flex: 1, textAlign: 'center', padding: '10px 6px', borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>{s.l}</div>
-                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.6rem', color: 'var(--amarelo)', lineHeight: 1 }}>{s.v}</div>
+                  <div key={s.l} style={{ flex: 1, textAlign: 'center', padding: '10px 4px', borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.15 }}>{s.l}</div>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.25rem', color: 'var(--amarelo)', lineHeight: 1 }}>{s.v}</div>
                   </div>
                 ))}
               </div>
