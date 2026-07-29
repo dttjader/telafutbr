@@ -125,7 +125,7 @@ export default function AdminJogadores() {
         time_atual: novoTimeId,
         transferencias,
         registro: form.registro ? +form.registro : undefined,
-        aliasOpta: form.aliasOpta.trim() || undefined,
+        alias_Opta: form.aliasOpta.trim() || undefined,
       });
       flash(true, editId ? 'Jogador atualizado!' : 'Jogador cadastrado!');
       setForm(emptyForm()); setEditId(null); load();
