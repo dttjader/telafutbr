@@ -18,7 +18,7 @@ const DESCRICOES_GOL: Record<string, string[]> = {
 };
 
 const MOTIVOS_CARTAO: Record<string, string[]> = {
-  amarelo: ['Falta tática','Reclamação com o árbitro','Retardar o jogo','Falta violenta','Simulação','Comemoração excessiva','Atitude antidesportiva','Desrespeito ao jogo','Agressão física','Agressão verbal','Mão na bola'],
+  amarelo: ['Falta tática','Reclamação com o árbitro','Retardar o jogo','Falta violenta','Simulação','Impedimento de saída de goleiro','Comemoração excessiva','Desrespeito à distância em cobrança','Agressão verbal','Mão na bola'],
   vermelho: ['Segundo cartão amarelo','Falta violenta grave','Agressão física','Cuspida','Linguagem ofensiva ou abusiva','Negação de gol com falta (DOGSO)','Negação de gol com mão','Conduta violenta'],
   amarelo_tecnico: ['Reclamação excessiva','Conduta antidesportiva','Entrada na área técnica indevida','Protesto veemente','Desrespeito ao árbitro'],
   vermelho_tecnico: ['Expulsão por reclamação reiterada','Conduta violenta','Insulto ao árbitro','Segunda advertência (técnico)','Agressão a membro da comissão'],
@@ -555,30 +555,32 @@ function SubsTab({
 // ── STATS (Opta) ─────────────────────────────────────────────────────────────
 // Aba somente-leitura para escalação e alias, com campos numéricos (0-30)
 // editáveis para cada estatística individual do jogador na partida.
-const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id'>; label: string; title: string }[] = [
-  { key: 'S',   label: 'S',   title: 'Finalizações' },
-  { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo' },
-  { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas' },
-  { key: 'P',   label: 'P',   title: 'Passes' },
-  { key: 'C',   label: 'C',   title: 'Cruzamentos' },
-  { key: 'Crn', label: 'Crn', title: 'Escanteios a favor' },
-  { key: 'Tk',  label: 'Tk',  title: 'Desarmes' },
-  { key: 'Off', label: 'Off', title: 'Impedimentos' },
-  { key: 'FC',  label: 'FC',  title: 'Faltas Cometidas' },
-  { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas' },
-  { key: 'Sav', label: 'Sav', title: 'Defesas' },
+const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id'>; label: string; title: string; max: number }[] = [
+  { key: 'S',   label: 'S',   title: 'Finalizações',              max: 20 },
+  { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo',       max: 20 },
+  { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas',    max: 20 },
+  { key: 'P',   label: 'P',   title: 'Passes',                     max: 100 },
+  { key: 'C',   label: 'C',   title: 'Cruzamentos',                max: 20 },
+  { key: 'Crn', label: 'Crn', title: 'Escanteios a favor',         max: 20 },
+  { key: 'Tk',  label: 'Tk',  title: 'Desarmes',                   max: 20 },
+  { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 20 },
+  { key: 'FC',  label: 'FC',  title: 'Faltas Cometidas',           max: 20 },
+  { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas',            max: 20 },
+  { key: 'Sav', label: 'Sav', title: 'Defesas',                    max: 20 },
 ];
 
-const OPCOES_0_30 = Array.from({ length: 31 }, (_, i) => i);
+const opcoesAte = (max: number) => Array.from({ length: max + 1 }, (_, i) => i);
 
 const statsVazio = (jogador_id: string): StatsJogador => ({
-  jogador_id, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0,
+  jogador_id, validado: false, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0,
 });
 
 function StatsTab({
-  partida, timeCasaNome, timeVisNome, jogadores, save,
+  partida, timeCasa, timeVis, timeCasaNome, timeVisNome, jogadores, save,
 }: {
   partida: Partida;
+  timeCasa: Time | undefined;
+  timeVis: Time | undefined;
   timeCasaNome: string;
   timeVisNome: string;
   jogadores: Jogador[];
@@ -589,9 +591,17 @@ function StatsTab({
   const getStats = (jogador_id: string): StatsJogador =>
     statsAtuais.find(s => s.jogador_id === jogador_id) ?? statsVazio(jogador_id);
 
-  const updStat = (jogador_id: string, campo: keyof Omit<StatsJogador, 'jogador_id'>, valor: number) => {
+  const updStat = (jogador_id: string, campo: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>, valor: number) => {
     const existente = getStats(jogador_id);
+    if (existente.validado) return; // trava: jogador validado não pode ter os números editados
     const atualizado: StatsJogador = { ...existente, [campo]: valor };
+    const semEste = statsAtuais.filter(s => s.jogador_id !== jogador_id);
+    save({ ...partida, stats_jogadores: [...semEste, atualizado] });
+  };
+
+  const updValidado = (jogador_id: string, valor: boolean) => {
+    const existente = getStats(jogador_id);
+    const atualizado: StatsJogador = { ...existente, validado: valor };
     const semEste = statsAtuais.filter(s => s.jogador_id !== jogador_id);
     save({ ...partida, stats_jogadores: [...semEste, atualizado] });
   };
@@ -599,43 +609,43 @@ function StatsTab({
   const nomeJog = (jid: string) => jogadores.find(j => j.id === jid)?.nome ?? jid;
   const aliasOpta = (jid: string) => jogadores.find(j => j.id === jid)?.alias_opta ?? '';
 
-  const todasEscalacoes = [
-    ...partida.escalacao_casa.map(e => ({ esc: e, isCasa: true })),
-    ...partida.escalacao_visitante.map(e => ({ esc: e, isCasa: false })),
-  ];
-
-  if (todasEscalacoes.length === 0) {
+  if (partida.escalacao_casa.length === 0 && partida.escalacao_visitante.length === 0) {
     return <p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Cadastre a escalação primeiro na aba Escalação.</p>;
   }
 
-  // Larguras fixas das duas primeiras colunas — necessárias para calcular o
-  // deslocamento (left) da segunda coluna fixa e para as células não
+  // Larguras fixas das colunas iniciais — necessárias para calcular o
+  // deslocamento (left) de cada coluna fixa e para as células não
   // encolherem/esticarem conforme o conteúdo durante o scroll.
   const COL1_WIDTH = 110; // Jogador
   const COL2_WIDTH = 84;  // Alias Opta
+  const COL3_WIDTH = 72;  // Validado
 
   const stickyCol1: React.CSSProperties = {
     position: 'sticky', left: 0, zIndex: 2,
     width: COL1_WIDTH, minWidth: COL1_WIDTH, maxWidth: COL1_WIDTH,
-    boxShadow: '2px 0 4px rgba(0,0,0,.35)',
   };
   const stickyCol2: React.CSSProperties = {
     position: 'sticky', left: COL1_WIDTH, zIndex: 2,
     width: COL2_WIDTH, minWidth: COL2_WIDTH, maxWidth: COL2_WIDTH,
+  };
+  const stickyCol3: React.CSSProperties = {
+    position: 'sticky', left: COL1_WIDTH + COL2_WIDTH, zIndex: 2,
+    width: COL3_WIDTH, minWidth: COL3_WIDTH, maxWidth: COL3_WIDTH,
     boxShadow: '2px 0 4px rgba(0,0,0,.35)',
   };
 
-  return (
-    <div>
-      <p style={{fontSize:'.78rem',color:'var(--text-muted)',marginBottom:'1rem'}}>
-        Estatísticas por jogador (fonte: Opta). Escalação e alias não são editáveis aqui — para alterá-los, use a aba Escalação e o cadastro de Jogadores.
-      </p>
+  const TabelaTime = ({ esc, cor }: { esc: EscalacaoJogador[]; cor: string }) => {
+    if (esc.length === 0) {
+      return <p style={{color:'var(--text-muted)',fontSize:'.85rem',padding:'.5rem 0'}}>Nenhum jogador escalado.</p>;
+    }
+    return (
       <div style={{overflowX:'auto',borderRadius:10,border:'1px solid var(--border)'}}>
         <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
-          <thead style={{background:'var(--surface2)',borderBottom:'2px solid var(--verde)'}}>
+          <thead style={{background:'var(--surface2)',borderBottom:`2px solid ${cor}`}}>
             <tr>
               <th style={{...stickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Jogador</th>
               <th style={{...stickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Alias</th>
+              <th style={{...stickyCol3,zIndex:3,background:'var(--surface2)',padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.78rem'}}>Validado</th>
               {STAT_COLS.map(col=>(
                 <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help'}}>
                   {col.label}
@@ -644,33 +654,45 @@ function StatsTab({
             </tr>
           </thead>
           <tbody>
-            {todasEscalacoes.map(({esc,isCasa},i)=>{
-              const s = getStats(esc.jogador_id);
+            {esc.map((e,i)=>{
+              const s = getStats(e.jogador_id);
               const rowBg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
+              const travado = s.validado;
               return (
-                <tr key={esc.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
-                  <td style={{...stickyCol1,background:rowBg,padding:'.5rem .4rem',borderLeft:`3px solid ${isCasa?'var(--verde)':'var(--amarelo)'}`}}>
-                    <div style={{fontWeight:600,fontSize:'.78rem',lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis'}} title={nomeJog(esc.jogador_id)}>
-                      {nomeJog(esc.jogador_id)}
+                <tr key={e.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
+                  <td style={{...stickyCol1,background:rowBg,padding:'.5rem .4rem',borderLeft:`3px solid ${cor}`}}>
+                    <div style={{fontWeight:600,fontSize:'.78rem',lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis'}} title={nomeJog(e.jogador_id)}>
+                      {nomeJog(e.jogador_id)}
                     </div>
                     <div style={{fontSize:'.62rem',color:'var(--text-muted)',lineHeight:1.2}}>
-                      {isCasa?timeCasaNome:timeVisNome} · #{esc.numero}
+                      #{e.numero} · {e.posicao}
                     </div>
                   </td>
-                  <td style={{...stickyCol2,background:rowBg,padding:'.5rem .4rem',fontSize:'.72rem',color:aliasOpta(esc.jogador_id)?'var(--text)':'#555',overflow:'hidden',textOverflow:'ellipsis'}} title={aliasOpta(esc.jogador_id)||undefined}>
-                    {aliasOpta(esc.jogador_id) || '—'}
+                  <td style={{...stickyCol2,background:rowBg,padding:'.5rem .4rem',fontSize:'.72rem',color:aliasOpta(e.jogador_id)?'var(--text)':'#555',overflow:'hidden',textOverflow:'ellipsis'}} title={aliasOpta(e.jogador_id)||undefined}>
+                    {aliasOpta(e.jogador_id) || '—'}
+                  </td>
+                  <td style={{...stickyCol3,background:rowBg,padding:'.4rem .3rem',textAlign:'center'}}>
+                    <label style={{display:'flex',alignItems:'center',justifyContent:'center',gap:3,fontSize:'.68rem',color:travado?'var(--verde)':'var(--text-muted)',cursor:'pointer',fontWeight:travado?700:400}}>
+                      <input type="checkbox" checked={travado} onChange={ev=>updValidado(e.jogador_id, ev.target.checked)} />
+                      {travado ? '✔' : ''}
+                    </label>
                   </td>
                   {STAT_COLS.map(col=>(
                     <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg}}>
                       <select
                         value={s[col.key]}
-                        onChange={e=>updStat(esc.jogador_id,col.key,+e.target.value)}
+                        disabled={travado}
+                        onChange={ev=>updStat(e.jogador_id,col.key,+ev.target.value)}
                         style={{
-                          width:54, background:'var(--surface2)', border:'1px solid var(--border)',
-                          borderRadius:4, color:'var(--text)', padding:'.3rem .2rem', textAlign:'center', fontSize:'.85rem',
+                          width:54, background: travado ? 'var(--surface)' : 'var(--surface2)',
+                          border:'1px solid var(--border)', borderRadius:4,
+                          color: travado ? 'var(--text-muted)' : 'var(--text)',
+                          padding:'.3rem .2rem', textAlign:'center', fontSize:'.85rem',
+                          cursor: travado ? 'not-allowed' : 'pointer',
+                          opacity: travado ? .7 : 1,
                         }}
                       >
-                        {OPCOES_0_30.map(n=><option key={n} value={n}>{n}</option>)}
+                        {opcoesAte(col.max).map(n=><option key={n} value={n}>{n}</option>)}
                       </select>
                     </td>
                   ))}
@@ -679,6 +701,25 @@ function StatsTab({
             })}
           </tbody>
         </table>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <p style={{fontSize:'.78rem',color:'var(--text-muted)',marginBottom:'1rem'}}>
+        Estatísticas por jogador (fonte: Opta). Escalação e alias não são editáveis aqui — para alterá-los, use a aba Escalação e o cadastro de Jogadores.
+        Ao marcar <strong>Validado</strong>, os números daquele jogador ficam bloqueados para edição.
+      </p>
+      <div style={{display:'flex',flexDirection:'column',gap:'2rem'}}>
+        <div>
+          <h3 style={{fontSize:'1.1rem',marginBottom:'.6rem',color:'var(--verde)'}}>{timeCasa?.nome ?? timeCasaNome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>(Mandante)</span></h3>
+          <TabelaTime esc={partida.escalacao_casa} cor="var(--verde)" />
+        </div>
+        <div>
+          <h3 style={{fontSize:'1.1rem',marginBottom:'.6rem',color:'var(--amarelo)'}}>{timeVis?.nome ?? timeVisNome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>(Visitante)</span></h3>
+          <TabelaTime esc={partida.escalacao_visitante} cor="var(--amarelo)" />
+        </div>
       </div>
     </div>
   );
@@ -923,7 +964,7 @@ export default function AdminPartidaEventos() {
       )}
       {tab==='stats'&&(
         <StatsTab
-          partida={partida}
+          partida={partida} timeCasa={timeCasa} timeVis={timeVis}
           timeCasaNome={timeCasaNome} timeVisNome={timeVisNome}
           jogadores={jogadores} save={save}
         />
