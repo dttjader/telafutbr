@@ -18,7 +18,7 @@ const DESCRICOES_GOL: Record<string, string[]> = {
 };
 
 const MOTIVOS_CARTAO: Record<string, string[]> = {
-  amarelo: ['Falta tática','Reclamação com o árbitro','Retardar o jogo','Falta violenta','Simulação','Impedimento de saída de goleiro','Comemoração excessiva','Desrespeito à distância em cobrança','Agressão verbal','Mão na bola'],
+  amarelo: ['Falta tática','Reclamação com o árbitro','Retardar o jogo','Falta violenta','Simulação','Comemoração excessiva','Atitude antidesportiva','Desrespeito ao jogo','Agressão física','Agressão verbal','Mão na bola'],
   vermelho: ['Segundo cartão amarelo','Falta violenta grave','Agressão física','Cuspida','Linguagem ofensiva ou abusiva','Negação de gol com falta (DOGSO)','Negação de gol com mão','Conduta violenta'],
   amarelo_tecnico: ['Reclamação excessiva','Conduta antidesportiva','Entrada na área técnica indevida','Protesto veemente','Desrespeito ao árbitro'],
   vermelho_tecnico: ['Expulsão por reclamação reiterada','Conduta violenta','Insulto ao árbitro','Segunda advertência (técnico)','Agressão a membro da comissão'],
