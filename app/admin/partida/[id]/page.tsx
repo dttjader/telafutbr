@@ -611,8 +611,8 @@ function StatsTab({
   // Larguras fixas das duas primeiras colunas — necessárias para calcular o
   // deslocamento (left) da segunda coluna fixa e para as células não
   // encolherem/esticarem conforme o conteúdo durante o scroll.
-  const COL1_WIDTH = 190; // Jogador
-  const COL2_WIDTH = 150; // Alias Opta
+  const COL1_WIDTH = 110; // Jogador
+  const COL2_WIDTH = 84;  // Alias Opta
 
   const stickyCol1: React.CSSProperties = {
     position: 'sticky', left: 0, zIndex: 2,
@@ -634,8 +634,8 @@ function StatsTab({
         <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
           <thead style={{background:'var(--surface2)',borderBottom:'2px solid var(--verde)'}}>
             <tr>
-              <th style={{...stickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Jogador</th>
-              <th style={{...stickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Alias Opta</th>
+              <th style={{...stickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Jogador</th>
+              <th style={{...stickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Alias</th>
               {STAT_COLS.map(col=>(
                 <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help'}}>
                   {col.label}
@@ -649,13 +649,15 @@ function StatsTab({
               const rowBg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
               return (
                 <tr key={esc.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
-                  <td style={{...stickyCol1,background:rowBg,padding:'.5rem .6rem',whiteSpace:'nowrap',borderLeft:`3px solid ${isCasa?'var(--verde)':'var(--amarelo)'}`}}>
-                    <div style={{fontWeight:600}}>{nomeJog(esc.jogador_id)}</div>
-                    <div style={{fontSize:'.68rem',color:'var(--text-muted)'}}>
-                      {isCasa?timeCasaNome:timeVisNome} · #{esc.numero} · {esc.posicao}
+                  <td style={{...stickyCol1,background:rowBg,padding:'.5rem .4rem',borderLeft:`3px solid ${isCasa?'var(--verde)':'var(--amarelo)'}`}}>
+                    <div style={{fontWeight:600,fontSize:'.78rem',lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis'}} title={nomeJog(esc.jogador_id)}>
+                      {nomeJog(esc.jogador_id)}
+                    </div>
+                    <div style={{fontSize:'.62rem',color:'var(--text-muted)',lineHeight:1.2}}>
+                      {isCasa?timeCasaNome:timeVisNome} · #{esc.numero}
                     </div>
                   </td>
-                  <td style={{...stickyCol2,background:rowBg,padding:'.5rem .6rem',fontSize:'.8rem',color:aliasOpta(esc.jogador_id)?'var(--text)':'#555'}}>
+                  <td style={{...stickyCol2,background:rowBg,padding:'.5rem .4rem',fontSize:'.72rem',color:aliasOpta(esc.jogador_id)?'var(--text)':'#555',overflow:'hidden',textOverflow:'ellipsis'}} title={aliasOpta(esc.jogador_id)||undefined}>
                     {aliasOpta(esc.jogador_id) || '—'}
                   </td>
                   {STAT_COLS.map(col=>(
