@@ -103,10 +103,13 @@ export interface EscalacaoJogador {
 }
 
 // Estatísticas individuais por jogador em uma partida (fonte: Opta Stats).
-// Todos os campos são numéricos, de 0 a 30, e editáveis apenas na aba
-// "Stats" da tela de eventos da partida (admin/partida/[id]).
+// Todos os campos numéricos vão de 0 até o limite definido por coluna (ver
+// STAT_COLS em app/admin/partida/[id]/page.tsx), editáveis apenas na aba
+// "Stats" da tela de eventos da partida. Quando "validado" é true, os
+// campos numéricos desse jogador ficam bloqueados para edição.
 export interface StatsJogador {
   jogador_id: string;
+  validado: boolean;
   S: number;    // Finalizações
   SoT: number;  // Finalizações no Alvo
   SB: number;   // Finalizações Bloqueadas
