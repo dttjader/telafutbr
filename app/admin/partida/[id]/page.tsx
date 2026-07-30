@@ -608,6 +608,23 @@ function StatsTab({
     return <p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Cadastre a escalação primeiro na aba Escalação.</p>;
   }
 
+  // Larguras fixas das duas primeiras colunas — necessárias para calcular o
+  // deslocamento (left) da segunda coluna fixa e para as células não
+  // encolherem/esticarem conforme o conteúdo durante o scroll.
+  const COL1_WIDTH = 190; // Jogador
+  const COL2_WIDTH = 150; // Alias Opta
+
+  const stickyCol1: React.CSSProperties = {
+    position: 'sticky', left: 0, zIndex: 2,
+    width: COL1_WIDTH, minWidth: COL1_WIDTH, maxWidth: COL1_WIDTH,
+    boxShadow: '2px 0 4px rgba(0,0,0,.35)',
+  };
+  const stickyCol2: React.CSSProperties = {
+    position: 'sticky', left: COL1_WIDTH, zIndex: 2,
+    width: COL2_WIDTH, minWidth: COL2_WIDTH, maxWidth: COL2_WIDTH,
+    boxShadow: '2px 0 4px rgba(0,0,0,.35)',
+  };
+
   return (
     <div>
       <p style={{fontSize:'.78rem',color:'var(--text-muted)',marginBottom:'1rem'}}>
@@ -617,8 +634,8 @@ function StatsTab({
         <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
           <thead style={{background:'var(--surface2)',borderBottom:'2px solid var(--verde)'}}>
             <tr>
-              <th style={{padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Jogador</th>
-              <th style={{padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Alias Opta</th>
+              <th style={{...stickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Jogador</th>
+              <th style={{...stickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif"}}>Alias Opta</th>
               {STAT_COLS.map(col=>(
                 <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help'}}>
                   {col.label}
@@ -627,21 +644,22 @@ function StatsTab({
             </tr>
           </thead>
           <tbody>
-            {todasEscalacoes.map(({esc,isCasa})=>{
+            {todasEscalacoes.map(({esc,isCasa},i)=>{
               const s = getStats(esc.jogador_id);
+              const rowBg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
               return (
                 <tr key={esc.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
-                  <td style={{padding:'.5rem .6rem',whiteSpace:'nowrap',borderLeft:`3px solid ${isCasa?'var(--verde)':'var(--amarelo)'}`}}>
+                  <td style={{...stickyCol1,background:rowBg,padding:'.5rem .6rem',whiteSpace:'nowrap',borderLeft:`3px solid ${isCasa?'var(--verde)':'var(--amarelo)'}`}}>
                     <div style={{fontWeight:600}}>{nomeJog(esc.jogador_id)}</div>
                     <div style={{fontSize:'.68rem',color:'var(--text-muted)'}}>
                       {isCasa?timeCasaNome:timeVisNome} · #{esc.numero} · {esc.posicao}
                     </div>
                   </td>
-                  <td style={{padding:'.5rem .6rem',fontSize:'.8rem',color:aliasOpta(esc.jogador_id)?'var(--text)':'#555'}}>
+                  <td style={{...stickyCol2,background:rowBg,padding:'.5rem .6rem',fontSize:'.8rem',color:aliasOpta(esc.jogador_id)?'var(--text)':'#555'}}>
                     {aliasOpta(esc.jogador_id) || '—'}
                   </td>
                   {STAT_COLS.map(col=>(
-                    <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center'}}>
+                    <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg}}>
                       <select
                         value={s[col.key]}
                         onChange={e=>updStat(esc.jogador_id,col.key,+e.target.value)}
