@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       tecnico_casa_id: body.tecnico_casa_id ?? null, tecnico_visitante_id: body.tecnico_visitante_id ?? null,
       arbitragem: body.arbitragem ?? { principal: '', assistente1: '', assistente2: '', quarto: '', var: '' },
       escalacao_casa: [], escalacao_visitante: [], gols: [], cartoes: [], substituicoes: [],
+      stats_jogadores: [],
     };
     return NextResponse.json(await upsertPartida(nova), { status: 201 });
   } catch (e) {
