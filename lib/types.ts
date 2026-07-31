@@ -146,6 +146,9 @@ export interface Partida {
   cartoes: Cartao[];
   substituicoes: Substituicao[];
   stats_jogadores: StatsJogador[];
+  link_transfermarkt?: string;
+  link_cbf?: string;
+  link_opta?: string;
 }
 
 export interface TabelaEntry {
