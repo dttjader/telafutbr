@@ -5,7 +5,7 @@ import { Partida, Time, Estadio, Tecnico } from '@/lib/types';
 import { clientGetPartidas, clientGetTimes, clientUpsertPartida, clientDeletePartida, clientGetEstadios, clientGetTecnicos, uid } from '@/lib/client';
 
 const STATUS_OPTS = [{value:'agendada',label:'Agendada'},{value:'ao_vivo',label:'Ao Vivo'},{value:'encerrada',label:'Encerrada'},{value:'adiada',label:'Adiada'}];
-const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_casa_id:'',time_visitante_id:'',estadio_id:'',placar_casa:'0',placar_visitante:'0',publico:'',acrescimo_primeiro:'0',acrescimo_segundo:'0',arb_principal:'',arb_ass1:'',arb_ass2:'',arb_quarto:'',arb_var:'',tecnico_casa_id:'',tecnico_visitante_id:''});
+const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_casa_id:'',time_visitante_id:'',estadio_id:'',placar_casa:'0',placar_visitante:'0',publico:'',acrescimo_primeiro:'0',acrescimo_segundo:'0',arb_principal:'',arb_ass1:'',arb_ass2:'',arb_quarto:'',arb_var:'',tecnico_casa_id:'',tecnico_visitante_id:'',link_transfermarkt:'',link_cbf:'',link_opta:''});
 
 const PSEUDO_IDS = new Set(['outros']);
 const filtrarTimesReais = (times: Time[]) => times.filter(t => !PSEUDO_IDS.has(t.id));
@@ -64,11 +64,15 @@ export default function AdminPartidas() {
         tecnico_casa_id: form.tecnico_casa_id || null,
         tecnico_visitante_id: form.tecnico_visitante_id || null,
         arbitragem:{principal:form.arb_principal,assistente1:form.arb_ass1,assistente2:form.arb_ass2,quarto:form.arb_quarto,var:form.arb_var},
+        link_transfermarkt: form.link_transfermarkt.trim() || undefined,
+        link_cbf: form.link_cbf.trim() || undefined,
+        link_opta: form.link_opta.trim() || undefined,
         escalacao_casa: existente?.escalacao_casa ?? [],
         escalacao_visitante: existente?.escalacao_visitante ?? [],
         gols: existente?.gols ?? [],
         cartoes: existente?.cartoes ?? [],
         substituicoes: existente?.substituicoes ?? [],
+        stats_jogadores: existente?.stats_jogadores ?? [],
       });
       flash(true, editId?'Partida atualizada!':'Partida cadastrada!');
       setForm(emptyForm()); setEditId(null); setShowForm(false); load();
@@ -77,7 +81,7 @@ export default function AdminPartidas() {
   };
 
   const edit=(p:Partida)=>{
-    setForm({rodada:p.rodada.toString(),data:p.data,hora:p.hora,status:p.status,time_casa_id:p.time_casa_id,time_visitante_id:p.time_visitante_id,estadio_id:p.estadio_id,publico:p.publico.toString(),placar_casa:p.placar_casa.toString(),placar_visitante:p.placar_visitante.toString(),acrescimo_primeiro:p.acrescimo_primeiro.toString(),acrescimo_segundo:p.acrescimo_segundo.toString(),arb_principal:p.arbitragem.principal,arb_ass1:p.arbitragem.assistente1,arb_ass2:p.arbitragem.assistente2,arb_quarto:p.arbitragem.quarto,arb_var:p.arbitragem.var,tecnico_casa_id:p.tecnico_casa_id??'',tecnico_visitante_id:p.tecnico_visitante_id??''});
+    setForm({rodada:p.rodada.toString(),data:p.data,hora:p.hora,status:p.status,time_casa_id:p.time_casa_id,time_visitante_id:p.time_visitante_id,estadio_id:p.estadio_id,publico:p.publico.toString(),placar_casa:p.placar_casa.toString(),placar_visitante:p.placar_visitante.toString(),acrescimo_primeiro:p.acrescimo_primeiro.toString(),acrescimo_segundo:p.acrescimo_segundo.toString(),arb_principal:p.arbitragem.principal,arb_ass1:p.arbitragem.assistente1,arb_ass2:p.arbitragem.assistente2,arb_quarto:p.arbitragem.quarto,arb_var:p.arbitragem.var,tecnico_casa_id:p.tecnico_casa_id??'',tecnico_visitante_id:p.tecnico_visitante_id??'',link_transfermarkt:p.link_transfermarkt??'',link_cbf:p.link_cbf??'',link_opta:p.link_opta??''});
     setEditId(p.id); setShowForm(true); window.scrollTo({top:0,behavior:'smooth'});
   };
 
@@ -202,6 +206,16 @@ export default function AdminPartidas() {
               </div>
             </div>
 
+            <div style={{background:'var(--surface2)',borderRadius:8,padding:'1rem',marginBottom:'1rem'}}>
+              <p style={{fontSize:'.8rem',color:'var(--text-muted)',marginBottom:'.75rem',textTransform:'uppercase',letterSpacing:'.08em',fontWeight:700}}>Links Externos</p>
+              <p style={{fontSize:'.72rem',color:'var(--text-muted)',marginBottom:'.75rem'}}>Opcional. Cole o link da página desta partida em cada site, se disponível.</p>
+              <div className="grid-3">
+                <div className="form-group" style={{margin:0}}><label>Link Transfermarkt</label><input type="url" placeholder="https://www.transfermarkt.com.br/..." value={form.link_transfermarkt} onChange={f('link_transfermarkt')} /></div>
+                <div className="form-group" style={{margin:0}}><label>Link CBF</label><input type="url" placeholder="https://www.cbf.com.br/..." value={form.link_cbf} onChange={f('link_cbf')} /></div>
+                <div className="form-group" style={{margin:0}}><label>Link Opta</label><input type="url" placeholder="https://opta.com/..." value={form.link_opta} onChange={f('link_opta')} /></div>
+              </div>
+            </div>
+
             <div style={{display:'flex',gap:'.75rem'}}>
               <button type="submit" className="btn btn-primary" disabled={loading}>{loading?'Salvando...':(editId?'Salvar alterações':'Cadastrar partida')}</button>
               <button type="button" className="btn btn-ghost" onClick={()=>{setForm(emptyForm());setEditId(null);setShowForm(false);}}>Cancelar</button>
@@ -227,7 +241,7 @@ export default function AdminPartidas() {
             {isOpen&&(
               <div style={{border:'1px solid var(--border)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1rem',background:'var(--surface)',display:'flex',flexDirection:'column',gap:'.5rem'}}>
                 {ps.map(p=>(
-                  <div key={p.id} className="card" style={{display:'flex',alignItems:'center',gap:'1rem',padding:'1rem 1.25rem'}}>
+                  <div key={p.id} className="card" style={{display:'flex',alignItems:'center',gap:'1rem',padding:'1rem 1.25rem',flexWrap:'wrap'}}>
                     <span className={`badge ${statusBadge[p.status]}`}>{statusLabel[p.status]}</span>
                     <div style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.1rem',letterSpacing:'.05em'}}>
                       {nomeTime(p.time_casa_id)}<span style={{color:'var(--verde)',margin:'0 .5rem'}}>{p.placar_casa} × {p.placar_visitante}</span>{nomeTime(p.time_visitante_id)}
@@ -240,6 +254,13 @@ export default function AdminPartidas() {
                       </div>
                       <div style={{fontSize:'.78rem',color:'var(--text-muted)'}}>{p.data ? p.data.split('-').reverse().join('/') : 'A definir'} · {p.hora} · {nomeEstadio(p.estadio_id)}</div>
                     </div>
+                    {(p.link_transfermarkt||p.link_cbf||p.link_opta) && (
+                      <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap'}}>
+                        {p.link_transfermarkt&&<a href={p.link_transfermarkt} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Transfermarkt</a>}
+                        {p.link_cbf&&<a href={p.link_cbf} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 CBF</a>}
+                        {p.link_opta&&<a href={p.link_opta} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Opta</a>}
+                      </div>
+                    )}
                     <div style={{display:'flex',gap:'.5rem'}}>
                       <button className="btn btn-ghost btn-sm" onClick={()=>router.push(`/admin/partida/${p.id}`)}>📋 Eventos</button>
                       <button className="btn btn-ghost btn-sm" onClick={()=>edit(p)}>✏️</button>
@@ -255,4 +276,4 @@ export default function AdminPartidas() {
       {partidas.length===0&&<p style={{color:'var(--text-muted)',textAlign:'center',padding:'3rem'}}>Nenhuma partida cadastrada.</p>}
     </div>
   );
-                  }
+}
