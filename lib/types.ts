@@ -20,6 +20,7 @@ export interface Estadio {
   cidade: string;
   estado: string;
   capacidade?: number;
+  api_football_id?: number | null;
 }
 
 export interface Time {
@@ -29,6 +30,7 @@ export interface Time {
   cor_primaria: string;
   cor_secundaria: string;
   estadio_id?: string;
+  api_football_id?: number | null;
 }
 
 export interface Transferencia {
@@ -48,6 +50,7 @@ export interface Jogador {
   transferencias: Transferencia[];
   registro?: number; // Código numérico único
   alias_opta?: string; // Nome usado para identificar o jogador no Opta Stats
+  api_football_id?: number | null;
 }
 
 export interface Arbitragem {
