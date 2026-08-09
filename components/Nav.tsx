@@ -15,6 +15,7 @@ const adminLinks = [
   { href: '/admin/tecnicos',  label: 'Técnicos'  },
   { href: '/admin/partidas',  label: 'Partidas'  },
   { href: '/admin/config',    label: 'Config'    },
+  { href: '/admin/sync',      label: 'API-Football' },
 ];
 
 export function Nav() {
