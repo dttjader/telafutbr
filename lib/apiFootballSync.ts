@@ -135,7 +135,7 @@ export interface ResultadoSyncJogadores {
     time_id: string;
     time_nome: string;
     jogadoresAtualizados: { id: string; nome: string; api_football_id: number }[];
-    naoEncontrados: { nome_api: string; posicao_sugerida: string }[];
+    naoEncontrados: { id_api: number; nome_api: string; posicao_sugerida: string }[];
   }[];
   timesPulados: { id: string; nome: string; motivo: string }[];
 }
@@ -170,7 +170,7 @@ export async function sincronizarJogadores(limiteTimes?: number): Promise<Result
       const { data: jogadoresLocais } = await supabase.from('jogadores').select('*').eq('time_atual', time.id);
 
       const jogadoresAtualizados: { id: string; nome: string; api_football_id: number }[] = [];
-      const naoEncontrados: { nome_api: string; posicao_sugerida: string }[] = [];
+      const naoEncontrados: { id_api: number; nome_api: string; posicao_sugerida: string }[] = [];
 
       for (const afJog of jogadoresAF) {
         const match = encontrarJogadorCorrespondente(afJog, (jogadoresLocais ?? []) as Jogador[]);
@@ -179,6 +179,7 @@ export async function sincronizarJogadores(limiteTimes?: number): Promise<Result
           jogadoresAtualizados.push({ id: match.id, nome: match.nome, api_football_id: afJog.id });
         } else {
           naoEncontrados.push({
+            id_api: afJog.id,
             nome_api: afJog.name,
             posicao_sugerida: POSICAO_MAP[afJog.position ?? ''] ?? 'MEI',
           });
@@ -193,4 +194,4 @@ export async function sincronizarJogadores(limiteTimes?: number): Promise<Result
 
   const { usadas } = await getOrcamentoRestante();
   return { requisicoesUsadas: usadas, porTime, timesPulados };
-    }
+  }
