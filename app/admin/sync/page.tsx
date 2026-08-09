@@ -13,7 +13,7 @@ interface ResultadoJogadores {
   porTime: {
     time_id: string; time_nome: string;
     jogadoresAtualizados: { id: string; nome: string; api_football_id: number }[];
-    naoEncontrados: { nome_api: string; posicao_sugerida: string }[];
+    naoEncontrados: { id_api: number; nome_api: string; posicao_sugerida: string }[];
   }[];
   timesPulados: { id: string; nome: string; motivo: string }[];
 }
@@ -137,11 +137,33 @@ export default function AdminSync() {
                 {t.naoEncontrados.length > 0 && (
                   <div style={{ marginTop: '.4rem', color: 'var(--text-muted)' }}>
                     ⚠️ {t.naoEncontrados.length} jogador(es) do elenco da API sem correspondência local:
-                    <ul style={{ paddingLeft: '1.2rem', marginTop: '.2rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', marginTop: '.4rem' }}>
                       {t.naoEncontrados.map((n, i) => (
-                        <li key={i}>{n.nome_api} <span style={{ color: '#555' }}>(sugestão: {n.posicao_sugerida})</span></li>
+                        <div key={i} style={{
+                          display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap',
+                          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+                          padding: '.35rem .6rem',
+                        }}>
+                          <span style={{
+                            fontFamily: "'Bebas Neue',sans-serif", fontSize: '.85rem', color: '#60a5fa',
+                            background: 'rgba(59,130,246,.1)', border: '1px solid rgba(59,130,246,.25)',
+                            borderRadius: 4, padding: '.05rem .4rem', minWidth: 60, textAlign: 'center',
+                          }}>
+                            #{n.id_api}
+                          </span>
+                          <span style={{ color: 'var(--text)' }}>{n.nome_api}</span>
+                          <span style={{ color: '#555' }}>(sugestão: {n.posicao_sugerida})</span>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            style={{ marginLeft: 'auto', padding: '.15rem .5rem', fontSize: '.7rem' }}
+                            onClick={() => navigator.clipboard.writeText(String(n.id_api))}
+                          >
+                            📋 Copiar ID
+                          </button>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
               </div>
@@ -156,4 +178,4 @@ export default function AdminSync() {
       </div>
     </div>
   );
-                           }
+}
