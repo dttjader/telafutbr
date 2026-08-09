@@ -84,7 +84,7 @@ export default function AdminEstadios() {
         {estadios.map(e=>(
           <div key={e.id} className="card" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'1rem',padding:'1rem 1.25rem'}}>
             <div>
-              <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}
+              <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
               <strong>{e.nome}</strong>
               <ApiFootballBadge apiFootballId={e.api_football_id} />
               </div>
