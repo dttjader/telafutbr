@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Jogador, Time, SubPosicao, Nacionalidade } from '@/lib/types';
 import { clientGetJogadores, clientGetTimes, clientUpsertJogador, clientDeleteJogador, uid } from '@/lib/client';
+import { ApiFootballBadge } from '@/components/ApiFootballBadge';
 
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
 const POS_LABEL: Record<string,string> = {GOL:'Goleiro',ZAG:'Zagueiro',LAT:'Lateral',VOL:'Volante',MEI:'Meia',ATA:'Atacante'};
@@ -356,6 +357,7 @@ export default function AdminJogadores() {
                       </span>
                     )}
                     <span className="badge badge-cinza">{POS_LABEL[j.posicao]}</span>
+                    <ApiFootballBadge apiFootballId={j.api_football_id} />
                     {j.sub_posicao && j.sub_posicao !== j.posicao && (
                       <span style={{
                         fontSize: '.7rem', padding: '.1rem .4rem', borderRadius: 4,
