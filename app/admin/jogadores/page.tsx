@@ -66,6 +66,7 @@ const emptyForm = () => ({
   dataTransferencia: new Date().toISOString().slice(0, 10),
   registro: '',
   aliasOpta: '',
+  apiFootballId: '',
 });
 
 export default function AdminJogadores() {
@@ -103,6 +104,12 @@ export default function AdminJogadores() {
       if (duplicado) return flash(false, `O registro ${regNum} já pertence ao jogador ${duplicado.nome}.`);
     }
 
+    if (form.apiFootballId) {
+      const afId = +form.apiFootballId;
+      const duplicadoAF = jogadores.find(j => j.api_football_id === afId && j.id !== editId);
+      if (duplicadoAF) return flash(false, `O ID da API-Football ${afId} já está vinculado a ${duplicadoAF.nome}.`);
+    }
+
     setLoading(true);
     try {
       const jogAtual = editId ? jogadores.find(j => j.id === editId) : null;
@@ -127,6 +134,7 @@ export default function AdminJogadores() {
         transferencias,
         registro: form.registro ? +form.registro : undefined,
         alias_opta: form.aliasOpta.trim() || undefined,
+        api_football_id: form.apiFootballId ? +form.apiFootballId : null,
       });
       flash(true, editId ? 'Jogador atualizado!' : 'Jogador cadastrado!');
       setForm(emptyForm()); setEditId(null); load();
@@ -147,6 +155,7 @@ export default function AdminJogadores() {
       dataTransferencia: new Date().toISOString().slice(0, 10),
       registro: j.registro?.toString() ?? '',
       aliasOpta: j.alias_opta ?? '',
+      apiFootballId: j.api_football_id?.toString() ?? '',
     });
     setEditId(j.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -217,6 +226,15 @@ export default function AdminJogadores() {
                   value={form.aliasOpta}
                   onChange={e => setForm(f => ({ ...f, aliasOpta: e.target.value }))}
                   placeholder="Nome usado para identificar o jogador no Opta Stats"
+                />
+              </div>
+              <div className="form-group">
+                <label>API-Football ID</label>
+                <input
+                  type="number"
+                  value={form.apiFootballId}
+                  onChange={e => setForm(f => ({ ...f, apiFootballId: e.target.value }))}
+                  placeholder="Ex: 12345 (visto na lista de não identificados)"
                 />
               </div>
             </div>
@@ -399,4 +417,4 @@ export default function AdminJogadores() {
       </div>
     </div>
   );
-    }
+}
