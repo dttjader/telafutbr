@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Estadio } from '@/lib/types';
 import { clientGetEstadios, clientUpsertEstadio, clientDeleteEstadio, uid } from '@/lib/client';
+import { ApiFootballBadge } from '@/components/ApiFootballBadge';
 
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 const empty = (): Partial<Estadio> => ({ nome: '', cidade: '', estado: 'SP', capacidade: undefined });
@@ -83,7 +84,10 @@ export default function AdminEstadios() {
         {estadios.map(e=>(
           <div key={e.id} className="card" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'1rem',padding:'1rem 1.25rem'}}>
             <div>
+              <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}
               <strong>{e.nome}</strong>
+              <ApiFootballBadge apiFootballId={e.api_football_id} />
+              </div>
               <div style={{fontSize:'.8rem',color:'var(--text-muted)',marginTop:'.15rem'}}>{e.cidade} · {e.estado}{e.capacidade?` · ${e.capacidade.toLocaleString('pt-BR')} lugares`:''}</div>
             </div>
             <div style={{display:'flex',gap:'.5rem'}}>
