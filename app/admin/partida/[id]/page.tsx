@@ -971,6 +971,9 @@ export default function AdminPartidaEventos() {
           jogadores={jogadores} save={save}
         />
       )}
+      {tab==='apifootball'&&(
+        <ImportarApiFootballTab partida={partida} onImportado={load} />
+      )}
     </div>
   );
 }
