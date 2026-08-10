@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Partida, Time, Estadio, Tecnico } from '@/lib/types';
 import { clientGetPartidas, clientGetTimes, clientUpsertPartida, clientDeletePartida, clientGetEstadios, clientGetTecnicos, uid } from '@/lib/client';
+import { VincularPartidaApiFootball } from '@/components/VincularPartidaApiFootball';
 
 const STATUS_OPTS = [{value:'agendada',label:'Agendada'},{value:'ao_vivo',label:'Ao Vivo'},{value:'encerrada',label:'Encerrada'},{value:'adiada',label:'Adiada'}];
 const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_casa_id:'',time_visitante_id:'',estadio_id:'',placar_casa:'0',placar_visitante:'0',publico:'',acrescimo_primeiro:'0',acrescimo_segundo:'0',arb_principal:'',arb_ass1:'',arb_ass2:'',arb_quarto:'',arb_var:'',tecnico_casa_id:'',tecnico_visitante_id:'',link_transfermarkt:'',link_cbf:'',link_opta:''});
