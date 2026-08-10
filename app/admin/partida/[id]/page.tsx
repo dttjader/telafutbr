@@ -938,6 +938,7 @@ export default function AdminPartidaEventos() {
         <button className={`btn ${tab==='cartoes'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('cartoes')}>🟨 Cartões ({partida.cartoes.length})</button>
         <button className={`btn ${tab==='subs'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('subs')}>🔄 Subs ({partida.substituicoes.length})</button>
         <button className={`btn ${tab==='stats'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('stats')}>📈 Stats</button>
+        <button className={`btn ${tab==='apifootball'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('apifootball')}>🔗 API-Football</button>
       </div>
 
       {tab==='escalacao'&&<EscalacaoTab/>}
