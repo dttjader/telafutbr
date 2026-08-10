@@ -96,7 +96,7 @@ export function VincularPartidaApiFootball({ partida, timeCasa, timeVisitante, o
           disabled={!ambosVinculados}
           title={!ambosVinculados ? 'Vincule os dois times primeiro em /admin/sync' : undefined}
         >
-          🔗 Vincular API-Football
+          🔗 API-Football
         </button>
       ) : (
         <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '.75rem', marginTop: '.5rem', minWidth: 280 }}>
