@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Partida, Time, Jogador, Tecnico, Gol, Cartao, Substituicao, EscalacaoJogador, StatsJogador } from '@/lib/types';
 import { clientGetPartida, clientGetTimes, clientGetJogadores, clientUpsertPartida, clientGetTecnicos, uid } from '@/lib/client';
+import { ImportarApiFootballTab } from './ImportarApiFootballTab';
 
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
 const TIPO_GOL = ['normal','penalti','falta','contra','penalti_perdido','penalti_defendido'];
