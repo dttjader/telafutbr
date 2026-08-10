@@ -18,13 +18,32 @@ interface ResultadoJogadores {
   timesPulados: { id: string; nome: string; motivo: string }[];
 }
 
+interface LigaEncontrada {
+  id: number;
+  nome: string;
+  tipo: string;
+  temporadaAtual: number | null;
+}
+
+function parseNumeros(texto: string): number[] {
+  return texto
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter(n => !Number.isNaN(n));
+}
+
 export default function AdminSync() {
   const [orcamento, setOrcamento] = useState<Orcamento | null>(null);
-  const [season, setSeason] = useState(new Date().getFullYear());
+  const [temporadasTexto, setTemporadasTexto] = useState(String(new Date().getFullYear()));
+  const [ligasExtrasTexto, setLigasExtrasTexto] = useState('');
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [loadingJogadores, setLoadingJogadores] = useState(false);
+  const [loadingLigas, setLoadingLigas] = useState(false);
   const [resultadoTimes, setResultadoTimes] = useState<ResultadoTimes | null>(null);
   const [resultadoJogadores, setResultadoJogadores] = useState<ResultadoJogadores | null>(null);
+  const [ligas, setLigas] = useState<LigaEncontrada[] | null>(null);
   const [erro, setErro] = useState('');
 
   const carregarOrcamento = async () => {
@@ -33,23 +52,49 @@ export default function AdminSync() {
   };
   useEffect(() => { carregarOrcamento(); }, []);
 
-  const rodar = async (etapa: 'times' | 'jogadores') => {
-    setErro('');
-    if (etapa === 'times') setLoadingTimes(true); else setLoadingJogadores(true);
+  const chamar = async (body: Record<string, unknown>) => {
+    const r = await fetch('/api/sync/times-jogadores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error ?? 'Erro desconhecido');
+    return data;
+  };
+
+  const rodarTimes = async () => {
+    setErro(''); setLoadingTimes(true);
     try {
-      const r = await fetch('/api/sync/times-jogadores', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ season, etapa }),
+      const data = await chamar({
+        etapa: 'times',
+        temporadas: parseNumeros(temporadasTexto),
+        ligasExtras: parseNumeros(ligasExtrasTexto),
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error ?? 'Erro desconhecido');
-      if (etapa === 'times') setResultadoTimes(data); else setResultadoJogadores(data);
+      setResultadoTimes(data);
       await carregarOrcamento();
-    } catch (e) {
-      setErro(String(e));
-    }
-    if (etapa === 'times') setLoadingTimes(false); else setLoadingJogadores(false);
+    } catch (e) { setErro(String(e)); }
+    setLoadingTimes(false);
+  };
+
+  const rodarJogadores = async () => {
+    setErro(''); setLoadingJogadores(true);
+    try {
+      const data = await chamar({ etapa: 'jogadores' });
+      setResultadoJogadores(data);
+      await carregarOrcamento();
+    } catch (e) { setErro(String(e)); }
+    setLoadingJogadores(false);
+  };
+
+  const descobrirLigas = async () => {
+    setErro(''); setLoadingLigas(true);
+    try {
+      const data = await chamar({ etapa: 'descobrir-ligas' });
+      setLigas(data.ligas);
+      await carregarOrcamento();
+    } catch (e) { setErro(String(e)); }
+    setLoadingLigas(false);
   };
 
   const pct = orcamento ? (orcamento.usadas / orcamento.limite) * 100 : 0;
@@ -58,7 +103,7 @@ export default function AdminSync() {
     <div className="container" style={{ paddingTop: '2rem', maxWidth: 900 }}>
       <h1 style={{ fontSize: '2.5rem', marginBottom: '.25rem' }}>🔗 Sincronização API-Football</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-        Vincula times, estádios e jogadores locais aos IDs da API-Football. Execute primeiro &quot;Times&quot;, depois &quot;Jogadores&quot;.
+        Vincula times, estádios e jogadores locais aos IDs da API-Football.
       </p>
 
       {erro && <div className="alert alert-error">{erro}</div>}
@@ -84,22 +129,67 @@ export default function AdminSync() {
         ) : <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>}
       </div>
 
-      {/* Temporada */}
-      <div className="form-group" style={{ maxWidth: 200, marginBottom: '1.5rem' }}>
-        <label>Temporada (season)</label>
-        <input type="number" value={season} onChange={e => setSeason(+e.target.value)} />
+      {/* Descobrir ligas do Brasil */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', flexWrap: 'wrap', gap: '.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.2rem', color: 'var(--amarelo)' }}>🔍 Descobrir ligas do Brasil</h2>
+            <p style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>
+              Rode 1x para achar o ID exato da Série B (ou outra competição) — evita chutar um ID errado.
+            </p>
+          </div>
+          <button className="btn btn-ghost" onClick={descobrirLigas} disabled={loadingLigas}>
+            {loadingLigas ? 'Buscando...' : 'Buscar (1 requisição)'}
+          </button>
+        </div>
+        {ligas && (
+          <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
+              <thead style={{ background: 'var(--surface2)', position: 'sticky', top: 0 }}>
+                <tr>
+                  <th style={{ padding: '.4rem .6rem', textAlign: 'left' }}>ID</th>
+                  <th style={{ padding: '.4rem .6rem', textAlign: 'left' }}>Nome</th>
+                  <th style={{ padding: '.4rem .6rem', textAlign: 'left' }}>Tipo</th>
+                  <th style={{ padding: '.4rem .6rem', textAlign: 'left' }}>Temporada atual</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ligas.map(l => (
+                  <tr key={l.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '.35rem .6rem', color: 'var(--amarelo)', fontFamily: "'Bebas Neue',sans-serif" }}>{l.id}</td>
+                    <td style={{ padding: '.35rem .6rem' }}>{l.nome}</td>
+                    <td style={{ padding: '.35rem .6rem', color: 'var(--text-muted)' }}>{l.tipo}</td>
+                    <td style={{ padding: '.35rem .6rem', color: 'var(--text-muted)' }}>{l.temporadaAtual ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Etapa 1: Times */}
       <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
-          <h2 style={{ fontSize: '1.3rem', color: 'var(--amarelo)' }}>1️⃣ Times &amp; Estádios</h2>
-          <button className="btn btn-primary" onClick={() => rodar('times')} disabled={loadingTimes}>
-            {loadingTimes ? 'Sincronizando...' : '▶️ Sincronizar Times (1 requisição)'}
-          </button>
+        <h2 style={{ fontSize: '1.3rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>1️⃣ Times &amp; Estádios</h2>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 180 }}>
+            <label>Temporadas (separadas por vírgula)</label>
+            <input value={temporadasTexto} onChange={e => setTemporadasTexto(e.target.value)} placeholder="Ex: 2026, 2025, 2024" />
+          </div>
+          <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 180 }}>
+            <label>Ligas extras (IDs, separados por vírgula)</label>
+            <input value={ligasExtrasTexto} onChange={e => setLigasExtrasTexto(e.target.value)} placeholder="Ex: 72 (Série B)" />
+          </div>
         </div>
+        <p style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+          Custo: 1 requisição por temporada + 1 por liga extra. Ex: 3 temporadas + Série B = 4 requisições.
+        </p>
+        <button className="btn btn-primary" onClick={rodarTimes} disabled={loadingTimes}>
+          {loadingTimes ? 'Sincronizando...' : '▶️ Sincronizar Times'}
+        </button>
+
         {resultadoTimes && (
-          <div style={{ fontSize: '.85rem' }}>
+          <div style={{ fontSize: '.85rem', marginTop: '1rem' }}>
             <p style={{ color: 'var(--verde)', marginBottom: '.5rem' }}>
               ✅ {resultadoTimes.timesAtualizados.length} time(s) vinculado(s) · {resultadoTimes.estadiosAtualizados.length} estádio(s) vinculado(s)
             </p>
@@ -110,7 +200,7 @@ export default function AdminSync() {
                   {resultadoTimes.timesNaoEncontrados.map(t => <li key={t.id}>{t.nome} ({t.id})</li>)}
                 </ul>
                 <p style={{ color: 'var(--text-muted)', marginTop: '.4rem' }}>
-                  Vincule manualmente pela coluna <code>api_football_id</code> desses times no Supabase (ou adicione um alias em <code>lib/apiFootballSync.ts</code> e rode de novo).
+                  Tente adicionar mais temporadas/ligas acima, ou vincule manualmente pela coluna <code>api_football_id</code> desses times no Supabase.
                 </p>
               </div>
             )}
@@ -122,7 +212,7 @@ export default function AdminSync() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
           <h2 style={{ fontSize: '1.3rem', color: 'var(--amarelo)' }}>2️⃣ Jogadores</h2>
-          <button className="btn btn-primary" onClick={() => rodar('jogadores')} disabled={loadingJogadores}>
+          <button className="btn btn-primary" onClick={rodarJogadores} disabled={loadingJogadores}>
             {loadingJogadores ? 'Sincronizando...' : '▶️ Sincronizar Elencos (1 requisição/time)'}
           </button>
         </div>
