@@ -3,6 +3,7 @@ import { Time, Jogador } from './types';
 import {
   afGetTeamsByLeague,
   afGetSquad,
+  afGetLeaguesByCountry,
   AFTeamEntry,
   AFSquadPlayer,
   getOrcamentoRestante,
@@ -88,15 +89,38 @@ export interface ResultadoSyncTimes {
   estadiosAtualizados: { id: string; nome: string; api_football_id: number }[];
 }
 
-export async function sincronizarTimes(season: number): Promise<ResultadoSyncTimes> {
-  const { restantes } = await getOrcamentoRestante();
-  if (restantes < 1) throw new Error('Cota diária insuficiente para sincronizar times (precisa de ao menos 1 requisição).');
+export async function sincronizarTimes(
+  temporadas: number[],
+  ligasExtras: number[] = [],
+): Promise<ResultadoSyncTimes> {
+  const combos: { liga: number; temporada: number }[] = [];
+  for (const t of temporadas) combos.push({ liga: LIGA_BRASILEIRAO, temporada: t });
+  for (const liga of ligasExtras) combos.push({ liga, temporada: temporadas[0] ?? new Date().getFullYear() });
 
-  const [afTimes, { data: locais, error }] = await Promise.all([
-    afGetTeamsByLeague(LIGA_BRASILEIRAO, season),
+  if (combos.length === 0) throw new Error('Informe ao menos uma temporada.');
+
+  const { restantes } = await getOrcamentoRestante();
+  if (restantes < combos.length) {
+    throw new Error(`Cota insuficiente: essa busca custaria ${combos.length} requisição(ões), restam ${restantes} hoje.`);
+  }
+
+  const [pools, { data: locais, error }] = await Promise.all([
+    Promise.all(combos.map(c => afGetTeamsByLeague(c.liga, c.temporada))),
     supabase.from('times').select('*'),
   ]);
   if (error) throw error;
+
+  // Junta os times de todas as buscas num único pool, sem duplicar o mesmo
+  // time da API (times que aparecem em mais de uma temporada/liga).
+  const vistos = new Set<number>();
+  const afTimes: AFTeamEntry[] = [];
+  for (const pool of pools) {
+    for (const t of pool) {
+      if (vistos.has(t.team.id)) continue;
+      vistos.add(t.team.id);
+      afTimes.push(t);
+    }
+  }
 
   const timesAtualizados: ResultadoSyncTimes['timesAtualizados'] = [];
   const timesNaoEncontrados: ResultadoSyncTimes['timesNaoEncontrados'] = [];
@@ -126,6 +150,28 @@ export async function sincronizarTimes(season: number): Promise<ResultadoSyncTim
 
   const { usadas } = await getOrcamentoRestante();
   return { requisicoesUsadas: usadas, timesAtualizados, timesNaoEncontrados, estadiosAtualizados };
+}
+
+// ── Descoberta de ligas do Brasil (rodar 1x para achar o ID certo da Série
+// B, Copa do Brasil etc., em vez de arriscar um ID chutado errado) ─────────
+export interface LigaEncontrada {
+  id: number;
+  nome: string;
+  tipo: string;
+  temporadaAtual: number | null;
+}
+
+export async function descobrirLigasBrasil(): Promise<LigaEncontrada[]> {
+  const { restantes } = await getOrcamentoRestante();
+  if (restantes < 1) throw new Error('Cota diária insuficiente para essa busca.');
+
+  const ligas = await afGetLeaguesByCountry('Brazil');
+  return ligas.map(l => ({
+    id: l.league.id,
+    nome: l.league.name,
+    tipo: l.league.type,
+    temporadaAtual: l.seasons.find(s => s.current)?.year ?? null,
+  }));
 }
 
 // ── Etapa 2: Jogadores (1 requisição por time já vinculado) ────────────────
@@ -194,4 +240,4 @@ export async function sincronizarJogadores(limiteTimes?: number): Promise<Result
 
   const { usadas } = await getOrcamentoRestante();
   return { requisicoesUsadas: usadas, porTime, timesPulados };
-  }
+}
