@@ -733,8 +733,8 @@ export default function AdminPartidaEventos() {
   const [jogadores, setJogadores] = useState<Jogador[]>([]);
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [msg, setMsg] = useState(''); const [error, setError] = useState('');
-  const [tab, setTab] = useState<'escalacao'|'gols'|'cartoes'|'subs'|'stats'>('escalacao');
-
+  const [tab, setTab] = useState<'escalacao'|'gols'|'cartoes'|'subs'|'stats'|'apifootball'>('escalacao');
+  
   const flash=(ok:boolean,t:string)=>{if(ok)setMsg(t);else setError(t);setTimeout(()=>{setMsg('');setError('');},3500);};
 
   const load = useCallback(async () => {
