@@ -262,6 +262,12 @@ export default function AdminPartidas() {
                         {p.link_opta&&<a href={p.link_opta} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Opta</a>}
                       </div>
                     )}
+                    <VincularPartidaApiFootball
+                      partida={p}
+                      timeCasa={times.find(t=>t.id===p.time_casa_id)}
+                      timeVisitante={times.find(t=>t.id===p.time_visitante_id)}
+                      onVinculado={load}
+                    />
                     <div style={{display:'flex',gap:'.5rem'}}>
                       <button className="btn btn-ghost btn-sm" onClick={()=>router.push(`/admin/partida/${p.id}`)}>📋 Eventos</button>
                       <button className="btn btn-ghost btn-sm" onClick={()=>edit(p)}>✏️</button>
