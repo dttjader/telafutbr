@@ -152,6 +152,7 @@ export interface Partida {
   link_transfermarkt?: string;
   link_cbf?: string;
   link_opta?: string;
+  api_football_id?: number | null;
 }
 
 export interface TabelaEntry {
