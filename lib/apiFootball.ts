@@ -96,3 +96,61 @@ export async function afGetTeamsByLeague(league: number, season: number) {
 export async function afGetSquad(teamId: number) {
   return apiFootballFetch<AFSquadEntry>('/players/squads', { team: teamId });
 }
+
+// ── Descoberta de ligas (usado uma única vez para achar o ID certo da
+// Série B, Copa do Brasil etc. — evita chutar um ID errado) ────────────────
+export interface AFLeagueEntry {
+  league: { id: number; name: string; type: string; logo: string };
+  country: { name: string; code: string | null };
+  seasons: { year: number; start: string; end: string; current: boolean }[];
+}
+
+export async function afGetLeaguesByCountry(country: string) {
+  return apiFootballFetch<AFLeagueEntry>('/leagues', { country });
+}
+
+// ── Fixtures (partidas) ─────────────────────────────────────────────────────
+export interface AFFixtureEntry {
+  fixture: { id: number; date: string; status: { long: string; short: string } };
+  league: { id: number; name: string; season: number; round: string };
+  teams: {
+    home: { id: number; name: string; logo: string; winner: boolean | null };
+    away: { id: number; name: string; logo: string; winner: boolean | null };
+  };
+  goals: { home: number | null; away: number | null };
+}
+
+export async function afGetFixturesH2H(team1: number, team2: number, season?: number) {
+  const params: Record<string, string | number> = { h2h: `${team1}-${team2}` };
+  if (season) params.season = season;
+  return apiFootballFetch<AFFixtureEntry>('/fixtures/headtohead', params);
+}
+
+export interface AFEvent {
+  time: { elapsed: number; extra: number | null };
+  team: { id: number; name: string };
+  player: { id: number | null; name: string | null };
+  assist: { id: number | null; name: string | null };
+  type: string;   // "Goal" | "Card" | "subst" | "Var"
+  detail: string; // "Normal Goal" | "Own Goal" | "Penalty" | "Missed Penalty" | "Yellow Card" | "Red Card" | "Substitution ..."
+  comments: string | null;
+}
+
+export async function afGetFixtureEvents(fixtureId: number) {
+  return apiFootballFetch<AFEvent>('/fixtures/events', { fixture: fixtureId });
+}
+
+export interface AFLineupPlayer {
+  player: { id: number; name: string; number: number; pos: string | null; grid: string | null };
+}
+
+export interface AFLineup {
+  team: { id: number; name: string };
+  formation: string;
+  startXI: AFLineupPlayer[];
+  substitutes: AFLineupPlayer[];
+}
+
+export async function afGetFixtureLineups(fixtureId: number) {
+  return apiFootballFetch<AFLineup>('/fixtures/lineups', { fixture: fixtureId });
+  }
