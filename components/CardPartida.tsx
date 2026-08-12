@@ -61,10 +61,27 @@ export function CardPartida({ partida, times, estadios }: Props) {
         </div>
       )}
 
-      <div style={{ fontSize: '.7rem', color: '#555', display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: '.7rem', color: '#555', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{estadio?.nome ?? ''}</span>
         {enc && partida.publico > 0 && <span>{partida.publico.toLocaleString('pt-BR')} presentes</span>}
       </div>
+
+      {partida.link_cbf && (
+        <div
+          role="link"
+          tabIndex={0}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(partida.link_cbf, '_blank', 'noopener,noreferrer'); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); window.open(partida.link_cbf, '_blank', 'noopener,noreferrer'); } }}
+          style={{
+            marginTop: '.6rem', fontSize: '.7rem', color: 'var(--verde)',
+            textDecoration: 'none', borderTop: '1px solid var(--border)',
+            paddingTop: '.5rem', cursor: 'pointer', display: 'inline-flex',
+            alignItems: 'center', gap: '.3rem',
+          }}
+        >
+          🔗 Súmula CBF
+        </div>
+      )}
     </Link>
   );
-}
+      }
