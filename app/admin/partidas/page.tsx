@@ -252,6 +252,7 @@ export default function AdminPartidas() {
                         <span>G: <strong>{p.gols.length}</strong></span>
                         <span>C: <strong>{p.cartoes.length}</strong></span>
                         <span>S: <strong>{p.substituicoes.length}</strong></span>
+                        <span>Público: <strong>{p.publico > 0 ? p.publico.toLocaleString('pt-BR') : '—'}</strong></span>
                       </div>
                       <div style={{fontSize:'.78rem',color:'var(--text-muted)'}}>{p.data ? p.data.split('-').reverse().join('/') : 'A definir'} · {p.hora} · {nomeEstadio(p.estadio_id)}</div>
                     </div>
