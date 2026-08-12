@@ -831,6 +831,28 @@ export default function AdminPartidaEventos() {
       else flash(true,`${novos.length} jogador(es) adicionado(s) como titulares!`);
     };
 
+    // "A/Z": adiciona TODOS os jogadores restantes do time em ordem alfabética,
+    // sem considerar o campo Titular (todos entram como titular=false).
+    const adicionarTodosAZ=(isCasa:boolean)=>{
+      const lista=isCasa?jogCasa:jogVis;
+      const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
+      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
+      const disponiveis=[...lista]
+        .filter(j=>!jaAdicionados.has(j.id))
+        .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+      if(disponiveis.length===0) return flash(false,'Não há mais jogadores disponíveis para adicionar.');
+
+      const novos:EscalacaoJogador[]=disponiveis.map(j=>({
+        jogador_id:j.id, numero:j.numero??0, posicao:j.posicao??'ATA', titular:false,
+      }));
+
+      const u={...partida};
+      if(isCasa) u.escalacao_casa=[...u.escalacao_casa,...novos];
+      else u.escalacao_visitante=[...u.escalacao_visitante,...novos];
+      save(u as Partida);
+      flash(true,`${novos.length} jogador(es) adicionado(s) em ordem alfabética!`);
+    };
+
     const updJogador=(isCasa:boolean,idx:number,novoJogadorId:string)=>{
       const jog=jogadores.find(j=>j.id===novoJogadorId);
       const u={...partida};
@@ -873,6 +895,7 @@ export default function AdminPartidaEventos() {
             </div>
             <div style={{display:'flex',gap:'.5rem'}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>completarEscalacao(isCasa)} title="Preenche automaticamente os titulares que faltam">⚡ Completar</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>adicionarTodosAZ(isCasa)} title="Adiciona todos os jogadores restantes em ordem alfabética, sem marcar titular">🔤 A/Z</button>
               <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
             </div>
           </div>
