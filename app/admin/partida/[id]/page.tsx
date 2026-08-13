@@ -35,13 +35,9 @@ function ordenarPorMinuto<T extends { minuto: number; acrescimo?: number }>(arr:
 
 type CartaoEx = Cartao & { acrescimo?: number; tecnico_id?: string };
 
-// Estilo base dos campos de Gols/Cartões/Subs. O foco visual (borda + halo verde)
-// vem da classe "evt-field" definida no <style> do componente principal — assim
-// funciona tanto para clique quanto para navegação via Tab.
 const selectSt: React.CSSProperties = {background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.35rem .5rem',fontSize:'.88rem',width:'100%'};
 const inputSt: React.CSSProperties = {...selectSt};
 
-// Componente de chips de sugestão
 function Chips({opcoes, valor, onSelect, corAtivo='var(--verde)', bgAtivo='rgba(0,168,79,.15)', borderAtivo='var(--verde)'}:{
   opcoes:string[]; valor:string; onSelect:(v:string)=>void;
   corAtivo?:string; bgAtivo?:string; borderAtivo?:string;
@@ -61,9 +57,6 @@ function Chips({opcoes, valor, onSelect, corAtivo='var(--verde)', bgAtivo='rgba(
   );
 }
 
-// Componente de seleção de time — dois botões lado a lado
-// `compact` reduz o tamanho dos botões e faz a largura se ajustar ao conteúdo
-// (usado quando o TimePicker precisa ficar ao lado de outros campos, na mesma linha)
 function TimePicker({
   value, onChange, timeCasaId, timeVisId, timeCasaNome, timeVisNome, compact = false,
 }: {
@@ -107,11 +100,6 @@ function TimePicker({
   );
 }
 
-// ── GOLS ────────────────────────────────────────────────────────────────────
-// Componente hoisted (fora do componente pai) para não ser recriado a cada
-// re-render — isso evita que o React desmonte/remonte o formulário inteiro
-// toda vez que a partida é recarregada após salvar, o que fazia o campo
-// perder o foco e o formulário "reiniciar" visualmente.
 function GolsTab({
   partida, timeCasa, timeVis, timeCasaNome, timeVisNome, nomeJog, save, flash,
 }: {
@@ -170,7 +158,6 @@ function GolsTab({
       : [...partida.gols, novoGol];
     save({...partida, gols:ordenarPorMinuto(listaAtualizada)});
     cancelarEdicao();
-    // Volta o foco para o Minuto, já que é sempre o primeiro campo a preencher
     minutoRef.current?.focus();
   };
   const del=(gid:string)=>save({...partida, gols:partida.gols.filter(g=>g.id!==gid)});
@@ -185,7 +172,6 @@ function GolsTab({
           {isEditing?'✏️ Editando Gol':'+ Registrar Evento de Gol/Pênalti'}
         </h3>
 
-        {/* Minuto, Acréscimo, Tipo, seletor de time e demais campos na mesma linha (igual ao padrão de Subs) */}
         <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
           <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input ref={minutoRef} className="evt-field" style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
           <div className="form-group" style={{width:70,margin:0}}><label>Acréscimo</label><input className="evt-field" style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
@@ -268,7 +254,6 @@ function GolsTab({
   );
 }
 
-// ── CARTÕES ─────────────────────────────────────────────────────────────────
 function CartoesTab({
   partida, timeCasa, timeVis, timeCasaNome, timeVisNome, tecnicosDaPartida, nomeJog, nomeTec, save, flash,
 }: {
@@ -351,7 +336,6 @@ function CartoesTab({
           {isEditing?'✏️ Editando Cartão':'+ Registrar Cartão'}
         </h3>
 
-        {/* Minuto, Acréscimo, Tipo, seletor de time e demais campos na mesma linha (igual ao padrão de Subs) */}
         <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
           <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input ref={minutoRef} className="evt-field" style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
           <div className="form-group" style={{width:70,margin:0}}><label>Acréscimo</label><input className="evt-field" style={inputSt} type="number" min={0} value={form.acrescimo} onChange={f('acrescimo')} /></div>
@@ -431,7 +415,6 @@ function CartoesTab({
   );
 }
 
-// ── SUBSTITUIÇÕES ────────────────────────────────────────────────────────────
 function SubsTab({
   partida, timeCasaNome, timeVisNome, nomeJog, save, flash,
 }: {
@@ -491,7 +474,6 @@ function SubsTab({
           {isEditing?'✏️ Editando Substituição':'+ Registrar Substituição'}
         </h3>
 
-        {/* Minuto, seletor de time, Entra e Sai — tudo na mesma linha */}
         <div style={{display:'flex',gap:'.6rem',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'1rem'}}>
           <div className="form-group" style={{width:70,margin:0}}><label>Minuto *</label><input ref={minutoRef} className="evt-field" style={inputSt} type="number" min={1} max={120} value={form.minuto} onChange={f('minuto')} /></div>
           <div className="form-group" style={{margin:0}}>
@@ -554,21 +536,24 @@ function SubsTab({
 }
 
 // ── STATS (Opta) ─────────────────────────────────────────────────────────────
-// Aba somente-leitura para escalação e alias, com campos numéricos (0-30)
-// editáveis para cada estatística individual do jogador na partida.
-const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>; label: string; title: string; max: number }[] = [
+// `sep: true` desenha uma borda mais forte à direita da coluna, criando um
+// separador visual entre grupos de estatísticas relacionadas.
+// Ordem: S, SoT, SB | P | Crn, C, Tk, Off | FC, FS | Sav
+const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>; label: string; title: string; max: number; sep?: boolean }[] = [
   { key: 'S',   label: 'S',   title: 'Finalizações',              max: 20 },
   { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo',       max: 20 },
-  { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas',    max: 20 },
-  { key: 'P',   label: 'P',   title: 'Passes',                     max: 100 },
-  { key: 'C',   label: 'C',   title: 'Cruzamentos',                max: 20 },
+  { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas',    max: 20, sep: true },
+  { key: 'P',   label: 'P',   title: 'Passes',                     max: 100, sep: true },
   { key: 'Crn', label: 'Crn', title: 'Escanteios a favor',         max: 20 },
+  { key: 'C',   label: 'C',   title: 'Cruzamentos',                max: 20 },
   { key: 'Tk',  label: 'Tk',  title: 'Desarmes',                   max: 20 },
-  { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 20 },
+  { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 20, sep: true },
   { key: 'FC',  label: 'FC',  title: 'Faltas Cometidas',           max: 20 },
-  { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas',            max: 20 },
+  { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas',            max: 20, sep: true },
   { key: 'Sav', label: 'Sav', title: 'Defesas',                    max: 20 },
 ];
+
+const SEP_BORDER = '2px solid var(--verde)';
 
 const opcoesAte = (max: number) => Array.from({ length: max + 1 }, (_, i) => i);
 
@@ -594,7 +579,7 @@ function StatsTab({
 
   const updStat = (jogador_id: string, campo: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>, valor: number) => {
     const existente = getStats(jogador_id);
-    if (existente.validado) return; // trava: jogador validado não pode ter os números editados
+    if (existente.validado) return;
     const atualizado: StatsJogador = { ...existente, [campo]: valor };
     const semEste = statsAtuais.filter(s => s.jogador_id !== jogador_id);
     save({ ...partida, stats_jogadores: [...semEste, atualizado] });
@@ -614,12 +599,9 @@ function StatsTab({
     return <p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Cadastre a escalação primeiro na aba Escalação.</p>;
   }
 
-  // Larguras fixas das colunas iniciais — necessárias para calcular o
-  // deslocamento (left) de cada coluna fixa e para as células não
-  // encolherem/esticarem conforme o conteúdo durante o scroll.
-  const COL1_WIDTH = 110; // Jogador
-  const COL2_WIDTH = 84;  // Alias Opta
-  const COL3_WIDTH = 72;  // Validado
+  const COL1_WIDTH = 110;
+  const COL2_WIDTH = 84;
+  const COL3_WIDTH = 72;
 
   const stickyCol1: React.CSSProperties = {
     position: 'sticky', left: 0, zIndex: 2,
@@ -639,6 +621,13 @@ function StatsTab({
     if (esc.length === 0) {
       return <p style={{color:'var(--text-muted)',fontSize:'.85rem',padding:'.5rem 0'}}>Nenhum jogador escalado.</p>;
     }
+
+    // Somatório de cada coluna de estatística para o time, exibido na última linha.
+    const totais: Record<string, number> = {};
+    STAT_COLS.forEach(col => {
+      totais[col.key] = esc.reduce((soma, e) => soma + getStats(e.jogador_id)[col.key], 0);
+    });
+
     return (
       <div style={{overflowX:'auto',borderRadius:10,border:'1px solid var(--border)'}}>
         <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
@@ -648,7 +637,7 @@ function StatsTab({
               <th style={{...stickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Alias</th>
               <th style={{...stickyCol3,zIndex:3,background:'var(--surface2)',padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.78rem'}}>Validado</th>
               {STAT_COLS.map(col=>(
-                <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help'}}>
+                <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help',borderRight: col.sep ? SEP_BORDER : undefined}}>
                   {col.label}
                 </th>
               ))}
@@ -679,7 +668,7 @@ function StatsTab({
                     </label>
                   </td>
                   {STAT_COLS.map(col=>(
-                    <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg}}>
+                    <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg,borderRight: col.sep ? SEP_BORDER : undefined}}>
                       <select
                         value={s[col.key]}
                         disabled={travado}
@@ -700,6 +689,20 @@ function StatsTab({
                 </tr>
               );
             })}
+
+            {/* Linha de totais por coluna */}
+            <tr style={{borderTop:`2px solid ${cor}`, background:'var(--surface2)'}}>
+              <td style={{...stickyCol1,background:'var(--surface2)',padding:'.55rem .4rem',fontWeight:700,color:cor,fontFamily:"'Bebas Neue',sans-serif",fontSize:'.95rem'}}>
+                Total
+              </td>
+              <td style={{...stickyCol2,background:'var(--surface2)'}} />
+              <td style={{...stickyCol3,background:'var(--surface2)'}} />
+              {STAT_COLS.map(col=>(
+                <td key={col.key} style={{padding:'.55rem .3rem',textAlign:'center',fontWeight:700,color:'var(--amarelo)',background:'var(--surface2)',borderRight: col.sep ? SEP_BORDER : undefined}}>
+                  {totais[col.key]}
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
       </div>
@@ -710,7 +713,7 @@ function StatsTab({
     <div>
       <p style={{fontSize:'.78rem',color:'var(--text-muted)',marginBottom:'1rem'}}>
         Estatísticas por jogador (fonte: Opta). Escalação e alias não são editáveis aqui — para alterá-los, use a aba Escalação e o cadastro de Jogadores.
-        Ao marcar <strong>Validado</strong>, os números daquele jogador ficam bloqueados para edição.
+        Ao marcar <strong>Validado</strong>, os números daquele jogador ficam bloqueados para edição. A última linha de cada tabela mostra o somatório de cada coluna.
       </p>
       <div style={{display:'flex',flexDirection:'column',gap:'2rem'}}>
         <div>
@@ -743,13 +746,19 @@ export default function AdminPartidaEventos() {
   },[id]);
   useEffect(()=>{load();},[load]);
 
+  // Salva a partida e atualiza o estado local apenas com o registro retornado
+  // pelo upsert — sem refazer o fetch de times/jogadores/técnicos. Antes, cada
+  // salvamento chamava load() e refazia TODAS as buscas, o que dava a
+  // sensação de a página "recarregar do zero" a cada edição (a mensagem
+  // "Salvo!" sumia junto com esse recarregamento completo).
   const save = async (updated: Partida) => {
     try {
       const golsValidos = updated.gols.filter(g => !['penalti_perdido','penalti_defendido'].includes(g.tipo));
       const placarCasa = golsValidos.filter(g => g.time_id === updated.time_casa_id).length;
       const placarVis  = golsValidos.filter(g => g.time_id === updated.time_visitante_id).length;
-      await clientUpsertPartida({...updated, placar_casa:placarCasa, placar_visitante:placarVis});
-      flash(true,'Salvo!'); load();
+      const salvo = await clientUpsertPartida({...updated, placar_casa:placarCasa, placar_visitante:placarVis});
+      setPartida(salvo);
+      flash(true,'Salvo!');
     } catch(e) { flash(false,'Erro: '+String(e)); }
   };
 
@@ -769,7 +778,6 @@ export default function AdminPartidaEventos() {
   const timeCasaNome = timeCasa?.sigla ?? 'Mandante';
   const timeVisNome  = timeVis?.sigla  ?? 'Visitante';
 
-  // ── ESCALAÇÃO ───────────────────────────────────────────────────────────────
   const EscalacaoTab = () => {
     const addJog=(isCasa:boolean)=>{
       const lista=isCasa?jogCasa:jogVis;
@@ -789,8 +797,6 @@ export default function AdminPartidaEventos() {
       save(u as Partida);
     };
 
-    // "Completar": adiciona automaticamente jogadores disponíveis como titulares
-    // até atingir 11 titulares para o time selecionado.
     const completarEscalacao=(isCasa:boolean)=>{
       const lista=isCasa?jogCasa:jogVis;
       const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
@@ -831,8 +837,6 @@ export default function AdminPartidaEventos() {
       else flash(true,`${novos.length} jogador(es) adicionado(s) como titulares!`);
     };
 
-    // "A/Z": adiciona TODOS os jogadores restantes do time em ordem alfabética,
-    // sem considerar o campo Titular (todos entram como titular=false).
     const adicionarTodosAZ=(isCasa:boolean)=>{
       const lista=isCasa?jogCasa:jogVis;
       const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
@@ -932,10 +936,6 @@ export default function AdminPartidaEventos() {
         .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
         .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
 
-        /* Foco visível (clique ou Tab) nos campos de Gols/Cartões/Subs.
-           Precisa de classe própria porque o estilo inline de borda sempre
-           vence uma regra ":focus" do CSS externo, então sem isso o Tab
-           não dava nenhum feedback visual. */
         .evt-field { transition: border-color .15s, box-shadow .15s; }
         .evt-field:focus {
           outline: none;
