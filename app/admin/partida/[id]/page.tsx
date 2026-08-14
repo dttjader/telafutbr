@@ -535,16 +535,217 @@ function SubsTab({
   );
 }
 
+// ── ESCALAÇÃO ────────────────────────────────────────────────────────────────
+// EscalacaoTab e EscalacaoBlock são hoisted (fora do componente pai), pelo
+// mesmo motivo dos demais tabs acima: se ficassem definidos dentro de
+// AdminPartidaEventos, o React criaria um NOVO componente a cada re-render
+// (o que acontece a cada save() e também quando a mensagem "Salvo!" some,
+// já que isso também atualiza o estado do componente pai). Um componente
+// "novo" força o React a desmontar e remontar toda a lista de jogadores,
+// e é isso que fazia a tabulação voltar sempre para o primeiro campo e dava
+// a impressão de um recarregamento residual da página.
+function EscalacaoBlock({
+  isCasa, esc, time, lista,
+  addJog, completarEscalacao, adicionarTodosAZ, updJogador, upd, rem,
+}: {
+  isCasa: boolean;
+  esc: EscalacaoJogador[];
+  time: Time | undefined;
+  lista: Jogador[];
+  addJog: (isCasa: boolean) => void;
+  completarEscalacao: (isCasa: boolean) => void;
+  adicionarTodosAZ: (isCasa: boolean) => void;
+  updJogador: (isCasa: boolean, idx: number, novoJogadorId: string) => void;
+  upd: (isCasa: boolean, idx: number, field: string, value: string | boolean) => void;
+  rem: (isCasa: boolean, idx: number) => void;
+}) {
+  const jaAdicionados = new Set(esc.map(e => e.jogador_id));
+  const titularesCount = esc.filter(e => e.titular).length;
+
+  return (
+    <div style={{flex:1}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.75rem'}}>
+        <div>
+          <h3 style={{fontSize:'1.2rem'}}>{time?.nome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>{isCasa?'(Mandante)':'(Visitante)'}</span></h3>
+          <div style={{fontSize:'.7rem',color:titularesCount===11?'var(--verde)':'var(--text-muted)',fontWeight:titularesCount===11?700:400}}>
+            {titularesCount}/11 Titulares · {esc.length}/23 Total
+          </div>
+        </div>
+        <div style={{display:'flex',gap:'.5rem'}}>
+          <button className="btn btn-ghost btn-sm" onClick={()=>completarEscalacao(isCasa)} title="Preenche automaticamente os titulares que faltam">⚡ Completar</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>adicionarTodosAZ(isCasa)} title="Adiciona todos os jogadores restantes em ordem alfabética, sem marcar titular">🔤 A/Z</button>
+          <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
+        </div>
+      </div>
+      {esc.length===0&&<p style={{color:'var(--text-muted)',fontSize:'.85rem'}}>Nenhum jogador adicionado.</p>}
+      {esc.map((e,i)=>{
+        const opcoes=lista.filter(j=>j.id===e.jogador_id||!jaAdicionados.has(j.id));
+        return (
+          <div key={i} style={{display:'flex',gap:'.5rem',marginBottom:'.4rem',background:'var(--surface2)',borderRadius:6,padding:'.5rem',borderLeft:e.titular?'3px solid var(--verde)':'3px solid transparent'}}>
+            <input type="number" min={0} max={99} value={e.numero} onChange={ev=>upd(isCasa,i,'numero',ev.target.value)} style={{width:52,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem',textAlign:'center'}} />
+            <select value={e.jogador_id} onChange={ev=>updJogador(isCasa,i,ev.target.value)} style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
+              {opcoes.map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
+            </select>
+            <select value={e.posicao} onChange={ev=>upd(isCasa,i,'posicao',ev.target.value)} style={{width:60,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
+              {POSICOES.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+            <label style={{display:'flex',alignItems:'center',gap:4,fontSize:'.8rem',color:e.titular?'var(--verde)':'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap',fontWeight:e.titular?700:400}}>
+              <input type="checkbox" checked={e.titular} onChange={ev=>upd(isCasa,i,'titular',ev.target.checked)} /> Titular
+            </label>
+            <button className="btn btn-danger btn-sm" onClick={()=>rem(isCasa,i)}>✕</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EscalacaoTab({
+  partida, timeCasa, timeVis, jogCasa, jogVis, jogadores, save, flash,
+}: {
+  partida: Partida;
+  timeCasa: Time | undefined;
+  timeVis: Time | undefined;
+  jogCasa: Jogador[];
+  jogVis: Jogador[];
+  jogadores: Jogador[];
+  save: (updated: Partida) => Promise<void> | void;
+  flash: (ok: boolean, t: string) => void;
+}) {
+  const addJog=(isCasa:boolean)=>{
+    const lista=isCasa?jogCasa:jogVis;
+    const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
+    if(!lista.length) return flash(false,'Nenhum jogador cadastrado para este time.');
+    const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
+    let disponivel = esc.length===0 ? lista.find(j=>j.posicao==='GOL'&&!jaAdicionados.has(j.id)) : undefined;
+    if(!disponivel) disponivel=lista.find(j=>!jaAdicionados.has(j.id));
+    if(!disponivel) return flash(false,'Todos os jogadores já foram adicionados.');
+    const titularesAtuais=esc.filter(e=>e.titular).length;
+    const temGoleiroTitular=esc.some(e=>e.titular&&e.posicao==='GOL');
+    let deveSerTitular=titularesAtuais<11;
+    if(disponivel.posicao==='GOL'&&temGoleiroTitular) deveSerTitular=false;
+    const novo:EscalacaoJogador={jogador_id:disponivel.id,numero:disponivel.numero??0,posicao:disponivel.posicao??'ATA',titular:deveSerTitular};
+    const u={...partida};
+    if(isCasa) u.escalacao_casa=[...u.escalacao_casa,novo]; else u.escalacao_visitante=[...u.escalacao_visitante,novo];
+    save(u as Partida);
+  };
+
+  // "Completar": adiciona automaticamente jogadores disponíveis como titulares
+  // até atingir 11 titulares para o time selecionado.
+  const completarEscalacao=(isCasa:boolean)=>{
+    const lista=isCasa?jogCasa:jogVis;
+    const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
+    const titularesAtuais=esc.filter(e=>e.titular).length;
+    const faltam=11-titularesAtuais;
+    if(faltam<=0) return flash(false,'Este time já tem 11 titulares.');
+
+    const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
+    let temGoleiroTitular=esc.some(e=>e.titular&&e.posicao==='GOL');
+    const disponiveis=lista.filter(j=>!jaAdicionados.has(j.id));
+    if(disponiveis.length===0) return flash(false,'Não há mais jogadores disponíveis para adicionar.');
+
+    const novos:EscalacaoJogador[]=[];
+
+    if(!temGoleiroTitular){
+      const gol=disponiveis.find(j=>j.posicao==='GOL');
+      if(gol){
+        novos.push({jogador_id:gol.id,numero:gol.numero??0,posicao:gol.posicao??'GOL',titular:true});
+        temGoleiroTitular=true;
+      }
+    }
+
+    for(const j of disponiveis){
+      if(novos.length>=faltam) break;
+      if(novos.some(n=>n.jogador_id===j.id)) continue;
+      if(j.posicao==='GOL'&&temGoleiroTitular) continue;
+      novos.push({jogador_id:j.id,numero:j.numero??0,posicao:j.posicao??'ATA',titular:true});
+    }
+
+    if(novos.length===0) return flash(false,'Não foi possível completar automaticamente (faltam jogadores de linha).');
+
+    const u={...partida};
+    if(isCasa) u.escalacao_casa=[...u.escalacao_casa,...novos];
+    else u.escalacao_visitante=[...u.escalacao_visitante,...novos];
+    save(u as Partida);
+
+    if(novos.length<faltam) flash(true,`${novos.length} jogador(es) adicionado(s). Não há jogadores suficientes para completar 11 titulares.`);
+    else flash(true,`${novos.length} jogador(es) adicionado(s) como titulares!`);
+  };
+
+  // "A/Z": adiciona TODOS os jogadores restantes do time em ordem alfabética,
+  // sem considerar o campo Titular (todos entram como titular=false).
+  const adicionarTodosAZ=(isCasa:boolean)=>{
+    const lista=isCasa?jogCasa:jogVis;
+    const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
+    const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
+    const disponiveis=[...lista]
+      .filter(j=>!jaAdicionados.has(j.id))
+      .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    if(disponiveis.length===0) return flash(false,'Não há mais jogadores disponíveis para adicionar.');
+
+    const novos:EscalacaoJogador[]=disponiveis.map(j=>({
+      jogador_id:j.id, numero:j.numero??0, posicao:j.posicao??'ATA', titular:false,
+    }));
+
+    const u={...partida};
+    if(isCasa) u.escalacao_casa=[...u.escalacao_casa,...novos];
+    else u.escalacao_visitante=[...u.escalacao_visitante,...novos];
+    save(u as Partida);
+    flash(true,`${novos.length} jogador(es) adicionado(s) em ordem alfabética!`);
+  };
+
+  const updJogador=(isCasa:boolean,idx:number,novoJogadorId:string)=>{
+    const jog=jogadores.find(j=>j.id===novoJogadorId);
+    const u={...partida};
+    const esc=isCasa?[...u.escalacao_casa]:[...u.escalacao_visitante];
+    esc[idx]={...esc[idx],jogador_id:novoJogadorId,numero:jog?.numero??esc[idx].numero,posicao:jog?.posicao??esc[idx].posicao};
+    if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
+    save(u as Partida);
+  };
+  const upd=(isCasa:boolean,idx:number,field:string,value:string|boolean)=>{
+    const u={...partida};
+    const esc=isCasa?[...u.escalacao_casa]:[...u.escalacao_visitante];
+    if(field==='titular'&&value===true){
+      if(esc.filter((e,i)=>e.titular&&i!==idx).length>=11){flash(false,'Limite de 11 titulares atingido.');return;}
+      if(esc[idx].posicao==='GOL'&&esc.some((e,i)=>e.titular&&e.posicao==='GOL'&&i!==idx)){flash(false,'Já existe um goleiro titular.');return;}
+    }
+    esc[idx]={...esc[idx],[field]:field==='numero'?+value:value};
+    if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
+    save(u as Partida);
+  };
+  const rem=(isCasa:boolean,idx:number)=>{
+    const u={...partida};
+    if(isCasa) u.escalacao_casa=u.escalacao_casa.filter((_,i)=>i!==idx);
+    else u.escalacao_visitante=u.escalacao_visitante.filter((_,i)=>i!==idx);
+    save(u as Partida);
+  };
+
+  return (
+    <div style={{display:'flex',gap:'2rem',flexWrap:'wrap'}}>
+      <EscalacaoBlock
+        isCasa={true} esc={partida.escalacao_casa} time={timeCasa} lista={jogCasa}
+        addJog={addJog} completarEscalacao={completarEscalacao} adicionarTodosAZ={adicionarTodosAZ}
+        updJogador={updJogador} upd={upd} rem={rem}
+      />
+      <EscalacaoBlock
+        isCasa={false} esc={partida.escalacao_visitante} time={timeVis} lista={jogVis}
+        addJog={addJog} completarEscalacao={completarEscalacao} adicionarTodosAZ={adicionarTodosAZ}
+        updJogador={updJogador} upd={upd} rem={rem}
+      />
+    </div>
+  );
+}
+
 // ── STATS (Opta) ─────────────────────────────────────────────────────────────
 // `sep: true` desenha uma borda mais forte à direita da coluna, criando um
 // separador visual entre grupos de estatísticas relacionadas.
-// Ordem: S, SoT, SB | P | Crn, C, Tk, Off | FC, FS | Sav
+// Ordem: Crn | S, SoT, SB | P | C, Tk, Off | FC, FS | Sav
 const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>; label: string; title: string; max: number; sep?: boolean }[] = [
+  { key: 'Crn', label: 'Crn', title: 'Escanteios a favor',         max: 20, sep: true },
   { key: 'S',   label: 'S',   title: 'Finalizações',              max: 20 },
   { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo',       max: 20 },
   { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas',    max: 20, sep: true },
   { key: 'P',   label: 'P',   title: 'Passes',                     max: 100, sep: true },
-  { key: 'Crn', label: 'Crn', title: 'Escanteios a favor',         max: 20 },
   { key: 'C',   label: 'C',   title: 'Cruzamentos',                max: 20 },
   { key: 'Tk',  label: 'Tk',  title: 'Desarmes',                   max: 20 },
   { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 20, sep: true },
@@ -560,6 +761,133 @@ const opcoesAte = (max: number) => Array.from({ length: max + 1 }, (_, i) => i);
 const statsVazio = (jogador_id: string): StatsJogador => ({
   jogador_id, validado: false, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0,
 });
+
+// Larguras fixas das colunas iniciais — necessárias para calcular o
+// deslocamento (left) de cada coluna fixa e para as células não
+// encolherem/esticarem conforme o conteúdo durante o scroll.
+const STATS_COL1_WIDTH = 110; // Jogador
+const STATS_COL2_WIDTH = 84;  // Alias Opta
+const STATS_COL3_WIDTH = 72;  // Validado
+
+const statsStickyCol1: React.CSSProperties = {
+  position: 'sticky', left: 0, zIndex: 2,
+  width: STATS_COL1_WIDTH, minWidth: STATS_COL1_WIDTH, maxWidth: STATS_COL1_WIDTH,
+};
+const statsStickyCol2: React.CSSProperties = {
+  position: 'sticky', left: STATS_COL1_WIDTH, zIndex: 2,
+  width: STATS_COL2_WIDTH, minWidth: STATS_COL2_WIDTH, maxWidth: STATS_COL2_WIDTH,
+};
+const statsStickyCol3: React.CSSProperties = {
+  position: 'sticky', left: STATS_COL1_WIDTH + STATS_COL2_WIDTH, zIndex: 2,
+  width: STATS_COL3_WIDTH, minWidth: STATS_COL3_WIDTH, maxWidth: STATS_COL3_WIDTH,
+  boxShadow: '2px 0 4px rgba(0,0,0,.35)',
+};
+
+// Hoisted pelo mesmo motivo do EscalacaoBlock/EscalacaoTab acima: antes esse
+// componente era declarado dentro de StatsTab, então era recriado a cada
+// render (inclusive quando a mensagem "Salvo!" some) e o React remontava a
+// tabela inteira, fazendo o campo perder o foco durante a tabulação.
+function StatsTabelaTime({
+  esc, cor, getStats, updStat, updValidado, nomeJog, aliasOpta,
+}: {
+  esc: EscalacaoJogador[];
+  cor: string;
+  getStats: (jogador_id: string) => StatsJogador;
+  updStat: (jogador_id: string, campo: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>, valor: number) => void;
+  updValidado: (jogador_id: string, valor: boolean) => void;
+  nomeJog: (jid: string) => string;
+  aliasOpta: (jid: string) => string;
+}) {
+  if (esc.length === 0) {
+    return <p style={{color:'var(--text-muted)',fontSize:'.85rem',padding:'.5rem 0'}}>Nenhum jogador escalado.</p>;
+  }
+
+  // Somatório de cada coluna de estatística para o time, exibido na última linha.
+  const totais: Record<string, number> = {};
+  STAT_COLS.forEach(col => {
+    totais[col.key] = esc.reduce((soma, e) => soma + getStats(e.jogador_id)[col.key], 0);
+  });
+
+  return (
+    <div style={{overflowX:'auto',borderRadius:10,border:'1px solid var(--border)'}}>
+      <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
+        <thead style={{background:'var(--surface2)',borderBottom:`2px solid ${cor}`}}>
+          <tr>
+            <th style={{...statsStickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Jogador</th>
+            <th style={{...statsStickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Alias</th>
+            <th style={{...statsStickyCol3,zIndex:3,background:'var(--surface2)',padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.78rem'}}>Validado</th>
+            {STAT_COLS.map(col=>(
+              <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help',borderRight: col.sep ? SEP_BORDER : undefined}}>
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {esc.map((e,i)=>{
+            const s = getStats(e.jogador_id);
+            const rowBg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
+            const travado = s.validado;
+            return (
+              <tr key={e.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
+                <td style={{...statsStickyCol1,background:rowBg,padding:'.5rem .4rem',borderLeft:`3px solid ${cor}`}}>
+                  <div style={{fontWeight:600,fontSize:'.78rem',lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis'}} title={nomeJog(e.jogador_id)}>
+                    {nomeJog(e.jogador_id)}
+                  </div>
+                  <div style={{fontSize:'.62rem',color:'var(--text-muted)',lineHeight:1.2}}>
+                    #{e.numero} · {e.posicao}
+                  </div>
+                </td>
+                <td style={{...statsStickyCol2,background:rowBg,padding:'.5rem .4rem',fontSize:'.72rem',color:aliasOpta(e.jogador_id)?'var(--text)':'#555',overflow:'hidden',textOverflow:'ellipsis'}} title={aliasOpta(e.jogador_id)||undefined}>
+                  {aliasOpta(e.jogador_id) || '—'}
+                </td>
+                <td style={{...statsStickyCol3,background:rowBg,padding:'.4rem .3rem',textAlign:'center'}}>
+                  <label style={{display:'flex',alignItems:'center',justifyContent:'center',gap:3,fontSize:'.68rem',color:travado?'var(--verde)':'var(--text-muted)',cursor:'pointer',fontWeight:travado?700:400}}>
+                    <input type="checkbox" checked={travado} onChange={ev=>updValidado(e.jogador_id, ev.target.checked)} />
+                    {travado ? '✔' : ''}
+                  </label>
+                </td>
+                {STAT_COLS.map(col=>(
+                  <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg,borderRight: col.sep ? SEP_BORDER : undefined}}>
+                    <select
+                      value={s[col.key]}
+                      disabled={travado}
+                      onChange={ev=>updStat(e.jogador_id,col.key,+ev.target.value)}
+                      style={{
+                        width:54, background: travado ? 'var(--surface)' : 'var(--surface2)',
+                        border:'1px solid var(--border)', borderRadius:4,
+                        color: travado ? 'var(--text-muted)' : 'var(--text)',
+                        padding:'.3rem .2rem', textAlign:'center', fontSize:'.85rem',
+                        cursor: travado ? 'not-allowed' : 'pointer',
+                        opacity: travado ? .7 : 1,
+                      }}
+                    >
+                      {opcoesAte(col.max).map(n=><option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+
+          {/* Linha de totais por coluna */}
+          <tr style={{borderTop:`2px solid ${cor}`, background:'var(--surface2)'}}>
+            <td style={{...statsStickyCol1,background:'var(--surface2)',padding:'.55rem .4rem',fontWeight:700,color:cor,fontFamily:"'Bebas Neue',sans-serif",fontSize:'.95rem'}}>
+              Total
+            </td>
+            <td style={{...statsStickyCol2,background:'var(--surface2)'}} />
+            <td style={{...statsStickyCol3,background:'var(--surface2)'}} />
+            {STAT_COLS.map(col=>(
+              <td key={col.key} style={{padding:'.55rem .3rem',textAlign:'center',fontWeight:700,color:'var(--amarelo)',background:'var(--surface2)',borderRight: col.sep ? SEP_BORDER : undefined}}>
+                {totais[col.key]}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function StatsTab({
   partida, timeCasa, timeVis, timeCasaNome, timeVisNome, jogadores, save,
@@ -579,7 +907,7 @@ function StatsTab({
 
   const updStat = (jogador_id: string, campo: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>, valor: number) => {
     const existente = getStats(jogador_id);
-    if (existente.validado) return;
+    if (existente.validado) return; // trava: jogador validado não pode ter os números editados
     const atualizado: StatsJogador = { ...existente, [campo]: valor };
     const semEste = statsAtuais.filter(s => s.jogador_id !== jogador_id);
     save({ ...partida, stats_jogadores: [...semEste, atualizado] });
@@ -599,116 +927,6 @@ function StatsTab({
     return <p style={{color:'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Cadastre a escalação primeiro na aba Escalação.</p>;
   }
 
-  const COL1_WIDTH = 110;
-  const COL2_WIDTH = 84;
-  const COL3_WIDTH = 72;
-
-  const stickyCol1: React.CSSProperties = {
-    position: 'sticky', left: 0, zIndex: 2,
-    width: COL1_WIDTH, minWidth: COL1_WIDTH, maxWidth: COL1_WIDTH,
-  };
-  const stickyCol2: React.CSSProperties = {
-    position: 'sticky', left: COL1_WIDTH, zIndex: 2,
-    width: COL2_WIDTH, minWidth: COL2_WIDTH, maxWidth: COL2_WIDTH,
-  };
-  const stickyCol3: React.CSSProperties = {
-    position: 'sticky', left: COL1_WIDTH + COL2_WIDTH, zIndex: 2,
-    width: COL3_WIDTH, minWidth: COL3_WIDTH, maxWidth: COL3_WIDTH,
-    boxShadow: '2px 0 4px rgba(0,0,0,.35)',
-  };
-
-  const TabelaTime = ({ esc, cor }: { esc: EscalacaoJogador[]; cor: string }) => {
-    if (esc.length === 0) {
-      return <p style={{color:'var(--text-muted)',fontSize:'.85rem',padding:'.5rem 0'}}>Nenhum jogador escalado.</p>;
-    }
-
-    // Somatório de cada coluna de estatística para o time, exibido na última linha.
-    const totais: Record<string, number> = {};
-    STAT_COLS.forEach(col => {
-      totais[col.key] = esc.reduce((soma, e) => soma + getStats(e.jogador_id)[col.key], 0);
-    });
-
-    return (
-      <div style={{overflowX:'auto',borderRadius:10,border:'1px solid var(--border)'}}>
-        <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
-          <thead style={{background:'var(--surface2)',borderBottom:`2px solid ${cor}`}}>
-            <tr>
-              <th style={{...stickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Jogador</th>
-              <th style={{...stickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Alias</th>
-              <th style={{...stickyCol3,zIndex:3,background:'var(--surface2)',padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.78rem'}}>Validado</th>
-              {STAT_COLS.map(col=>(
-                <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help',borderRight: col.sep ? SEP_BORDER : undefined}}>
-                  {col.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {esc.map((e,i)=>{
-              const s = getStats(e.jogador_id);
-              const rowBg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
-              const travado = s.validado;
-              return (
-                <tr key={e.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
-                  <td style={{...stickyCol1,background:rowBg,padding:'.5rem .4rem',borderLeft:`3px solid ${cor}`}}>
-                    <div style={{fontWeight:600,fontSize:'.78rem',lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis'}} title={nomeJog(e.jogador_id)}>
-                      {nomeJog(e.jogador_id)}
-                    </div>
-                    <div style={{fontSize:'.62rem',color:'var(--text-muted)',lineHeight:1.2}}>
-                      #{e.numero} · {e.posicao}
-                    </div>
-                  </td>
-                  <td style={{...stickyCol2,background:rowBg,padding:'.5rem .4rem',fontSize:'.72rem',color:aliasOpta(e.jogador_id)?'var(--text)':'#555',overflow:'hidden',textOverflow:'ellipsis'}} title={aliasOpta(e.jogador_id)||undefined}>
-                    {aliasOpta(e.jogador_id) || '—'}
-                  </td>
-                  <td style={{...stickyCol3,background:rowBg,padding:'.4rem .3rem',textAlign:'center'}}>
-                    <label style={{display:'flex',alignItems:'center',justifyContent:'center',gap:3,fontSize:'.68rem',color:travado?'var(--verde)':'var(--text-muted)',cursor:'pointer',fontWeight:travado?700:400}}>
-                      <input type="checkbox" checked={travado} onChange={ev=>updValidado(e.jogador_id, ev.target.checked)} />
-                      {travado ? '✔' : ''}
-                    </label>
-                  </td>
-                  {STAT_COLS.map(col=>(
-                    <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg,borderRight: col.sep ? SEP_BORDER : undefined}}>
-                      <select
-                        value={s[col.key]}
-                        disabled={travado}
-                        onChange={ev=>updStat(e.jogador_id,col.key,+ev.target.value)}
-                        style={{
-                          width:54, background: travado ? 'var(--surface)' : 'var(--surface2)',
-                          border:'1px solid var(--border)', borderRadius:4,
-                          color: travado ? 'var(--text-muted)' : 'var(--text)',
-                          padding:'.3rem .2rem', textAlign:'center', fontSize:'.85rem',
-                          cursor: travado ? 'not-allowed' : 'pointer',
-                          opacity: travado ? .7 : 1,
-                        }}
-                      >
-                        {opcoesAte(col.max).map(n=><option key={n} value={n}>{n}</option>)}
-                      </select>
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-
-            {/* Linha de totais por coluna */}
-            <tr style={{borderTop:`2px solid ${cor}`, background:'var(--surface2)'}}>
-              <td style={{...stickyCol1,background:'var(--surface2)',padding:'.55rem .4rem',fontWeight:700,color:cor,fontFamily:"'Bebas Neue',sans-serif",fontSize:'.95rem'}}>
-                Total
-              </td>
-              <td style={{...stickyCol2,background:'var(--surface2)'}} />
-              <td style={{...stickyCol3,background:'var(--surface2)'}} />
-              {STAT_COLS.map(col=>(
-                <td key={col.key} style={{padding:'.55rem .3rem',textAlign:'center',fontWeight:700,color:'var(--amarelo)',background:'var(--surface2)',borderRight: col.sep ? SEP_BORDER : undefined}}>
-                  {totais[col.key]}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
   return (
     <div>
       <p style={{fontSize:'.78rem',color:'var(--text-muted)',marginBottom:'1rem'}}>
@@ -718,11 +936,11 @@ function StatsTab({
       <div style={{display:'flex',flexDirection:'column',gap:'2rem'}}>
         <div>
           <h3 style={{fontSize:'1.1rem',marginBottom:'.6rem',color:'var(--verde)'}}>{timeCasa?.nome ?? timeCasaNome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>(Mandante)</span></h3>
-          <TabelaTime esc={partida.escalacao_casa} cor="var(--verde)" />
+          <StatsTabelaTime esc={partida.escalacao_casa} cor="var(--verde)" getStats={getStats} updStat={updStat} updValidado={updValidado} nomeJog={nomeJog} aliasOpta={aliasOpta} />
         </div>
         <div>
           <h3 style={{fontSize:'1.1rem',marginBottom:'.6rem',color:'var(--amarelo)'}}>{timeVis?.nome ?? timeVisNome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>(Visitante)</span></h3>
-          <TabelaTime esc={partida.escalacao_visitante} cor="var(--amarelo)" />
+          <StatsTabelaTime esc={partida.escalacao_visitante} cor="var(--amarelo)" getStats={getStats} updStat={updStat} updValidado={updValidado} nomeJog={nomeJog} aliasOpta={aliasOpta} />
         </div>
       </div>
     </div>
@@ -737,8 +955,15 @@ export default function AdminPartidaEventos() {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [msg, setMsg] = useState(''); const [error, setError] = useState('');
   const [tab, setTab] = useState<'escalacao'|'gols'|'cartoes'|'subs'|'stats'|'apifootball'>('escalacao');
-  
-  const flash=(ok:boolean,t:string)=>{if(ok)setMsg(t);else setError(t);setTimeout(()=>{setMsg('');setError('');},3500);};
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cancela o timeout anterior antes de agendar um novo, para que toasts
+  // disparados em sequência rápida não empilhem múltiplos timers.
+  const flash=(ok:boolean,t:string)=>{
+    if(flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    if(ok)setMsg(t);else setError(t);
+    flashTimeoutRef.current = setTimeout(()=>{setMsg('');setError('');},3500);
+  };
 
   const load = useCallback(async () => {
     const [p,t,j,tc] = await Promise.all([clientGetPartida(id), clientGetTimes(), clientGetJogadores(), clientGetTecnicos()]);
@@ -747,10 +972,7 @@ export default function AdminPartidaEventos() {
   useEffect(()=>{load();},[load]);
 
   // Salva a partida e atualiza o estado local apenas com o registro retornado
-  // pelo upsert — sem refazer o fetch de times/jogadores/técnicos. Antes, cada
-  // salvamento chamava load() e refazia TODAS as buscas, o que dava a
-  // sensação de a página "recarregar do zero" a cada edição (a mensagem
-  // "Salvo!" sumia junto com esse recarregamento completo).
+  // pelo upsert — sem refazer o fetch de times/jogadores/técnicos.
   const save = async (updated: Partida) => {
     try {
       const golsValidos = updated.gols.filter(g => !['penalti_perdido','penalti_defendido'].includes(g.tipo));
@@ -777,156 +999,6 @@ export default function AdminPartidaEventos() {
 
   const timeCasaNome = timeCasa?.sigla ?? 'Mandante';
   const timeVisNome  = timeVis?.sigla  ?? 'Visitante';
-
-  const EscalacaoTab = () => {
-    const addJog=(isCasa:boolean)=>{
-      const lista=isCasa?jogCasa:jogVis;
-      const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
-      if(!lista.length) return flash(false,'Nenhum jogador cadastrado para este time.');
-      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
-      let disponivel = esc.length===0 ? lista.find(j=>j.posicao==='GOL'&&!jaAdicionados.has(j.id)) : undefined;
-      if(!disponivel) disponivel=lista.find(j=>!jaAdicionados.has(j.id));
-      if(!disponivel) return flash(false,'Todos os jogadores já foram adicionados.');
-      const titularesAtuais=esc.filter(e=>e.titular).length;
-      const temGoleiroTitular=esc.some(e=>e.titular&&e.posicao==='GOL');
-      let deveSerTitular=titularesAtuais<11;
-      if(disponivel.posicao==='GOL'&&temGoleiroTitular) deveSerTitular=false;
-      const novo:EscalacaoJogador={jogador_id:disponivel.id,numero:disponivel.numero??0,posicao:disponivel.posicao??'ATA',titular:deveSerTitular};
-      const u={...partida};
-      if(isCasa) u.escalacao_casa=[...u.escalacao_casa,novo]; else u.escalacao_visitante=[...u.escalacao_visitante,novo];
-      save(u as Partida);
-    };
-
-    const completarEscalacao=(isCasa:boolean)=>{
-      const lista=isCasa?jogCasa:jogVis;
-      const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
-      const titularesAtuais=esc.filter(e=>e.titular).length;
-      const faltam=11-titularesAtuais;
-      if(faltam<=0) return flash(false,'Este time já tem 11 titulares.');
-
-      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
-      let temGoleiroTitular=esc.some(e=>e.titular&&e.posicao==='GOL');
-      const disponiveis=lista.filter(j=>!jaAdicionados.has(j.id));
-      if(disponiveis.length===0) return flash(false,'Não há mais jogadores disponíveis para adicionar.');
-
-      const novos:EscalacaoJogador[]=[];
-
-      if(!temGoleiroTitular){
-        const gol=disponiveis.find(j=>j.posicao==='GOL');
-        if(gol){
-          novos.push({jogador_id:gol.id,numero:gol.numero??0,posicao:gol.posicao??'GOL',titular:true});
-          temGoleiroTitular=true;
-        }
-      }
-
-      for(const j of disponiveis){
-        if(novos.length>=faltam) break;
-        if(novos.some(n=>n.jogador_id===j.id)) continue;
-        if(j.posicao==='GOL'&&temGoleiroTitular) continue;
-        novos.push({jogador_id:j.id,numero:j.numero??0,posicao:j.posicao??'ATA',titular:true});
-      }
-
-      if(novos.length===0) return flash(false,'Não foi possível completar automaticamente (faltam jogadores de linha).');
-
-      const u={...partida};
-      if(isCasa) u.escalacao_casa=[...u.escalacao_casa,...novos];
-      else u.escalacao_visitante=[...u.escalacao_visitante,...novos];
-      save(u as Partida);
-
-      if(novos.length<faltam) flash(true,`${novos.length} jogador(es) adicionado(s). Não há jogadores suficientes para completar 11 titulares.`);
-      else flash(true,`${novos.length} jogador(es) adicionado(s) como titulares!`);
-    };
-
-    const adicionarTodosAZ=(isCasa:boolean)=>{
-      const lista=isCasa?jogCasa:jogVis;
-      const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
-      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
-      const disponiveis=[...lista]
-        .filter(j=>!jaAdicionados.has(j.id))
-        .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
-      if(disponiveis.length===0) return flash(false,'Não há mais jogadores disponíveis para adicionar.');
-
-      const novos:EscalacaoJogador[]=disponiveis.map(j=>({
-        jogador_id:j.id, numero:j.numero??0, posicao:j.posicao??'ATA', titular:false,
-      }));
-
-      const u={...partida};
-      if(isCasa) u.escalacao_casa=[...u.escalacao_casa,...novos];
-      else u.escalacao_visitante=[...u.escalacao_visitante,...novos];
-      save(u as Partida);
-      flash(true,`${novos.length} jogador(es) adicionado(s) em ordem alfabética!`);
-    };
-
-    const updJogador=(isCasa:boolean,idx:number,novoJogadorId:string)=>{
-      const jog=jogadores.find(j=>j.id===novoJogadorId);
-      const u={...partida};
-      const esc=isCasa?[...u.escalacao_casa]:[...u.escalacao_visitante];
-      esc[idx]={...esc[idx],jogador_id:novoJogadorId,numero:jog?.numero??esc[idx].numero,posicao:jog?.posicao??esc[idx].posicao};
-      if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
-      save(u as Partida);
-    };
-    const upd=(isCasa:boolean,idx:number,field:string,value:string|boolean)=>{
-      const u={...partida};
-      const esc=isCasa?[...u.escalacao_casa]:[...u.escalacao_visitante];
-      if(field==='titular'&&value===true){
-        if(esc.filter((e,i)=>e.titular&&i!==idx).length>=11){flash(false,'Limite de 11 titulares atingido.');return;}
-        if(esc[idx].posicao==='GOL'&&esc.some((e,i)=>e.titular&&e.posicao==='GOL'&&i!==idx)){flash(false,'Já existe um goleiro titular.');return;}
-      }
-      esc[idx]={...esc[idx],[field]:field==='numero'?+value:value};
-      if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
-      save(u as Partida);
-    };
-    const rem=(isCasa:boolean,idx:number)=>{
-      const u={...partida};
-      if(isCasa) u.escalacao_casa=u.escalacao_casa.filter((_,i)=>i!==idx);
-      else u.escalacao_visitante=u.escalacao_visitante.filter((_,i)=>i!==idx);
-      save(u as Partida);
-    };
-    const Block=({isCasa}:{isCasa:boolean})=>{
-      const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
-      const time=isCasa?timeCasa:timeVis;
-      const lista=isCasa?jogCasa:jogVis;
-      const jaAdicionados=new Set(esc.map(e=>e.jogador_id));
-      const titularesCount=esc.filter(e=>e.titular).length;
-      return (
-        <div style={{flex:1}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.75rem'}}>
-            <div>
-              <h3 style={{fontSize:'1.2rem'}}>{time?.nome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>{isCasa?'(Mandante)':'(Visitante)'}</span></h3>
-              <div style={{fontSize:'.7rem',color:titularesCount===11?'var(--verde)':'var(--text-muted)',fontWeight:titularesCount===11?700:400}}>
-                {titularesCount}/11 Titulares · {esc.length}/23 Total
-              </div>
-            </div>
-            <div style={{display:'flex',gap:'.5rem'}}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>completarEscalacao(isCasa)} title="Preenche automaticamente os titulares que faltam">⚡ Completar</button>
-              <button className="btn btn-ghost btn-sm" onClick={()=>adicionarTodosAZ(isCasa)} title="Adiciona todos os jogadores restantes em ordem alfabética, sem marcar titular">🔤 A/Z</button>
-              <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
-            </div>
-          </div>
-          {esc.length===0&&<p style={{color:'var(--text-muted)',fontSize:'.85rem'}}>Nenhum jogador adicionado.</p>}
-          {esc.map((e,i)=>{
-            const opcoes=lista.filter(j=>j.id===e.jogador_id||!jaAdicionados.has(j.id));
-            return (
-              <div key={i} style={{display:'flex',gap:'.5rem',marginBottom:'.4rem',background:'var(--surface2)',borderRadius:6,padding:'.5rem',borderLeft:e.titular?'3px solid var(--verde)':'3px solid transparent'}}>
-                <input type="number" min={0} max={99} value={e.numero} onChange={ev=>upd(isCasa,i,'numero',ev.target.value)} style={{width:52,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem',textAlign:'center'}} />
-                <select value={e.jogador_id} onChange={ev=>updJogador(isCasa,i,ev.target.value)} style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
-                  {opcoes.map(j=><option key={j.id} value={j.id}>{j.nome}</option>)}
-                </select>
-                <select value={e.posicao} onChange={ev=>upd(isCasa,i,'posicao',ev.target.value)} style={{width:60,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text)',padding:'.3rem .4rem'}}>
-                  {POSICOES.map(p=><option key={p} value={p}>{p}</option>)}
-                </select>
-                <label style={{display:'flex',alignItems:'center',gap:4,fontSize:'.8rem',color:e.titular?'var(--verde)':'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap',fontWeight:e.titular?700:400}}>
-                  <input type="checkbox" checked={e.titular} onChange={ev=>upd(isCasa,i,'titular',ev.target.checked)} /> Titular
-                </label>
-                <button className="btn btn-danger btn-sm" onClick={()=>rem(isCasa,i)}>✕</button>
-              </div>
-            );
-          })}
-        </div>
-      );
-    };
-    return <div style={{display:'flex',gap:'2rem',flexWrap:'wrap'}}><Block isCasa={true}/><Block isCasa={false}/></div>;
-  };
 
   return (
     <div className="container" style={{paddingTop:'2rem'}}>
@@ -964,7 +1036,13 @@ export default function AdminPartidaEventos() {
         <button className={`btn ${tab==='apifootball'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('apifootball')}>🔗 API-Football</button>
       </div>
 
-      {tab==='escalacao'&&<EscalacaoTab/>}
+      {tab==='escalacao'&&(
+        <EscalacaoTab
+          partida={partida} timeCasa={timeCasa} timeVis={timeVis}
+          jogCasa={jogCasa} jogVis={jogVis} jogadores={jogadores}
+          save={save} flash={flash}
+        />
+      )}
       {tab==='gols'&&(
         <GolsTab
           partida={partida} timeCasa={timeCasa} timeVis={timeVis}
