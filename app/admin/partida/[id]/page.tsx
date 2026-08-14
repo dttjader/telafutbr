@@ -536,14 +536,13 @@ function SubsTab({
 }
 
 // ── ESCALAÇÃO ────────────────────────────────────────────────────────────────
-// EscalacaoTab e EscalacaoBlock são hoisted (fora do componente pai), pelo
-// mesmo motivo dos demais tabs acima: se ficassem definidos dentro de
-// AdminPartidaEventos, o React criaria um NOVO componente a cada re-render
-// (o que acontece a cada save() e também quando a mensagem "Salvo!" some,
-// já que isso também atualiza o estado do componente pai). Um componente
-// "novo" força o React a desmontar e remontar toda a lista de jogadores,
-// e é isso que fazia a tabulação voltar sempre para o primeiro campo e dava
-// a impressão de um recarregamento residual da página.
+// EscalacaoBlock e EscalacaoTab ficam hoisted (fora do componente pai) pelo
+// mesmo motivo de Gols/Cartões/Subs: definir esses componentes dentro de
+// AdminPartidaEventos fazia o React criar uma identidade de componente nova
+// a cada re-render (por ex. quando o toast "Salvo!" some, ou logo após
+// qualquer salvamento), o que desmontava e remontava a lista de jogadores —
+// daí o foco "voltar para o primeiro campo" na tabulação e a sensação de um
+// recarregamento residual.
 function EscalacaoBlock({
   isCasa, esc, time, lista,
   addJog, completarEscalacao, adicionarTodosAZ, updJogador, upd, rem,
@@ -561,7 +560,6 @@ function EscalacaoBlock({
 }) {
   const jaAdicionados = new Set(esc.map(e => e.jogador_id));
   const titularesCount = esc.filter(e => e.titular).length;
-
   return (
     <div style={{flex:1}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.75rem'}}>
@@ -630,8 +628,6 @@ function EscalacaoTab({
     save(u as Partida);
   };
 
-  // "Completar": adiciona automaticamente jogadores disponíveis como titulares
-  // até atingir 11 titulares para o time selecionado.
   const completarEscalacao=(isCasa:boolean)=>{
     const lista=isCasa?jogCasa:jogVis;
     const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
@@ -672,8 +668,6 @@ function EscalacaoTab({
     else flash(true,`${novos.length} jogador(es) adicionado(s) como titulares!`);
   };
 
-  // "A/Z": adiciona TODOS os jogadores restantes do time em ordem alfabética,
-  // sem considerar o campo Titular (todos entram como titular=false).
   const adicionarTodosAZ=(isCasa:boolean)=>{
     const lista=isCasa?jogCasa:jogVis;
     const esc=isCasa?partida.escalacao_casa:partida.escalacao_visitante;
@@ -739,7 +733,8 @@ function EscalacaoTab({
 // ── STATS (Opta) ─────────────────────────────────────────────────────────────
 // `sep: true` desenha uma borda mais forte à direita da coluna, criando um
 // separador visual entre grupos de estatísticas relacionadas.
-// Ordem: Crn | S, SoT, SB | P | C, Tk, Off | FC, FS | Sav
+// Ordem: Crn | S, SoT, SB | P | C, Tk, Off | FC, FS | Sav — "Validado" fica
+// como a última coluna da tabela.
 const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>; label: string; title: string; max: number; sep?: boolean }[] = [
   { key: 'Crn', label: 'Crn', title: 'Escanteios a favor',         max: 20, sep: true },
   { key: 'S',   label: 'S',   title: 'Finalizações',              max: 20 },
@@ -751,7 +746,7 @@ const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>; lab
   { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 20, sep: true },
   { key: 'FC',  label: 'FC',  title: 'Faltas Cometidas',           max: 20 },
   { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas',            max: 20, sep: true },
-  { key: 'Sav', label: 'Sav', title: 'Defesas',                    max: 20 },
+  { key: 'Sav', label: 'Sav', title: 'Defesas (somente Goleiros)', max: 20 },
 ];
 
 const SEP_BORDER = '2px solid var(--verde)';
@@ -762,32 +757,24 @@ const statsVazio = (jogador_id: string): StatsJogador => ({
   jogador_id, validado: false, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0,
 });
 
-// Larguras fixas das colunas iniciais — necessárias para calcular o
-// deslocamento (left) de cada coluna fixa e para as células não
-// encolherem/esticarem conforme o conteúdo durante o scroll.
-const STATS_COL1_WIDTH = 110; // Jogador
-const STATS_COL2_WIDTH = 84;  // Alias Opta
-const STATS_COL3_WIDTH = 72;  // Validado
+// Larguras fixas das colunas iniciais (sticky) — Jogador e Alias. "Validado"
+// deixou de ser sticky pois agora é a última coluna da tabela.
+const COL1_WIDTH = 110;
+const COL2_WIDTH = 84;
 
-const statsStickyCol1: React.CSSProperties = {
+const stickyCol1: React.CSSProperties = {
   position: 'sticky', left: 0, zIndex: 2,
-  width: STATS_COL1_WIDTH, minWidth: STATS_COL1_WIDTH, maxWidth: STATS_COL1_WIDTH,
+  width: COL1_WIDTH, minWidth: COL1_WIDTH, maxWidth: COL1_WIDTH,
 };
-const statsStickyCol2: React.CSSProperties = {
-  position: 'sticky', left: STATS_COL1_WIDTH, zIndex: 2,
-  width: STATS_COL2_WIDTH, minWidth: STATS_COL2_WIDTH, maxWidth: STATS_COL2_WIDTH,
-};
-const statsStickyCol3: React.CSSProperties = {
-  position: 'sticky', left: STATS_COL1_WIDTH + STATS_COL2_WIDTH, zIndex: 2,
-  width: STATS_COL3_WIDTH, minWidth: STATS_COL3_WIDTH, maxWidth: STATS_COL3_WIDTH,
+const stickyCol2: React.CSSProperties = {
+  position: 'sticky', left: COL1_WIDTH, zIndex: 2,
+  width: COL2_WIDTH, minWidth: COL2_WIDTH, maxWidth: COL2_WIDTH,
   boxShadow: '2px 0 4px rgba(0,0,0,.35)',
 };
 
-// Hoisted pelo mesmo motivo do EscalacaoBlock/EscalacaoTab acima: antes esse
-// componente era declarado dentro de StatsTab, então era recriado a cada
-// render (inclusive quando a mensagem "Salvo!" some) e o React remontava a
-// tabela inteira, fazendo o campo perder o foco durante a tabulação.
-function StatsTabelaTime({
+// Hoisted pelo mesmo motivo do EscalacaoBlock/EscalacaoTab acima: evita que a
+// tabela de estatísticas seja desmontada/remontada a cada edição de célula.
+function StatsTeamTable({
   esc, cor, getStats, updStat, updValidado, nomeJog, aliasOpta,
 }: {
   esc: EscalacaoJogador[];
@@ -813,14 +800,14 @@ function StatsTabelaTime({
       <table style={{borderCollapse:'collapse',fontSize:'.85rem',width:'100%'}}>
         <thead style={{background:'var(--surface2)',borderBottom:`2px solid ${cor}`}}>
           <tr>
-            <th style={{...statsStickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Jogador</th>
-            <th style={{...statsStickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Alias</th>
-            <th style={{...statsStickyCol3,zIndex:3,background:'var(--surface2)',padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.78rem'}}>Validado</th>
+            <th style={{...stickyCol1,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Jogador</th>
+            <th style={{...stickyCol2,zIndex:3,background:'var(--surface2)',padding:'.6rem .4rem',textAlign:'left',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.85rem'}}>Alias</th>
             {STAT_COLS.map(col=>(
               <th key={col.key} title={col.title} style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",cursor:'help',borderRight: col.sep ? SEP_BORDER : undefined}}>
                 {col.label}
               </th>
             ))}
+            <th style={{padding:'.6rem .3rem',textAlign:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:'.78rem'}}>Validado</th>
           </tr>
         </thead>
         <tbody>
@@ -828,9 +815,10 @@ function StatsTabelaTime({
             const s = getStats(e.jogador_id);
             const rowBg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
             const travado = s.validado;
+            const isGoleiro = e.posicao === 'GOL';
             return (
               <tr key={e.jogador_id} style={{borderBottom:'1px solid #1a1a1a'}}>
-                <td style={{...statsStickyCol1,background:rowBg,padding:'.5rem .4rem',borderLeft:`3px solid ${cor}`}}>
+                <td style={{...stickyCol1,background:rowBg,padding:'.5rem .4rem',borderLeft:`3px solid ${cor}`}}>
                   <div style={{fontWeight:600,fontSize:'.78rem',lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis'}} title={nomeJog(e.jogador_id)}>
                     {nomeJog(e.jogador_id)}
                   </div>
@@ -838,50 +826,59 @@ function StatsTabelaTime({
                     #{e.numero} · {e.posicao}
                   </div>
                 </td>
-                <td style={{...statsStickyCol2,background:rowBg,padding:'.5rem .4rem',fontSize:'.72rem',color:aliasOpta(e.jogador_id)?'var(--text)':'#555',overflow:'hidden',textOverflow:'ellipsis'}} title={aliasOpta(e.jogador_id)||undefined}>
+                <td style={{...stickyCol2,background:rowBg,padding:'.5rem .4rem',fontSize:'.72rem',color:aliasOpta(e.jogador_id)?'var(--text)':'#555',overflow:'hidden',textOverflow:'ellipsis'}} title={aliasOpta(e.jogador_id)||undefined}>
                   {aliasOpta(e.jogador_id) || '—'}
                 </td>
-                <td style={{...statsStickyCol3,background:rowBg,padding:'.4rem .3rem',textAlign:'center'}}>
+                {STAT_COLS.map(col=>{
+                  // Sav (defesas) só é editável para jogadores na posição Goleiro.
+                  const bloqueadoPorPosicao = col.key === 'Sav' && !isGoleiro;
+                  const desabilitado = travado || bloqueadoPorPosicao;
+                  return (
+                    <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg,borderRight: col.sep ? SEP_BORDER : undefined}}>
+                      {bloqueadoPorPosicao ? (
+                        <span style={{display:'inline-block',width:54,color:'#444',fontSize:'.85rem'}} title="Disponível apenas para goleiros">—</span>
+                      ) : (
+                        <select
+                          value={s[col.key]}
+                          disabled={desabilitado}
+                          onChange={ev=>updStat(e.jogador_id,col.key,+ev.target.value)}
+                          style={{
+                            width:54, background: desabilitado ? 'var(--surface)' : 'var(--surface2)',
+                            border:'1px solid var(--border)', borderRadius:4,
+                            color: desabilitado ? 'var(--text-muted)' : 'var(--text)',
+                            padding:'.3rem .2rem', textAlign:'center', fontSize:'.85rem',
+                            cursor: desabilitado ? 'not-allowed' : 'pointer',
+                            opacity: desabilitado ? .7 : 1,
+                          }}
+                        >
+                          {opcoesAte(col.max).map(n=><option key={n} value={n}>{n}</option>)}
+                        </select>
+                      )}
+                    </td>
+                  );
+                })}
+                <td style={{padding:'.4rem .3rem',textAlign:'center',background:rowBg}}>
                   <label style={{display:'flex',alignItems:'center',justifyContent:'center',gap:3,fontSize:'.68rem',color:travado?'var(--verde)':'var(--text-muted)',cursor:'pointer',fontWeight:travado?700:400}}>
                     <input type="checkbox" checked={travado} onChange={ev=>updValidado(e.jogador_id, ev.target.checked)} />
                     {travado ? '✔' : ''}
                   </label>
                 </td>
-                {STAT_COLS.map(col=>(
-                  <td key={col.key} style={{padding:'.3rem .3rem',textAlign:'center',background:rowBg,borderRight: col.sep ? SEP_BORDER : undefined}}>
-                    <select
-                      value={s[col.key]}
-                      disabled={travado}
-                      onChange={ev=>updStat(e.jogador_id,col.key,+ev.target.value)}
-                      style={{
-                        width:54, background: travado ? 'var(--surface)' : 'var(--surface2)',
-                        border:'1px solid var(--border)', borderRadius:4,
-                        color: travado ? 'var(--text-muted)' : 'var(--text)',
-                        padding:'.3rem .2rem', textAlign:'center', fontSize:'.85rem',
-                        cursor: travado ? 'not-allowed' : 'pointer',
-                        opacity: travado ? .7 : 1,
-                      }}
-                    >
-                      {opcoesAte(col.max).map(n=><option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </td>
-                ))}
               </tr>
             );
           })}
 
           {/* Linha de totais por coluna */}
           <tr style={{borderTop:`2px solid ${cor}`, background:'var(--surface2)'}}>
-            <td style={{...statsStickyCol1,background:'var(--surface2)',padding:'.55rem .4rem',fontWeight:700,color:cor,fontFamily:"'Bebas Neue',sans-serif",fontSize:'.95rem'}}>
+            <td style={{...stickyCol1,background:'var(--surface2)',padding:'.55rem .4rem',fontWeight:700,color:cor,fontFamily:"'Bebas Neue',sans-serif",fontSize:'.95rem'}}>
               Total
             </td>
-            <td style={{...statsStickyCol2,background:'var(--surface2)'}} />
-            <td style={{...statsStickyCol3,background:'var(--surface2)'}} />
+            <td style={{...stickyCol2,background:'var(--surface2)'}} />
             {STAT_COLS.map(col=>(
               <td key={col.key} style={{padding:'.55rem .3rem',textAlign:'center',fontWeight:700,color:'var(--amarelo)',background:'var(--surface2)',borderRight: col.sep ? SEP_BORDER : undefined}}>
                 {totais[col.key]}
               </td>
             ))}
+            <td style={{background:'var(--surface2)'}} />
           </tr>
         </tbody>
       </table>
@@ -907,7 +904,7 @@ function StatsTab({
 
   const updStat = (jogador_id: string, campo: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>, valor: number) => {
     const existente = getStats(jogador_id);
-    if (existente.validado) return; // trava: jogador validado não pode ter os números editados
+    if (existente.validado) return;
     const atualizado: StatsJogador = { ...existente, [campo]: valor };
     const semEste = statsAtuais.filter(s => s.jogador_id !== jogador_id);
     save({ ...partida, stats_jogadores: [...semEste, atualizado] });
@@ -931,16 +928,17 @@ function StatsTab({
     <div>
       <p style={{fontSize:'.78rem',color:'var(--text-muted)',marginBottom:'1rem'}}>
         Estatísticas por jogador (fonte: Opta). Escalação e alias não são editáveis aqui — para alterá-los, use a aba Escalação e o cadastro de Jogadores.
-        Ao marcar <strong>Validado</strong>, os números daquele jogador ficam bloqueados para edição. A última linha de cada tabela mostra o somatório de cada coluna.
+        <strong> Sav</strong> (defesas) só fica disponível para jogadores na posição Goleiro.
+        Ao marcar <strong>Validado</strong> (última coluna), os números daquele jogador ficam bloqueados para edição. A última linha de cada tabela mostra o somatório de cada coluna.
       </p>
       <div style={{display:'flex',flexDirection:'column',gap:'2rem'}}>
         <div>
           <h3 style={{fontSize:'1.1rem',marginBottom:'.6rem',color:'var(--verde)'}}>{timeCasa?.nome ?? timeCasaNome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>(Mandante)</span></h3>
-          <StatsTabelaTime esc={partida.escalacao_casa} cor="var(--verde)" getStats={getStats} updStat={updStat} updValidado={updValidado} nomeJog={nomeJog} aliasOpta={aliasOpta} />
+          <StatsTeamTable esc={partida.escalacao_casa} cor="var(--verde)" getStats={getStats} updStat={updStat} updValidado={updValidado} nomeJog={nomeJog} aliasOpta={aliasOpta} />
         </div>
         <div>
           <h3 style={{fontSize:'1.1rem',marginBottom:'.6rem',color:'var(--amarelo)'}}>{timeVis?.nome ?? timeVisNome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>(Visitante)</span></h3>
-          <StatsTabelaTime esc={partida.escalacao_visitante} cor="var(--amarelo)" getStats={getStats} updStat={updStat} updValidado={updValidado} nomeJog={nomeJog} aliasOpta={aliasOpta} />
+          <StatsTeamTable esc={partida.escalacao_visitante} cor="var(--amarelo)" getStats={getStats} updStat={updStat} updValidado={updValidado} nomeJog={nomeJog} aliasOpta={aliasOpta} />
         </div>
       </div>
     </div>
@@ -957,10 +955,11 @@ export default function AdminPartidaEventos() {
   const [tab, setTab] = useState<'escalacao'|'gols'|'cartoes'|'subs'|'stats'|'apifootball'>('escalacao');
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cancela o timeout anterior antes de agendar um novo, para que toasts
-  // disparados em sequência rápida não empilhem múltiplos timers.
+  // Cancela o timeout anterior antes de agendar um novo — evita que múltiplos
+  // salvamentos rápidos empilhem vários setTimeout e o toast pareça "piscar"
+  // ou disparar limpezas de estado fora de hora.
   const flash=(ok:boolean,t:string)=>{
-    if(flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
     if(ok)setMsg(t);else setError(t);
     flashTimeoutRef.current = setTimeout(()=>{setMsg('');setError('');},3500);
   };
