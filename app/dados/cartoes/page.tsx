@@ -116,6 +116,21 @@ export default async function CartoesPage() {
     }
   }
 
+  // Um cartão vermelho já suspende automaticamente o jogador/técnico na
+  // próxima partida — se ele recebeu amarelo E vermelho na MESMA partida,
+  // esse amarelo não deve contar para a contagem cumulativa usada em
+  // pendurados/suspensos (senão ele avançaria indevidamente o ciclo de 3
+  // em 3 mesmo já estando suspenso pelo vermelho).
+  const removerAmarelosDaPartidaDoVermelho = (mapa: Record<string, { amarelos: EventoCartao[]; vermelhos: EventoCartao[] }>) => {
+    for (const dados of Object.values(mapa)) {
+      const partidasComVermelho = new Set(dados.vermelhos.map(v => v.partidaId));
+      if (partidasComVermelho.size === 0) continue;
+      dados.amarelos = dados.amarelos.filter(a => !partidasComVermelho.has(a.partidaId));
+    }
+  };
+  removerAmarelosDaPartidaDoVermelho(jogadorCartoes);
+  removerAmarelosDaPartidaDoVermelho(tecnicoCartoes);
+
   const tiposResumo: TipoCartaoResumo[] = TIPOS_ORDEM.map(tipo => ({
     tipo,
     label: TIPO_LABEL[tipo],
