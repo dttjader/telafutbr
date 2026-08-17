@@ -740,7 +740,7 @@ const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>; lab
   { key: 'S',   label: 'S',   title: 'Finalizações',              max: 20 },
   { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo',       max: 20 },
   { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas',    max: 20, sep: true },
-  { key: 'P',   label: 'P',   title: 'Passes',                     max: 100, sep: true },
+  { key: 'P',   label: 'P',   title: 'Passes',                     max: 150, sep: true },
   { key: 'C',   label: 'C',   title: 'Cruzamentos',                max: 20 },
   { key: 'Tk',  label: 'Tk',  title: 'Desarmes',                   max: 20 },
   { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 20, sep: true },
