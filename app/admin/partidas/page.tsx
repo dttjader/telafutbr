@@ -306,7 +306,7 @@ export default function AdminPartidas() {
                     </div>
                     {(p.link_transfermarkt||p.link_cbf||p.link_opta) && (
                       <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap'}}>
-                        {p.link_transfermarkt&&<a href={p.link_transfermarkt} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Transfermarkt</a>}
+                        {p.link_transfermarkt&&<a href={p.link_transfermarkt} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 TM</a>}
                         {p.link_cbf&&<a href={p.link_cbf} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 CBF</a>}
                         {p.link_opta&&<a href={p.link_opta} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Opta</a>}
                       </div>
