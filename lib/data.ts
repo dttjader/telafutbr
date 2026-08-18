@@ -315,3 +315,47 @@ export function somaPesoGolsPorJogador(itens: PesoGolItem[]): Record<string, num
   }
   return map;
 }
+
+// ── Estatísticas Opta (agregado por jogador) ──────────────────────────────
+// Soma, partida a partida, os números lançados manualmente na aba "Stats"
+// de cada partida (Admin → Partida → Eventos → Stats). Usado no Analítico.
+export interface StatsOptaAgregado {
+  partidas_com_stats: number;
+  S: number;
+  SoT: number;
+  SB: number;
+  P: number;
+  C: number;
+  Crn: number;
+  Tk: number;
+  Off: number;
+  FC: number;
+  FS: number;
+  Sav: number;
+}
+
+const STATS_OPTA_KEYS = ['S', 'SoT', 'SB', 'P', 'C', 'Crn', 'Tk', 'Off', 'FC', 'FS', 'Sav'] as const;
+
+function statsOptaVazio(): StatsOptaAgregado {
+  return { partidas_com_stats: 0, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0 };
+}
+
+// Considera apenas partidas ENCERRADAS e apenas jogadores que de fato têm
+// uma entrada em stats_jogadores (o lançamento na aba Stats é manual, então
+// nem toda partida/jogador tem stats registradas — "partidas_com_stats"
+// reflete essa cobertura).
+export function somaStatsOptaPorJogador(partidas: Partida[]): Record<string, StatsOptaAgregado> {
+  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const map: Record<string, StatsOptaAgregado> = {};
+
+  for (const p of encerradas) {
+    for (const s of p.stats_jogadores ?? []) {
+      if (!map[s.jogador_id]) map[s.jogador_id] = statsOptaVazio();
+      const acc = map[s.jogador_id];
+      acc.partidas_com_stats++;
+      for (const k of STATS_OPTA_KEYS) acc[k] += s[k];
+    }
+  }
+
+  return map;
+    }
