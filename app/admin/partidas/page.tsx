@@ -26,6 +26,10 @@ export default function AdminPartidas() {
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState(''); const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Por padrão, técnicos inativos ficam ocultos nos selects de Técnico mandante/visitante.
+  // Este toggle libera temporariamente a escolha de um técnico inativo (ex: cadastro
+  // esquecido de atualizar) sem precisar reativá-lo antes de registrar a partida.
+  const [mostrarTecnicosInativos, setMostrarTecnicosInativos] = useState(false);
 
   const load = async () => {
     const [p,t,e,tc] = await Promise.all([clientGetPartidas(),clientGetTimes(),clientGetEstadios(),clientGetTecnicos()]);
@@ -47,6 +51,13 @@ export default function AdminPartidas() {
     const totalNaRodada = partidas.filter(p => p.rodada === r && p.id !== editId).length;
     return totalNaRodada < PARTIDAS_POR_RODADA;
   });
+
+  // Técnicos elegíveis para cada select: sempre inclui os ativos, mais os
+  // inativos quando o toggle "mostrar técnicos inativos" estiver ligado, mais
+  // o técnico já selecionado naquele campo (para não sumir da lista caso ele
+  // tenha sido inativado depois de vinculado a esta partida).
+  const tecnicosParaSelect = (tecnicoSelecionadoId: string) =>
+    tecnicos.filter(t => t.ativo || mostrarTecnicosInativos || t.id === tecnicoSelecionadoId);
 
   const submit = async (ev:React.FormEvent) => {
     ev.preventDefault();
@@ -76,14 +87,14 @@ export default function AdminPartidas() {
         stats_jogadores: existente?.stats_jogadores ?? [],
       });
       flash(true, editId?'Partida atualizada!':'Partida cadastrada!');
-      setForm(emptyForm()); setEditId(null); setShowForm(false); load();
+      setForm(emptyForm()); setEditId(null); setShowForm(false); setMostrarTecnicosInativos(false); load();
     } catch(e) { flash(false,'Erro: '+String(e)); }
     setLoading(false);
   };
 
   const edit=(p:Partida)=>{
     setForm({rodada:p.rodada.toString(),data:p.data,hora:p.hora,status:p.status,time_casa_id:p.time_casa_id,time_visitante_id:p.time_visitante_id,estadio_id:p.estadio_id,publico:p.publico.toString(),placar_casa:p.placar_casa.toString(),placar_visitante:p.placar_visitante.toString(),acrescimo_primeiro:p.acrescimo_primeiro.toString(),acrescimo_segundo:p.acrescimo_segundo.toString(),arb_principal:p.arbitragem.principal,arb_ass1:p.arbitragem.assistente1,arb_ass2:p.arbitragem.assistente2,arb_quarto:p.arbitragem.quarto,arb_var:p.arbitragem.var,tecnico_casa_id:p.tecnico_casa_id??'',tecnico_visitante_id:p.tecnico_visitante_id??'',link_transfermarkt:p.link_transfermarkt??'',link_cbf:p.link_cbf??'',link_opta:p.link_opta??''});
-    setEditId(p.id); setShowForm(true); window.scrollTo({top:0,behavior:'smooth'});
+    setEditId(p.id); setShowForm(true); setMostrarTecnicosInativos(false); window.scrollTo({top:0,behavior:'smooth'});
   };
 
   const del=async(id:string)=>{
@@ -184,9 +195,46 @@ export default function AdminPartidas() {
               <div className="form-group" style={{width:100,margin:0}}><label>Público</label><input type="number" min={0} value={form.publico} onChange={f('publico')} /></div>
             </div>
 
-            <div className="grid-2">
-              <div className="form-group"><label>Técnico mandante</label><select value={form.tecnico_casa_id} onChange={f('tecnico_casa_id')}><option value="">Não informado</option>{tecnicos.filter(t=>t.ativo).map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}</select></div>
-              <div className="form-group"><label>Técnico visitante</label><select value={form.tecnico_visitante_id} onChange={f('tecnico_visitante_id')}><option value="">Não informado</option>{tecnicos.filter(t=>t.ativo).map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}</select></div>
+            {/* Técnicos — por padrão só mostra técnicos ativos; o botão abaixo
+                libera temporariamente a escolha de um técnico inativo (ex:
+                esqueceram de reativá-lo no cadastro antes de registrar a
+                partida), sem exigir passar por /admin/tecnicos antes. */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.4rem',flexWrap:'wrap',gap:'.5rem'}}>
+              <p style={{fontSize:'.8rem',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'.08em',fontWeight:700,margin:0}}>
+                Técnicos
+              </p>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={()=>setMostrarTecnicosInativos(v=>!v)}
+              >
+                {mostrarTecnicosInativos ? '✓ Exibindo técnicos inativos' : '👁️ Mostrar técnicos inativos'}
+              </button>
+            </div>
+            {mostrarTecnicosInativos && (
+              <div style={{fontSize:'.75rem',color:'#f59e0b',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.25)',borderRadius:6,padding:'.5rem .75rem',marginBottom:'.75rem'}}>
+                ℹ️ Você está exibindo técnicos marcados como inativos apenas para poder selecioná-los aqui. Isso <strong>não altera o cadastro dele</strong> — o técnico continua inativo normalmente; só esta partida fica vinculada a ele.
+              </div>
+            )}
+            <div className="grid-2" style={{marginBottom:'1rem'}}>
+              <div className="form-group" style={{margin:0}}>
+                <label>Técnico mandante</label>
+                <select value={form.tecnico_casa_id} onChange={f('tecnico_casa_id')}>
+                  <option value="">Não informado</option>
+                  {tecnicosParaSelect(form.tecnico_casa_id).map(t=>
+                    <option key={t.id} value={t.id}>{t.nome}{!t.ativo ? ' (inativo)' : ''}</option>
+                  )}
+                </select>
+              </div>
+              <div className="form-group" style={{margin:0}}>
+                <label>Técnico visitante</label>
+                <select value={form.tecnico_visitante_id} onChange={f('tecnico_visitante_id')}>
+                  <option value="">Não informado</option>
+                  {tecnicosParaSelect(form.tecnico_visitante_id).map(t=>
+                    <option key={t.id} value={t.id}>{t.nome}{!t.ativo ? ' (inativo)' : ''}</option>
+                  )}
+                </select>
+              </div>
             </div>
 
             <div style={{background:'var(--surface2)',borderRadius:8,padding:'1rem',marginBottom:'1rem'}}>
@@ -219,7 +267,7 @@ export default function AdminPartidas() {
 
             <div style={{display:'flex',gap:'.75rem'}}>
               <button type="submit" className="btn btn-primary" disabled={loading}>{loading?'Salvando...':(editId?'Salvar alterações':'Cadastrar partida')}</button>
-              <button type="button" className="btn btn-ghost" onClick={()=>{setForm(emptyForm());setEditId(null);setShowForm(false);}}>Cancelar</button>
+              <button type="button" className="btn btn-ghost" onClick={()=>{setForm(emptyForm());setEditId(null);setShowForm(false);setMostrarTecnicosInativos(false);}}>Cancelar</button>
             </div>
           </form>
         </div>
@@ -258,7 +306,7 @@ export default function AdminPartidas() {
                     </div>
                     {(p.link_transfermarkt||p.link_cbf||p.link_opta) && (
                       <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap'}}>
-                        {p.link_transfermarkt&&<a href={p.link_transfermarkt} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 TM</a>}
+                        {p.link_transfermarkt&&<a href={p.link_transfermarkt} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Transfermarkt</a>}
                         {p.link_cbf&&<a href={p.link_cbf} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 CBF</a>}
                         {p.link_opta&&<a href={p.link_opta} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Opta</a>}
                       </div>
