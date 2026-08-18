@@ -1,4 +1,4 @@
-import { getJogadores, getPartidas, getTimes, calcularPesoGols, somaPesoGolsPorJogador } from '@/lib/data';
+import { getJogadores, getPartidas, getTimes, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador } from '@/lib/data';
 import { Partida } from '@/lib/types';
 import { AnaliticoClient, StatJogador } from './AnaliticoClient';
 
@@ -42,6 +42,9 @@ export default async function AnaliticoPage() {
   const pesoGols = calcularPesoGols(partidas, jogadores, times);
   const pontuacaoPorJogador = somaPesoGolsPorJogador(pesoGols);
 
+  // Estatísticas Opta (aba "Stats" de cada partida), somadas por jogador
+  const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
+
   const statsMap: Record<string, StatJogador> = {};
   for (const j of jogadores) {
     const time = times.find(t => t.id === j.time_atual);
@@ -56,6 +59,9 @@ export default async function AnaliticoPage() {
       assistencias: 0, cartoes_amarelos: 0, cartoes_vermelhos: 0,
       minutos_com_amarelo: 0,
       pontuacao_gols: pontuacaoPorJogador[j.id] ?? 0,
+      stats_opta: statsOptaPorJogador[j.id] ?? {
+        partidas_com_stats: 0, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0,
+      },
     };
   }
 
