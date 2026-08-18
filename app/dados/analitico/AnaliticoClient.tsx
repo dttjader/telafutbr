@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time, Jogador } from '@/lib/types';
-import { PesoGolItem } from '@/lib/data';
+import { PesoGolItem, StatsOptaAgregado } from '@/lib/data';
 
 export interface StatJogador {
   jogador: Jogador;
@@ -23,6 +23,7 @@ export interface StatJogador {
   cartoes_vermelhos: number;
   minutos_com_amarelo: number;
   pontuacao_gols: number; // soma do peso dos gols/pênaltis defendidos na pontuação
+  stats_opta: StatsOptaAgregado; // soma das estatísticas lançadas na aba Stats de cada partida
 }
 
 const POSICAO_LABEL: Record<string, string> = {
@@ -78,6 +79,7 @@ interface Props {
 }
 
 type OrdenarPor = 'minutos' | 'partidas' | 'gols' | 'assistencias' | 'amarelos' | 'vermelhos';
+type OrdenarOptaPor = keyof Omit<StatsOptaAgregado, 'partidas_com_stats'> | 'partidas_com_stats';
 
 // ── Sub-componente: tabela de uma faixa de peso ──────────────────────────────
 // Hoisted (fora do componente principal) para não ser recriado a cada
@@ -169,6 +171,64 @@ function GrupoPesoTable({
   );
 }
 
+// ── Sub-componente: tabela de Estatísticas Opta ──────────────────────────────
+// Hoisted pelo mesmo motivo do GrupoPesoTable acima.
+function StatsOptaTable({ dados, times }: { dados: StatJogador[]; times: Time[] }) {
+  return (
+    <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
+        <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+          <tr>
+            {['Jogador', 'Time', 'Jogos', 'S', 'SoT', 'SB', 'P', 'C', 'Crn', 'Tk', 'Off', 'FC', 'FS', 'Sav'].map(h => (
+              <th key={h} style={{
+                padding: '.55rem .6rem',
+                textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: '.82rem',
+                letterSpacing: '.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dados.length === 0 ? (
+            <tr>
+              <td colSpan={14} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                Nenhum jogador com estatísticas Opta registradas para os filtros atuais.
+              </td>
+            </tr>
+          ) : dados.map((s, i) => {
+            const time = times.find(t => t.id === s.jogador.time_atual);
+            const o = s.stats_opta;
+            return (
+              <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{s.jogador.nome}</td>
+                <td style={{ padding: '.5rem .6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                    <EscudoTime time={time} size={20} />
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{s.timeSigla}</span>
+                  </div>
+                </td>
+                <td style={{ textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--amarelo)' }}>{o.partidas_com_stats}</td>
+                <td style={{ textAlign: 'center' }}>{o.S || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.SoT || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.SB || '—'}</td>
+                <td style={{ textAlign: 'center', fontWeight: 600 }}>{o.P || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.C || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.Crn || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.Tk || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.Off || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.FC || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{o.FS || '—'}</td>
+                <td style={{ textAlign: 'center', color: o.Sav > 0 ? 'var(--verde)' : 'var(--text-muted)', fontWeight: o.Sav > 0 ? 600 : 400 }}>{o.Sav || '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props) {
   const [filtroTime, setFiltroTime] = useState('');
   const [filtroNac, setFiltroNac] = useState('');
@@ -184,6 +244,9 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
   const [filtroTipoPeso, setFiltroTipoPeso] = useState<'todos' | 'gol' | 'penalti_defendido'>('todos');
   const [expandidoGrupo, setExpandidoGrupo] = useState<Record<string, boolean>>({});
   const toggleGrupo = (key: string) => setExpandidoGrupo(e => ({ ...e, [key]: !e[key] }));
+
+  // ── Estatísticas Avançadas (Opta) ─────────────────────────────────────────
+  const [ordenarOpta, setOrdenarOpta] = useState<OrdenarOptaPor>('P');
 
   const pesoPorTipo = useMemo(() => {
     return filtroTipoPeso === 'todos' ? pesoGols : pesoGols.filter(it => it.tipo === filtroTipoPeso);
@@ -233,6 +296,14 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
       }
     });
   }, [lista, filtroTime, filtroNac, filtroPos, filtroIdadeMin, filtroIdadeMax, filtroJogosMin, filtroCartao, ordenarPor]);
+
+  // Mesma base filtrada acima, restrita a quem tem estatísticas Opta lançadas
+  // e ordenada pela coluna Opta escolhida.
+  const filtradaOpta = useMemo(() => {
+    return [...filtrada]
+      .filter(s => s.stats_opta.partidas_com_stats > 0)
+      .sort((a, b) => b.stats_opta[ordenarOpta] - a.stats_opta[ordenarOpta]);
+  }, [filtrada, ordenarOpta]);
 
   const limparFiltros = () => {
     setFiltroTime(''); setFiltroNac(''); setFiltroPos('');
@@ -489,6 +560,55 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
             <strong style={{ color: 'var(--verde)' }}>CA/PD/PE</strong> Atacante
           </span>
         </div>
+
+        {/* 📈 Estatísticas Avançadas (Opta) */}
+        <section style={{ marginTop: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.6rem', marginBottom: '.25rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            📈 Estatísticas Avançadas (Opta)
+          </h2>
+          <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 760 }}>
+            Soma de todas as partidas encerradas em que o jogador teve estatísticas lançadas na aba &quot;Stats&quot;
+            (Admin → Partida → Eventos → Stats). A tabela abaixo respeita os filtros da seção acima e mostra apenas
+            jogadores com ao menos uma partida com estatística registrada.
+          </p>
+
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Ordenar por:</span>
+            <select value={ordenarOpta} onChange={e => setOrdenarOpta(e.target.value as OrdenarOptaPor)} style={selectStyle}>
+              <option value="P">Passes</option>
+              <option value="S">Finalizações</option>
+              <option value="SoT">Finalizações no Alvo</option>
+              <option value="SB">Finalizações Bloqueadas</option>
+              <option value="C">Cruzamentos</option>
+              <option value="Crn">Escanteios a favor</option>
+              <option value="Tk">Desarmes</option>
+              <option value="Off">Impedimentos</option>
+              <option value="FC">Faltas Cometidas</option>
+              <option value="FS">Faltas Sofridas</option>
+              <option value="Sav">Defesas</option>
+              <option value="partidas_com_stats">Partidas com stats</option>
+            </select>
+            <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+              {filtradaOpta.length} jogador(es) com estatística registrada
+            </span>
+          </div>
+
+          <StatsOptaTable dados={filtradaOpta} times={times} />
+
+          <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '.72rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '.75rem' }}>
+            <span><strong>S</strong> Finalizações</span>
+            <span><strong>SoT</strong> Finalizações no Alvo</span>
+            <span><strong>SB</strong> Finalizações Bloqueadas</span>
+            <span><strong>P</strong> Passes</span>
+            <span><strong>C</strong> Cruzamentos</span>
+            <span><strong>Crn</strong> Escanteios a favor</span>
+            <span><strong>Tk</strong> Desarmes</span>
+            <span><strong>Off</strong> Impedimentos</span>
+            <span><strong>FC</strong> Faltas Cometidas</span>
+            <span><strong>FS</strong> Faltas Sofridas</span>
+            <span><strong>Sav</strong> Defesas (somente Goleiros)</span>
+          </div>
+        </section>
 
         {/* ⚖️ Peso dos Gols na Pontuação */}
         <section style={{ marginTop: '2.5rem' }}>
