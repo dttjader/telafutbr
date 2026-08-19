@@ -1,4 +1,4 @@
-import { getJogadores, getPartidas, getTimes, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador } from '@/lib/data';
+import { getJogadores, getPartidas, getTimes, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador, calcularVinculosJogadores } from '@/lib/data';
 import { Partida } from '@/lib/types';
 import { AnaliticoClient, StatJogador } from './AnaliticoClient';
 
@@ -45,6 +45,10 @@ export default async function AnaliticoPage() {
   // Estatísticas Opta (aba "Stats" de cada partida), somadas por jogador
   const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
 
+  // Vínculos entre gols/cartões e as estatísticas Opta (assistências de
+  // escanteio/cruzamento e cartões com motivo contendo "falta")
+  const vinculosPorJogador = calcularVinculosJogadores(partidas);
+
   const statsMap: Record<string, StatJogador> = {};
   for (const j of jogadores) {
     const time = times.find(t => t.id === j.time_atual);
@@ -61,6 +65,12 @@ export default async function AnaliticoPage() {
       pontuacao_gols: pontuacaoPorJogador[j.id] ?? 0,
       stats_opta: statsOptaPorJogador[j.id] ?? {
         partidas_com_stats: 0, S: 0, SoT: 0, SB: 0, P: 0, C: 0, Crn: 0, Tk: 0, Off: 0, FC: 0, FS: 0, Sav: 0,
+      },
+      vinculo: vinculosPorJogador[j.id] ?? {
+        assist_gol_escanteio: 0,
+        assist_gol_cruzamento: 0,
+        cartoes_falta_amarelo: 0,
+        cartoes_falta_vermelho: 0,
       },
     };
   }
