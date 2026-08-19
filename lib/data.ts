@@ -358,4 +358,73 @@ export function somaStatsOptaPorJogador(partidas: Partida[]): Record<string, Sta
   }
 
   return map;
+}
+
+// ── Vínculos entre Gols/Cartões e Estatísticas Opta ───────────────────────
+// Cruza descrições de gol e motivos de cartão com os totais já lançados na
+// aba "Stats", para compor os índices exibidos no Analítico (seção
+// "Vínculos e Índices").
+//
+// IMPORTANTE — correspondência de texto:
+// - "Cabeceio em escanteio" e "Cabeceio após cruzamento" são as descrições
+//   já sugeridas nos chips da aba Gols (Admin → Partida → Eventos → Gols).
+//   O vínculo com escanteios (Crn) usa "Cabeceio em escanteio"; o vínculo
+//   com cruzamentos (C) usa "Cabeceio após cruzamento".
+// - Cartões de falta: o campo "Motivo" do cartão é texto livre. Em vez de
+//   exigir um texto exato, aqui contamos qualquer cartão (amarelo ou
+//   vermelho) cujo motivo contenha a palavra "falta" — cobre "Falta
+//   tática", "Falta violenta", "Falta violenta grave", "Falta técnica",
+//   "Falta grave" etc., sem diferenciar maiúsculas/minúsculas ou acentos.
+export interface VinculoJogador {
+  assist_gol_escanteio: number;   // assistências em gols com descrição "Cabeceio em escanteio"
+  assist_gol_cruzamento: number;  // assistências em gols com descrição "Cabeceio após cruzamento"
+  cartoes_falta_amarelo: number;  // cartões amarelos cujo motivo contém "falta"
+  cartoes_falta_vermelho: number; // cartões vermelhos cujo motivo contém "falta"
+}
+
+const DESC_GOL_ESCANTEIO = 'cabeceio em escanteio';
+const DESC_GOL_CRUZAMENTO = 'cabeceio após cruzamento';
+const PALAVRA_FALTA = 'falta';
+
+function normalizarTexto(s: string | null | undefined): string {
+  return (s ?? '').trim().toLowerCase();
+}
+
+function motivoIndicaFalta(motivo: string | null | undefined): boolean {
+  return normalizarTexto(motivo).includes(PALAVRA_FALTA);
+}
+
+function vinculoVazio(): VinculoJogador {
+  return {
+    assist_gol_escanteio: 0,
+    assist_gol_cruzamento: 0,
+    cartoes_falta_amarelo: 0,
+    cartoes_falta_vermelho: 0,
+  };
+}
+
+export function calcularVinculosJogadores(partidas: Partida[]): Record<string, VinculoJogador> {
+  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const map: Record<string, VinculoJogador> = {};
+  const get = (id: string): VinculoJogador => {
+    if (!map[id]) map[id] = vinculoVazio();
+    return map[id];
+  };
+
+  for (const p of encerradas) {
+    for (const g of p.gols) {
+      if (!g.assistencia_id) continue;
+      const desc = normalizarTexto(g.descricao);
+      if (desc === DESC_GOL_ESCANTEIO) get(g.assistencia_id).assist_gol_escanteio++;
+      else if (desc === DESC_GOL_CRUZAMENTO) get(g.assistencia_id).assist_gol_cruzamento++;
     }
+    for (const c of p.cartoes) {
+      if (!c.jogador_id || c.jogador_id === '__tecnico__') continue; // cartão de técnico não conta aqui
+      if (!motivoIndicaFalta(c.motivo)) continue;
+      if (c.tipo === 'amarelo') get(c.jogador_id).cartoes_falta_amarelo++;
+      else if (c.tipo === 'vermelho') get(c.jogador_id).cartoes_falta_vermelho++;
+    }
+  }
+
+  return map;
+}
