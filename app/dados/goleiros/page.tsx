@@ -1,5 +1,5 @@
 import { getPartidas, getTimes, getJogadores, somaStatsOptaPorJogador, calcularGolsSofridosPorJogador } from '@/lib/data';
-import { GoleirosClient, type CicloGoleiro, type StatGoleiro } from '@/app/goleiros/GoleirosClient';
+import { GoleirosClient, type CicloGoleiro, type StatGoleiro } from './GoleirosClient';
 
 export const dynamic = 'force-dynamic';
 
