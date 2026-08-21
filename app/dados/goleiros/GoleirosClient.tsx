@@ -35,6 +35,8 @@ export interface StatGoleiro {
   numeroCicloAtual: number;
   maiorCiclo: CicloGoleiro;
   ciclos: CicloGoleiro[];
+  sav: number;              // Defesas (Sav) lançadas na aba Stats, somadas nas partidas encerradas
+  golsSofridosTotal: number; // Total de gols sofridos (mesma contagem usada no Analítico)
 }
 
 interface Props {
@@ -56,6 +58,13 @@ function formatMin(min: number) {
   const resto = min % 90;
   if (resto === 0) return min + "' (~" + partidas + 'j)';
   return min + "'";
+}
+
+// Retorna '—' quando o denominador é zero (sem defesas nem gols sofridos
+// lançados ainda) — evita divisão por zero.
+function formatPct(num: number, den: number): string {
+  if (den <= 0) return '—';
+  return `${((num / den) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
 function BarraCiclo({ valor, max, cor }: { valor: number; max: number; cor: string }) {
@@ -104,6 +113,62 @@ function PontoPartida({
         {minLabel}
       </span>
     </span>
+  );
+}
+
+// ── Tabela de Aproveitamento (SAV%) ──────────────────────────────────────────
+// Migrada da aba Dados/Analítico ("Vínculos e Índices"): SAV% = defesas ÷
+// (defesas + gols sofridos). Só entram goleiros com pelo menos uma defesa ou
+// um gol sofrido lançado.
+function AproveitamentoSavTable({ lista, times }: { lista: StatGoleiro[]; times: Time[] }) {
+  const dados = [...lista]
+    .filter(s => s.sav > 0 || s.golsSofridosTotal > 0)
+    .sort((a, b) => {
+      const denA = a.sav + a.golsSofridosTotal;
+      const denB = b.sav + b.golsSofridosTotal;
+      const pctA = denA > 0 ? a.sav / denA : -1;
+      const pctB = denB > 0 ? b.sav / denB : -1;
+      return pctB - pctA;
+    });
+
+  return (
+    <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
+        <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+          <tr>
+            {['Goleiro', 'Time', 'Defesas (Sav)', 'Gols Sofridos', 'SAV%'].map(h => (
+              <th key={h} style={{
+                padding: '.55rem .6rem',
+                textAlign: (h === 'Goleiro' || h === 'Time') ? 'left' : 'center',
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: '.82rem',
+                letterSpacing: '.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dados.length === 0 ? (
+            <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum goleiro com defesas ou gols sofridos lançados na aba Stats.</td></tr>
+          ) : dados.map((s, i) => {
+            const time = times.find(t => t.id === s.jogador.time_atual);
+            return (
+              <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{s.jogador.nome}</td>
+                <td style={{ padding: '.5rem .6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                    <EscudoTime time={time} size={20} />
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{s.timeSigla}</span>
+                  </div>
+                </td>
+                <td style={{ textAlign: 'center', color: 'var(--verde)', fontWeight: 600 }}>{s.sav || '—'}</td>
+                <td style={{ textAlign: 'center', color: s.golsSofridosTotal > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)' }}>{s.golsSofridosTotal || '—'}</td>
+                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(s.sav, s.sav + s.golsSofridosTotal)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -415,6 +480,18 @@ export function GoleirosClient({ lista, times }: Props) {
           })}
         </div>
 
+        {/* 🧤 Aproveitamento (SAV%) — migrado de Dados/Analítico */}
+        <section style={{ marginTop: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.6rem', marginBottom: '.25rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            🧤 Aproveitamento (SAV%)
+          </h2>
+          <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 720 }}>
+            SAV% = defesas (Sav, lançadas na aba Stats de cada partida) ÷ (defesas + gols sofridos). Mostra apenas
+            goleiros com pelo menos uma defesa ou um gol sofrido registrado.
+          </p>
+          <AproveitamentoSavTable lista={lista} times={times} />
+        </section>
+
         <div style={{
           marginTop: '1.5rem', padding: '1rem 1.25rem',
           background: 'var(--surface)', border: '1px solid var(--border)',
@@ -430,6 +507,9 @@ export function GoleirosClient({ lista, times }: Props) {
           </span>
           <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
             Minutos calculados sobre o tempo efetivo (90min + acrescimos por partida)
+          </span>
+          <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '.75rem' }}>
+            <strong style={{ color: '#a78bfa' }}>SAV%</strong> - percentual de defesas em relação ao total de defesas + gols sofridos
           </span>
         </div>
       </div>

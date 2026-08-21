@@ -1,4 +1,4 @@
-import { getPartidas, getTimes, getJogadores } from '@/lib/data';
+import { getPartidas, getTimes, getJogadores, somaStatsOptaPorJogador, calcularGolsSofridosPorJogador } from '@/lib/data';
 import { GoleirosClient, type CicloGoleiro, type StatGoleiro } from '@/app/goleiros/GoleirosClient';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +7,11 @@ export default async function GoleirosPage() {
   const [partidas, times, jogadores] = await Promise.all([
     getPartidas(), getTimes(), getJogadores(),
   ]);
+
+  // Defesas (Sav) lançadas na aba Stats e gols sofridos totais — usados no
+  // bloco "Aproveitamento (SAV%)", migrado de Dados/Analítico.
+  const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
+  const golsSofridosPorJogador = calcularGolsSofridosPorJogador(partidas);
 
   const encerradas = partidas
     .filter(p => p.status === 'encerrada')
@@ -182,6 +187,8 @@ export default async function GoleirosPage() {
       numeroCicloAtual: cicloAtual.numero,
       maiorCiclo,
       ciclos,
+      sav: statsOptaPorJogador[goleiro.id]?.Sav ?? 0,
+      golsSofridosTotal: golsSofridosPorJogador[goleiro.id] ?? 0,
     });
   }
 
@@ -190,4 +197,4 @@ export default async function GoleirosPage() {
     .sort((a, b) => b.cicloAtualMin - a.cicloAtualMin);
 
   return <GoleirosClient lista={lista} times={times} />;
-        }
+}
