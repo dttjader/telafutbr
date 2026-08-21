@@ -69,8 +69,8 @@ export default async function AnaliticoPage() {
       vinculo: vinculosPorJogador[j.id] ?? {
         assist_gol_escanteio: 0,
         assist_gol_cruzamento: 0,
-        cartoes_falta_amarelo: 0,
-        cartoes_falta_vermelho: 0,
+        cartoes_falta_tecnica_grave_amarelo: 0,
+        cartoes_falta_tecnica_grave_vermelho: 0,
       },
     };
   }
