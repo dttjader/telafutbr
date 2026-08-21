@@ -1,9 +1,76 @@
-import { calcularArtilharia, getJogadores, getTimes, getTecnicos, getPartidas, calcularPesoGols, somaPesoGolsPorJogador } from '@/lib/data';
+import { calcularArtilharia, getJogadores, getTimes, getTecnicos, getPartidas, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 
 export const dynamic = 'force-dynamic';
 
 const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
+
+// Retorna '—' quando o denominador é zero (evita divisão por zero e índices
+// sem sentido quando não há volume suficiente de finalizações).
+function formatPct(num: number, den: number): string {
+  if (den <= 0) return '—';
+  return `${((num / den) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+
+interface FinalizacaoRow {
+  jogador_id: string;
+  nome: string;
+  timeId: string;
+  timeSigla: string;
+  gols: number;
+  S: number;
+  SoT: number;
+  SB: number;
+  Off: number;
+}
+
+// Migrada de Dados/Analítico ("Vínculos e Índices"): índices G/(Off+S) e
+// G/SoT calculados a partir das estatísticas lançadas na aba Stats.
+function FinalizacaoTable({ dados, times }: { dados: FinalizacaoRow[]; times: import('@/lib/types').Time[] }) {
+  return (
+    <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
+        <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+          <tr>
+            {['Jogador', 'Time', 'Gols', 'S', 'SoT', 'SB', 'Off', 'Índice G/(Off+S)', 'Índice G/SoT'].map(h => (
+              <th key={h} style={{
+                padding: '.55rem .6rem',
+                textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: '.78rem',
+                letterSpacing: '.04em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dados.length === 0 ? (
+            <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com finalizações lançadas na aba Stats.</td></tr>
+          ) : dados.map((r, i) => {
+            const time = times.find(t => t.id === r.timeId);
+            return (
+              <tr key={r.jogador_id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{r.nome}</td>
+                <td style={{ padding: '.5rem .6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                    <EscudoTime time={time} size={20} />
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{r.timeSigla}</span>
+                  </div>
+                </td>
+                <td style={{ textAlign: 'center', fontWeight: 600, color: r.gols > 0 ? 'var(--libertadores)' : 'var(--text-muted)' }}>{r.gols || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{r.S || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{r.SoT || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{r.SB || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{r.Off || '—'}</td>
+                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.gols, r.Off + r.S)}</td>
+                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.gols, r.SoT)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default async function ArtilhariaPage() {
   const [artilhariaBase, jogadores, times, tecnicos, partidas] = await Promise.all([
@@ -17,6 +84,10 @@ export default async function ArtilhariaPage() {
   // dos 20 maiores pontuadores, ao final da página.
   const pesoGols = calcularPesoGols(partidas, jogadores, times);
   const pontuacaoPorJogador = somaPesoGolsPorJogador(pesoGols);
+
+  // Estatísticas Opta (aba Stats) — usadas na tabela de Eficiência de
+  // Finalização, migrada de Dados/Analítico.
+  const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
 
   // Artilharia com a pontuação anexada e desempate: gols > pontuação
   const artilharia = artilhariaBase
@@ -83,6 +154,28 @@ export default async function ArtilhariaPage() {
     .filter(j => j.pontuacao > 0)
     .sort((a, b) => b.pontuacao - a.pontuacao)
     .slice(0, 20);
+
+  // Eficiência de Finalização — S/SoT/SB/Off por jogador (migrado de
+  // Dados/Analítico). Só entram jogadores com pelo menos uma finalização
+  // (S) lançada na aba Stats de alguma partida.
+  const finalizacaoRanking: FinalizacaoRow[] = jogadores
+    .map(j => {
+      const o = statsOptaPorJogador[j.id];
+      if (!o || o.S <= 0) return null;
+      const time = times.find(t => t.id === j.time_atual);
+      const golsJogador = artilharia.find(a => a.jogador_id === j.id)?.quantidade ?? 0;
+      const row: FinalizacaoRow = {
+        jogador_id: j.id,
+        nome: j.nome,
+        timeId: j.time_atual,
+        timeSigla: time?.sigla ?? '—',
+        gols: golsJogador,
+        S: o.S, SoT: o.SoT, SB: o.SB, Off: o.Off,
+      };
+      return row;
+    })
+    .filter((r): r is FinalizacaoRow => r !== null)
+    .sort((a, b) => b.gols - a.gols || b.S - a.S);
 
   const nomeJog = (id: string) => jogadores.find(j => j.id === id)?.nome ?? id;
   const nomeTime = (id: string) => times.find(t => t.id === id)?.nome ?? id;
@@ -192,6 +285,18 @@ export default async function ArtilhariaPage() {
               );
             })}
           </div>
+        </div>
+
+        {/* 🎯 Eficiência de Finalização — migrado de Dados/Analítico */}
+        <div style={{ marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.8rem', marginBottom: '.25rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            🎯 Eficiência de Finalização
+          </h2>
+          <p style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 760 }}>
+            Índice G/(Off+S) = gols ÷ (impedimentos + finalizações). Índice G/SoT = gols ÷ finalizações no alvo.
+            Dados vêm das estatísticas lançadas na aba Stats de cada partida (Admin → Partida → Eventos → Stats).
+          </p>
+          <FinalizacaoTable dados={finalizacaoRanking} times={times} />
         </div>
 
         {/* 🏅 20 Maiores Pontuadores de Gols */}
