@@ -1,4 +1,4 @@
-import { getJogadores, getPartidas, getTimes, getTecnicos } from '@/lib/data';
+import { getJogadores, getPartidas, getTimes, getTecnicos, somaStatsOptaPorJogador, calcularVinculosJogadores } from '@/lib/data';
 import {
   CartoesClient,
   type TipoCartaoResumo,
@@ -7,6 +7,7 @@ import {
   type PendenteItem,
   type SuspensoItem,
   type RankingCartaoItem,
+  type FaltaDesarmeItem,
 } from './CartoesClient';
 import { Partida, Time } from '@/lib/types';
 
@@ -61,6 +62,12 @@ export default async function CartoesPage() {
 
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
   const tecnicoMap = new Map(tecnicos.map(tc => [tc.id, tc]));
+
+  // Estatísticas Opta (FC/FS/Tk) e vínculos com cartões por "Falta
+  // Técnica"/"Falta Grave" — usados na seção "Faltas e Desarmes", migrada
+  // de Dados/Analítico.
+  const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
+  const vinculosPorJogador = calcularVinculosJogadores(partidas);
 
   // 0. Resumo por tipo de cartão (técnicos) + descrição (amarelo/vermelho de jogador)
   const tipoContagem: Record<string, number> = {};
@@ -236,6 +243,28 @@ export default async function CartoesPage() {
     .filter(x => x.quantidade > 0)
     .sort((a, b) => b.quantidade - a.quantidade);
 
+  // 4. Faltas e Desarmes (FC/FS/Tk) — migrado de Dados/Analítico.
+  // Só entram jogadores com FC, FS ou Tk lançados em ao menos uma partida.
+  const faltasDesarmes: FaltaDesarmeItem[] = jogadores
+    .map(j => {
+      const o = statsOptaPorJogador[j.id];
+      if (!o || (o.FC <= 0 && o.FS <= 0 && o.Tk <= 0)) return null;
+      const time = times.find(t => t.id === j.time_atual);
+      const v = vinculosPorJogador[j.id];
+      const item: FaltaDesarmeItem = {
+        jogador_id: j.id,
+        nome: j.nome,
+        timeId: j.time_atual,
+        timeSigla: time?.sigla ?? '—',
+        FC: o.FC, FS: o.FS, Tk: o.Tk,
+        cartoesFaltaTecnicaGraveAmarelo: v?.cartoes_falta_tecnica_grave_amarelo ?? 0,
+        cartoesFaltaTecnicaGraveVermelho: v?.cartoes_falta_tecnica_grave_vermelho ?? 0,
+      };
+      return item;
+    })
+    .filter((x): x is FaltaDesarmeItem => x !== null)
+    .sort((a, b) => b.Tk - a.Tk || b.FC - a.FC);
+
   return (
     <CartoesClient
       tiposResumo={tiposResumo}
@@ -245,6 +274,7 @@ export default async function CartoesPage() {
       suspensos={suspensos}
       rankingAmarelos={rankingAmarelos}
       rankingVermelhos={rankingVermelhos}
+      faltasDesarmes={faltasDesarmes}
       times={times}
     />
   );

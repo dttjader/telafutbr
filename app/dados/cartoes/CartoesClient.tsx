@@ -54,6 +54,19 @@ export interface RankingCartaoItem {
   quantidade: number;
 }
 
+// Migrado de Dados/Analítico ("Vínculos e Índices" — Faltas e Desarmes)
+export interface FaltaDesarmeItem {
+  jogador_id: string;
+  nome: string;
+  timeId: string;
+  timeSigla: string;
+  FC: number;
+  FS: number;
+  Tk: number;
+  cartoesFaltaTecnicaGraveAmarelo: number;
+  cartoesFaltaTecnicaGraveVermelho: number;
+}
+
 interface Props {
   tiposResumo: TipoCartaoResumo[];
   descricoesAmarelo: DescricaoCartao[];
@@ -62,6 +75,7 @@ interface Props {
   suspensos: SuspensoItem[];
   rankingAmarelos: RankingCartaoItem[];
   rankingVermelhos: RankingCartaoItem[];
+  faltasDesarmes: FaltaDesarmeItem[];
   times: Time[];
 }
 
@@ -85,6 +99,16 @@ function formatData(d: string) {
   if (!d) return '—';
   const [y, m, day] = d.split('-');
   return `${day}/${m}/${y}`;
+}
+
+// Retorna '—' quando o denominador é zero — evita divisão por zero.
+function formatPct(num: number, den: number): string {
+  if (den <= 0) return '—';
+  return `${((num / den) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+function formatRatio(num: number, den: number, casas = 2): string {
+  if (den <= 0) return '—';
+  return (num / den).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
 }
 
 function ListaDeJogos({ itens }: { itens: CartaoDetalhe[] }) {
@@ -205,8 +229,62 @@ function BlocoDescricao({
   );
 }
 
+// Migrada de Dados/Analítico ("Vínculos e Índices" — Faltas e Desarmes).
+// Índice FS/FC = faltas sofridas ÷ faltas cometidas. Índice Desarme =
+// Tk ÷ (Tk + FC). As duas últimas colunas contam cartões amarelos/vermelhos
+// cujo motivo foi lançado exatamente como "Falta Técnica" ou "Falta Grave".
+function FaltasDesarmesTable({ dados, times }: { dados: FaltaDesarmeItem[]; times: Time[] }) {
+  return (
+    <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
+        <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+          <tr>
+            {['Jogador', 'Time', 'FC', 'FS', 'Índice FS/FC', 'Tk', 'Índice Desarme', '🟨 Falta Téc/Grave', '🟥 Falta Téc/Grave'].map(h => (
+              <th key={h} style={{
+                padding: '.55rem .6rem',
+                textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: '.78rem',
+                letterSpacing: '.04em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dados.length === 0 ? (
+            <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com faltas ou desarmes lançados na aba Stats.</td></tr>
+          ) : dados.map((r, i) => {
+            const time = times.find(t => t.id === r.timeId);
+            return (
+              <tr key={r.jogador_id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{r.nome}</td>
+                <td style={{ padding: '.5rem .6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                    <EscudoTime time={time} size={20} />
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{r.timeSigla}</span>
+                  </div>
+                </td>
+                <td style={{ textAlign: 'center' }}>{r.FC || '—'}</td>
+                <td style={{ textAlign: 'center' }}>{r.FS || '—'}</td>
+                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatRatio(r.FS, r.FC)}</td>
+                <td style={{ textAlign: 'center' }}>{r.Tk || '—'}</td>
+                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.Tk, r.Tk + r.FC)}</td>
+                <td style={{ textAlign: 'center', color: r.cartoesFaltaTecnicaGraveAmarelo > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: r.cartoesFaltaTecnicaGraveAmarelo > 0 ? 700 : 400 }}>
+                  {r.cartoesFaltaTecnicaGraveAmarelo || '—'}
+                </td>
+                <td style={{ textAlign: 'center', color: r.cartoesFaltaTecnicaGraveVermelho > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)', fontWeight: r.cartoesFaltaTecnicaGraveVermelho > 0 ? 700 : 400 }}>
+                  {r.cartoesFaltaTecnicaGraveVermelho || '—'}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function CartoesClient({
-  tiposResumo, descricoesAmarelo, descricoesVermelho, pendurados, suspensos, rankingAmarelos, rankingVermelhos, times,
+  tiposResumo, descricoesAmarelo, descricoesVermelho, pendurados, suspensos, rankingAmarelos, rankingVermelhos, faltasDesarmes, times,
 }: Props) {
   const [modalJogos, setModalJogos] = useState<{ titulo: string; itens: CartaoDetalhe[] } | null>(null);
 
@@ -345,6 +423,20 @@ export function CartoesClient({
             <RankingCol titulo="🟨 Ranking de Amarelos" dados={rankingAmarelos} cor="#f59e0b" times={times} />
             <RankingCol titulo="🟥 Ranking de Vermelhos" dados={rankingVermelhos} cor="var(--rebaixamento)" times={times} />
           </div>
+        </section>
+
+        {/* 3. 🥊 Faltas e Desarmes — migrado de Dados/Analítico */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.6rem', marginBottom: '.25rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            🥊 Faltas e Desarmes
+          </h2>
+          <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 780 }}>
+            Índice FS/FC = faltas sofridas ÷ faltas cometidas. Índice Desarme = Tk ÷ (Tk + FC). As duas últimas
+            colunas contam cartões amarelos/vermelhos cujo motivo foi lançado exatamente como &quot;Falta
+            Técnica&quot; ou &quot;Falta Grave&quot; (o campo Motivo do cartão é texto livre). Dados vêm das
+            estatísticas lançadas na aba Stats de cada partida (Admin → Partida → Eventos → Stats).
+          </p>
+          <FaltasDesarmesTable dados={faltasDesarmes} times={times} />
         </section>
       </div>
 
