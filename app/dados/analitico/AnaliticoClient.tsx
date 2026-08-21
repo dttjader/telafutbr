@@ -89,10 +89,6 @@ function formatPct(num: number, den: number): string {
   if (den <= 0) return '—';
   return `${((num / den) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
-function formatRatio(num: number, den: number, casas = 2): string {
-  if (den <= 0) return '—';
-  return (num / den).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
-}
 
 // ── Sub-componente: tabela de uma faixa de peso ──────────────────────────────
 // Hoisted (fora do componente principal) para não ser recriado a cada
@@ -243,7 +239,10 @@ function StatsOptaTable({ dados, times }: { dados: StatJogador[]; times: Time[] 
 }
 
 // ── Sub-componentes: tabelas de Vínculos e Índices ───────────────────────────
-// Todos hoisted pelo mesmo motivo dos anteriores.
+// OBS: as tabelas de SAV% (Goleiros), Eficiência de Finalização (S/SoT/SB →
+// Artilharia) e Faltas/Desarmes (FC/FS/Tk → Cartões) foram migradas para as
+// respectivas abas. Aqui ficam apenas os vínculos que ainda não têm um lar
+// próprio: Escanteios/Cruzamentos → assistências de cabeça, e Passes/90.
 
 function EscanteiosCruzamentoTable({ dados, times }: { dados: StatJogador[]; times: Time[] }) {
   return (
@@ -283,148 +282,6 @@ function EscanteiosCruzamentoTable({ dados, times }: { dados: StatJogador[]; tim
                 <td style={{ textAlign: 'center' }}>{o.C || '—'}</td>
                 <td style={{ textAlign: 'center', color: v.assist_gol_cruzamento > 0 ? 'var(--verde)' : 'var(--text-muted)' }}>{v.assist_gol_cruzamento || '—'}</td>
                 <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(v.assist_gol_cruzamento, o.C)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function FaltasDesarmesTable({ dados, times }: { dados: StatJogador[]; times: Time[] }) {
-  return (
-    <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
-        <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
-          <tr>
-            {['Jogador', 'Time', 'FC', 'FS', 'Índice FS/FC', 'Tk', 'Índice Desarme', '🟨 Cartões c/ Falta', '🟥 Cartões c/ Falta'].map(h => (
-              <th key={h} style={{
-                padding: '.55rem .6rem',
-                textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
-                fontFamily: "'Bebas Neue',sans-serif", fontSize: '.75rem',
-                letterSpacing: '.03em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dados.length === 0 ? (
-            <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com faltas ou desarmes registrados.</td></tr>
-          ) : dados.map((s, i) => {
-            const time = times.find(t => t.id === s.jogador.time_atual);
-            const o = s.stats_opta;
-            const v = s.vinculo;
-            return (
-              <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{s.jogador.nome}</td>
-                <td style={{ padding: '.5rem .6rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                    <EscudoTime time={time} size={20} />
-                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{s.timeSigla}</span>
-                  </div>
-                </td>
-                <td style={{ textAlign: 'center' }}>{o.FC || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{o.FS || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatRatio(o.FS, o.FC)}</td>
-                <td style={{ textAlign: 'center' }}>{o.Tk || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(o.Tk, o.Tk + o.FC)}</td>
-                <td style={{ textAlign: 'center', color: v.cartoes_falta_amarelo > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: v.cartoes_falta_amarelo > 0 ? 700 : 400 }}>
-                  {v.cartoes_falta_amarelo || '—'}
-                </td>
-                <td style={{ textAlign: 'center', color: v.cartoes_falta_vermelho > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)', fontWeight: v.cartoes_falta_vermelho > 0 ? 700 : 400 }}>
-                  {v.cartoes_falta_vermelho || '—'}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function FinalizacaoTable({ dados, times }: { dados: StatJogador[]; times: Time[] }) {
-  return (
-    <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
-        <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
-          <tr>
-            {['Jogador', 'Time', 'Gols', 'S', 'SoT', 'SB', 'Off', 'Índice G/(Off+S)', 'Índice G/SoT'].map(h => (
-              <th key={h} style={{
-                padding: '.55rem .6rem',
-                textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
-                fontFamily: "'Bebas Neue',sans-serif", fontSize: '.78rem',
-                letterSpacing: '.04em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dados.length === 0 ? (
-            <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com finalizações registradas.</td></tr>
-          ) : dados.map((s, i) => {
-            const time = times.find(t => t.id === s.jogador.time_atual);
-            const o = s.stats_opta;
-            return (
-              <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{s.jogador.nome}</td>
-                <td style={{ padding: '.5rem .6rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                    <EscudoTime time={time} size={20} />
-                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{s.timeSigla}</span>
-                  </div>
-                </td>
-                <td style={{ textAlign: 'center', fontWeight: 600, color: s.gols > 0 ? 'var(--libertadores)' : 'var(--text-muted)' }}>{s.gols || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{o.S || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{o.SoT || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{o.SB || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{o.Off || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(s.gols, o.Off + o.S)}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(s.gols, o.SoT)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function GoleirosSavTable({ dados, times }: { dados: StatJogador[]; times: Time[] }) {
-  return (
-    <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
-        <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
-          <tr>
-            {['Jogador', 'Time', 'Defesas (Sav)', 'Gols Sofridos', 'SAV%'].map(h => (
-              <th key={h} style={{
-                padding: '.55rem .6rem',
-                textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
-                fontFamily: "'Bebas Neue',sans-serif", fontSize: '.82rem',
-                letterSpacing: '.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dados.length === 0 ? (
-            <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum goleiro com defesas ou gols sofridos registrados.</td></tr>
-          ) : dados.map((s, i) => {
-            const time = times.find(t => t.id === s.jogador.time_atual);
-            const o = s.stats_opta;
-            return (
-              <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
-                <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{s.jogador.nome}</td>
-                <td style={{ padding: '.5rem .6rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                    <EscudoTime time={time} size={20} />
-                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{s.timeSigla}</span>
-                  </div>
-                </td>
-                <td style={{ textAlign: 'center', color: 'var(--verde)', fontWeight: 600 }}>{o.Sav || '—'}</td>
-                <td style={{ textAlign: 'center', color: s.gols_sofridos > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)' }}>{s.gols_sofridos || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(o.Sav, o.Sav + s.gols_sofridos)}</td>
               </tr>
             );
           })}
@@ -561,30 +418,6 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
     [...filtrada]
       .filter(s => s.stats_opta.Crn > 0 || s.stats_opta.C > 0)
       .sort((a, b) => (b.stats_opta.Crn + b.stats_opta.C) - (a.stats_opta.Crn + a.stats_opta.C)),
-    [filtrada]);
-
-  const dadosFaltasDesarmes = useMemo(() =>
-    [...filtrada]
-      .filter(s => s.stats_opta.FC > 0 || s.stats_opta.FS > 0 || s.stats_opta.Tk > 0)
-      .sort((a, b) => b.stats_opta.Tk - a.stats_opta.Tk || b.stats_opta.FC - a.stats_opta.FC),
-    [filtrada]);
-
-  const dadosFinalizacao = useMemo(() =>
-    [...filtrada]
-      .filter(s => s.stats_opta.S > 0)
-      .sort((a, b) => b.gols - a.gols || b.stats_opta.S - a.stats_opta.S),
-    [filtrada]);
-
-  const dadosGoleirosSav = useMemo(() =>
-    [...filtrada]
-      .filter(s => s.jogador.posicao === 'GOL' && (s.stats_opta.Sav > 0 || s.gols_sofridos > 0))
-      .sort((a, b) => {
-        const denA = a.stats_opta.Sav + a.gols_sofridos;
-        const denB = b.stats_opta.Sav + b.gols_sofridos;
-        const pctA = denA > 0 ? a.stats_opta.Sav / denA : -1;
-        const pctB = denB > 0 ? b.stats_opta.Sav / denB : -1;
-        return pctB - pctA;
-      }),
     [filtrada]);
 
   const dadosPasses90 = useMemo(() =>
@@ -904,12 +737,14 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
             🔗 Vínculos e Índices
           </h2>
           <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1.5rem', maxWidth: 780 }}>
-            Cruza as estatísticas Opta com os gols e cartões já registrados nas partidas. Todas as tabelas abaixo
-            respeitam os filtros da seção &quot;Filtros&quot; e mostram apenas jogadores com volume suficiente para
-            calcular o índice (senão o campo aparece como &quot;—&quot;).
+            Cruza as estatísticas Opta com os gols já registrados nas partidas. Os índices de SAV% (Goleiros),
+            Eficiência de Finalização (Artilharia) e Faltas/Desarmes (Cartões) foram migrados para as respectivas
+            abas — veja em <Link href="/dados/goleiros" style={{ color: 'var(--verde)' }}>Goleiros</Link>,{' '}
+            <Link href="/dados/artilharia" style={{ color: 'var(--verde)' }}>Artilharia</Link> e{' '}
+            <Link href="/dados/cartoes" style={{ color: 'var(--verde)' }}>Cartões</Link>.
           </p>
 
-          {/* 1. Escanteios e Cruzamentos */}
+          {/* Escanteios e Cruzamentos */}
           <div style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontSize: '1.15rem', color: 'var(--verde)', marginBottom: '.4rem' }}>🚩 Escanteios e Cruzamentos → Assistências de Cabeça</h3>
             <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
@@ -918,36 +753,7 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
             <EscanteiosCruzamentoTable dados={dadosEscanteiosCruz} times={times} />
           </div>
 
-          {/* 2. Faltas e Desarmes */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '1.15rem', color: 'var(--verde)', marginBottom: '.4rem' }}>🥊 Faltas e Desarmes</h3>
-            <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-              Índice FS/FC = faltas sofridas ÷ faltas cometidas. Índice Desarme = Tk ÷ (Tk + FC). As duas últimas
-              colunas contam cartões amarelos/vermelhos cujo motivo contém a palavra &quot;falta&quot; (ex: &quot;Falta
-              tática&quot;, &quot;Falta violenta&quot;, &quot;Falta técnica&quot;, &quot;Falta grave&quot; etc.).
-            </p>
-            <FaltasDesarmesTable dados={dadosFaltasDesarmes} times={times} />
-          </div>
-
-          {/* 3. Eficiência de Finalização */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '1.15rem', color: 'var(--verde)', marginBottom: '.4rem' }}>🎯 Eficiência de Finalização</h3>
-            <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-              Índice G/(Off+S) = gols ÷ (impedimentos + finalizações). Índice G/SoT = gols ÷ finalizações no alvo.
-            </p>
-            <FinalizacaoTable dados={dadosFinalizacao} times={times} />
-          </div>
-
-          {/* 4. Aproveitamento de Goleiros */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '1.15rem', color: 'var(--verde)', marginBottom: '.4rem' }}>🧤 Aproveitamento de Goleiros</h3>
-            <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-              SAV% = defesas ÷ (defesas + gols sofridos).
-            </p>
-            <GoleirosSavTable dados={dadosGoleirosSav} times={times} />
-          </div>
-
-          {/* 5. Passes por 90 minutos */}
+          {/* Passes por 90 minutos */}
           <div style={{ marginBottom: '1rem' }}>
             <h3 style={{ fontSize: '1.15rem', color: 'var(--verde)', marginBottom: '.4rem' }}>🎯 Passes por 90 Minutos</h3>
             <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
