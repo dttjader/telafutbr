@@ -428,3 +428,19 @@ export function calcularVinculosJogadores(partidas: Partida[]): Record<string, V
 
   return map;
 }
+
+// ── Gols sofridos por goleiro (total) ─────────────────────────────────────
+// Mesma contagem já usada internamente no Analítico: soma de todo gol —
+// qualquer tipo, inclusive contra — cujo goleiro_id aponte para o jogador,
+// em partidas encerradas. Usado para calcular o SAV% na aba Goleiros.
+export function calcularGolsSofridosPorJogador(partidas: Partida[]): Record<string, number> {
+  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const map: Record<string, number> = {};
+  for (const p of encerradas) {
+    for (const g of p.gols) {
+      if (!g.goleiro_id) continue;
+      map[g.goleiro_id] = (map[g.goleiro_id] ?? 0) + 1;
+    }
+  }
+  return map;
+}
