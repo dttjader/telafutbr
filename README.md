@@ -1,202 +1,70 @@
 # ⚽ Brasileirão — Projeto de Resultados
 
-Site de acompanhamento do Campeonato Brasileiro, publicado no Vercel, com **atualização via arquivos JSON**.
+Site de acompanhamento do Campeonato Brasileiro Série A, feito em **Next.js (App Router)**, com dados
+persistidos no **Supabase** (Postgres). Publicado no Vercel.
+
+> ℹ️ Este projeto já teve uma versão anterior baseada em um único arquivo `campeonato.json` editado
+> manualmente. Essa arquitetura foi **descontinuada**. Os arquivos e o README daquela época foram
+> preservados em [`docs/legado/`](./docs/legado/README.md) apenas como referência histórica — não
+> refletem o funcionamento atual do site.
+
+---
 
 ## 🚀 Deploy no Vercel
 
-1. Suba o projeto para um repositório GitHub
-2. Acesse [vercel.com](https://vercel.com) → **Add New Project** → importe o repo
-3. O Vercel detecta Next.js automaticamente
-4. Clique em **Deploy** — pronto!
+1. Suba o projeto para um repositório GitHub.
+2. Configure as variáveis de ambiente (veja [Variáveis de ambiente](#-variáveis-de-ambiente) abaixo)
+   no painel do projeto na Vercel.
+3. Acesse [vercel.com](https://vercel.com) → **Add New Project** → importe o repo.
+4. O Vercel detecta Next.js automaticamente.
+5. Clique em **Deploy** — pronto!
 
 A cada push no repositório, o Vercel faz novo deploy automaticamente.
 
 ---
 
-## 📁 Como atualizar os dados
+## 🗄️ Banco de dados (Supabase)
 
-Todo o conteúdo do site vem de **um único arquivo**:
+Todo o conteúdo do site — estádios, times, jogadores, técnicos, partidas, gols, cartões, escalações,
+configurações de zonas de classificação — é armazenado no Supabase.
+
+- **Schema**: veja [`supabase_schema.sql`](./supabase_schema.sql). Rode esse script no SQL Editor do
+  seu projeto Supabase para criar as tabelas e o seed inicial de times/estádios.
+- **Acesso aos dados**:
+  - `lib/supabase.ts` / `lib/data.ts` — funções server-side (Server Components e Route Handlers).
+  - `lib/client.ts` — funções client-side (`'use client'`, usadas nas telas de admin).
+- **Tabelas principais**: `estadios`, `times`, `jogadores`, `tecnicos`, `partidas`, `configuracoes`.
+  Eventos de partida (gols, cartões, substituições, escalações, stats Opta) ficam em colunas `jsonb`
+  dentro de `partidas`, para manter flexibilidade sem migrations constantes.
+
+### Variáveis de ambiente
+
+Crie um `.env.local` (nunca commitado) com:
 
 ```
-src/data/campeonato.json
-```
-
-Edite esse arquivo e faça push para o GitHub — o Vercel deploya automaticamente.
-
----
-
-## 📋 Estrutura do JSON
-
-### Cabeçalho
-
-```json
-{
-  "campeonato": {
-    "nome": "Campeonato Brasileiro Série A",
-    "edicao": "2024",
-    "organizador": "CBF"
-  }
-}
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+API_FOOTBALL_KEY=...   # opcional — só necessário para as telas /admin/sync e importação de partidas
 ```
 
 ---
 
-### Times
+## 🔄 Fluxo de atualização de dados
 
-```json
-"times": [
-  {
-    "id": "FLA",           // ID único — usado em todo o arquivo
-    "nome": "Flamengo",
-    "sigla": "FLA",        // Abreviação (3 letras) exibida nos escudos
-    "cor_primaria": "#FF0000",
-    "cor_secundaria": "#000000",
-    "escudo": "/escudos/flamengo.png",  // Opcional
-    "estadio": "Maracanã"
-  }
-]
-```
-
----
-
-### Rodadas e Partidas
-
-```json
-"rodadas": [
-  {
-    "numero": 19,
-    "status": "encerrada",   // "futura" | "em_andamento" | "encerrada"
-    "partidas": [ ... ]
-  }
-]
-```
-
-#### Estrutura de uma Partida
-
-```json
-{
-  "id": "2024-19-001",           // ID único da partida
-  "rodada": 19,
-  "data": "2024-08-10",          // AAAA-MM-DD
-  "hora": "16:00",
-  "status": "encerrada",         // "agendada" | "ao_vivo" | "encerrada" | "adiada"
-  "time_casa": "FLA",            // ID do time (deve existir em "times")
-  "time_visitante": "PAL",
-  "placar_casa": 2,
-  "placar_visitante": 1,
-  "estadio": "Maracanã",
-  "cidade": "Rio de Janeiro",
-  "publico": 68420,
-  "arbitragem": {
-    "principal": "Anderson Daronco",
-    "assistente1": "Bruno Raphael Pires",
-    "assistente2": "Fabricio Vilarinho da Silva",
-    "quarto": "Rodrigo Guarizo Ferreira",
-    "var": "Rodrigo Nunes de Sá"
-  },
-  "escalacao_casa": { ... },
-  "escalacao_visitante": { ... },
-  "gols": [ ... ],
-  "cartoes": [ ... ],
-  "substituicoes": [ ... ]
-}
-```
-
-#### Escalação
-
-```json
-"escalacao_casa": {
-  "formacao": "4-2-3-1",
-  "titulares": [
-    { "numero": 1, "nome": "Rossi", "posicao": "GOL" },
-    { "numero": 4, "nome": "Fabrício Bruno", "posicao": "ZAG" }
-  ],
-  "reservas": [
-    { "numero": 23, "nome": "Matheus Cunha", "posicao": "MEI" }
-  ]
-}
-```
-
-Posições aceitas: `GOL` | `ZAG` | `LAT` | `VOL` | `MEI` | `ATA`
-
-#### Gols
-
-```json
-"gols": [
-  {
-    "id": "g001",                      // ID único
-    "minuto": 23,
-    "acrescimo": 0,                    // Minutos de acréscimo (0 se não houver)
-    "time": "FLA",                     // Quem marcou
-    "jogador": "Pedro",
-    "assistencia": "Arrascaeta",       // null se não houver
-    "tipo": "normal",                  // "normal" | "penalti" | "falta" | "contra"
-    "goleiro_adversario": "Weverton",  // Goleiro que levou o gol
-    "descricao": "Cabeceio após cruzamento..."
-  }
-]
-```
-
-#### Cartões
-
-```json
-"cartoes": [
-  {
-    "minuto": 34,
-    "tipo": "amarelo",          // "amarelo" | "vermelho"
-    "jogador": "Erick Pulgar",
-    "time": "FLA",
-    "motivo": "Falta tática"
-  }
-]
-```
-
-#### Substituições
-
-```json
-"substituicoes": [
-  {
-    "minuto": 60,
-    "time": "FLA",
-    "sai": "Luiz Araújo",
-    "entra": "Nicolás De La Cruz"
-  }
-]
-```
-
----
-
-### Tabela de Classificação
-
-```json
-"tabela": [
-  {
-    "posicao": 1,
-    "time": "BOT",
-    "pontos": 38,
-    "jogos": 19,
-    "vitorias": 11,
-    "empates": 5,
-    "derrotas": 3,
-    "gols_pro": 30,
-    "gols_contra": 17,
-    "saldo": 13
-  }
-]
-```
-
-As posições de classificação são coloridas automaticamente:
-- 🟢 1º–4º → Libertadores
-- 🔵 5º–6º → Sul-Americana
-- 🔴 18º–20º → Rebaixamento
-
----
-
-## 🔄 Fluxo de Atualização
+Diferente da versão antiga (edição manual de JSON + git push), hoje os dados são gerenciados pelas
+telas de **admin**, que gravam direto no Supabase:
 
 ```
-Atualiza campeonato.json → git commit & push → Vercel deploya → Site atualizado
+/admin/estadios   → cadastro de estádios
+/admin/jogadores  → cadastro de jogadores e transferências
+/admin/tecnicos   → cadastro de técnicos e histórico de vínculos
+/admin/partidas   → cadastro de partidas (rodada, times, estádio, arbitragem, técnicos)
+/admin/partida/[id] → eventos da partida: escalação, gols, cartões, substituições, stats
+/admin/config     → vagas de Libertadores/Sul-Americana/Rebaixamento e vagas diretas por título
+/admin/sync       → sincronização opcional com a API-Football (vínculo de times/jogadores/partidas)
 ```
+
+Não há mais "um único arquivo para editar" — a fonte de verdade é o banco.
 
 ---
 
@@ -214,19 +82,37 @@ Acesse: http://localhost:3000
 ## 📂 Estrutura do Projeto
 
 ```
-src/
-├── app/
-│   ├── page.tsx              # Página de rodadas
-│   ├── tabela/page.tsx       # Tabela de classificação
-│   ├── artilharia/page.tsx   # Artilharia
-│   └── partida/[id]/page.tsx # Detalhes de partida
-├── components/
-│   ├── Header.tsx
-│   ├── CardPartida.tsx
-│   └── EscudoTime.tsx
-├── data/
-│   └── campeonato.json       # ← ÚNICO ARQUIVO PARA ATUALIZAR
-└── lib/
-    ├── types.ts              # Tipos TypeScript
-    └── data.ts               # Funções de acesso aos dados
+app/
+├── page.tsx                      # Rodadas
+├── tabela/                       # Classificação (com config de zonas)
+├── confrontos/                   # Confrontos diretos
+├── resumo/                       # Painel condensado (não está no menu público)
+├── partida/[id]/                 # Detalhes de uma partida
+├── dados/                        # Estatísticas: artilharia, gols, goleiros, cartões, analítico, times, árbitros
+├── admin/                        # Telas de cadastro/gestão (estádios, jogadores, técnicos, partidas, config, sync)
+└── api/                          # Route Handlers usados pelas telas server-side / integrações
+
+components/                       # Componentes compartilhados (Nav, EscudoTime, CardPartida, etc.)
+
+lib/
+├── supabase.ts                   # Client Supabase (server)
+├── client.ts                     # Client Supabase (client components)
+├── data.ts                       # Funções de leitura/escrita + cálculos agregados (server-safe)
+├── config.ts                     # Configuração de zonas de classificação (Libertadores/Sula/Rebaixamento)
+├── utils.ts                      # Utilitários puros, seguros para Client Components
+├── types.ts                      # Tipos TypeScript compartilhados
+├── apiFootball*.ts               # Integração opcional com a API-Football
+
+docs/legado/                      # Documentação e dados da arquitetura antiga (histórico, não usado)
+supabase_schema.sql               # Schema + seed inicial do banco
 ```
+
+---
+
+## 🧩 Convenções internas
+
+- **Zona de classificação**: a única fonte de verdade é `lib/config.ts` (`zonaClassificacao`), que
+  recebe a configuração salva em `/admin/config` (vagas por tabela + vagas diretas por título). Não
+  existem mais versões alternativas dessa função espalhadas pelo código.
+- **Formatação de data**: `formatDate` vive em `lib/utils.ts` (seguro para uso em Client Components).
+  `lib/data.ts` reexporta a mesma função para não quebrar imports server-side existentes.
