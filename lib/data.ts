@@ -175,18 +175,19 @@ export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-export function formatDate(d: string) {
-  if (!d) return '';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
-}
+// `formatDate` vive em `lib/utils.ts` (utilitário puro, seguro para Client
+// Components). Reexportado aqui para não quebrar imports server-side já
+// existentes (`import { formatDate } from '@/lib/data'`) — evita ter duas
+// implementações divergentes do mesmo helper.
+export { formatDate } from './utils';
 
-export function zonaClassificacao(pos: number) {
-  if (pos <= 5) return 'libertadores';
-  if (pos <= 11) return 'sulamericana';
-  if (pos >= 17) return 'rebaixamento';
-  return 'neutro';
-}
+// NOTE: A função `zonaClassificacao` foi removida deste arquivo.
+// Havia aqui uma versão hardcoded (Lib 1-5, Sula 6-11, Reb >=17), diferente
+// da versão de `lib/utils.ts` (Lib 1-4, Sula 5-6, Reb >=18) e também
+// diferente da usada de fato pela tela de Tabela. A única fonte de verdade
+// agora é `lib/config.ts`, que recebe as vagas configuradas em
+// /admin/config: zonaClassificacao(posicao, timeId, config, totalTimes).
+// Importe de '@/lib/config' quando precisar dessa lógica.
 
 // ── Peso dos gols na pontuação da partida ────────────────────────────────
 // Cada gol "vale" a fração dos pontos que o resultado deu ao time, dividida

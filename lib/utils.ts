@@ -16,9 +16,10 @@ export function golTipoLabel(t: string) {
   return l[t] ?? t;
 }
 
-export function zonaClassificacao(pos: number) {
-  if (pos <= 4) return 'libertadores';
-  if (pos <= 6) return 'sulamericana';
-  if (pos >= 18) return 'rebaixamento';
-  return 'neutro';
-}
+// NOTE: A função `zonaClassificacao` foi removida deste arquivo.
+// A única fonte de verdade para zona de classificação é `lib/config.ts`,
+// que recebe a configuração de vagas salva em /admin/config
+// (zonaClassificacao(posicao, timeId, config, totalTimes)).
+// Havia aqui uma versão hardcoded (Lib 1-4, Sula 5-6, Reb >=18) que não
+// refletia as vagas configuráveis pelo admin — foi descontinuada para
+// evitar divergência entre telas. Importe de '@/lib/config' quando precisar.
