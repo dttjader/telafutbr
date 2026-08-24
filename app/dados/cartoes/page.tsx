@@ -63,9 +63,9 @@ export default async function CartoesPage() {
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
   const tecnicoMap = new Map(tecnicos.map(tc => [tc.id, tc]));
 
-  // Estatísticas Opta (FC/FS/Tk) e vínculos com cartões por "Falta
-  // Técnica"/"Falta Grave" — usados na seção "Faltas e Desarmes", migrada
-  // de Dados/Analítico.
+  // Estatísticas Opta (FC/FS/Tk) e vínculos com cartões "por falta"
+  // (motivo começa com "Falta") — usados na seção "Faltas e Desarmes",
+  // migrada de Dados/Analítico.
   const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
   const vinculosPorJogador = calcularVinculosJogadores(partidas);
 
@@ -215,7 +215,13 @@ export default async function CartoesPage() {
     }
   }
 
-  pendurados.sort((a, b) => b.cartoes - a.cartoes || a.nome.localeCompare(b.nome));
+  // Pendurados: mais cartões primeiro; empatado, agrupa por time (sigla,
+  // ordem alfabética); dentro do mesmo time, ordem alfabética pelo nome.
+  pendurados.sort((a, b) =>
+    b.cartoes - a.cartoes
+    || a.timeSigla.localeCompare(b.timeSigla)
+    || a.nome.localeCompare(b.nome)
+  );
   suspensos.sort((a, b) => b.rodada - a.rodada || a.nome.localeCompare(b.nome));
 
   // 3. Ranking de cartões (jogadores)
@@ -245,6 +251,7 @@ export default async function CartoesPage() {
 
   // 4. Faltas e Desarmes (FC/FS/Tk) — migrado de Dados/Analítico.
   // Só entram jogadores com FC, FS ou Tk lançados em ao menos uma partida.
+  // Ranking principal por Tk (desarmes) — ver FaltasDesarmesTable no client.
   const faltasDesarmes: FaltaDesarmeItem[] = jogadores
     .map(j => {
       const o = statsOptaPorJogador[j.id];
@@ -257,8 +264,8 @@ export default async function CartoesPage() {
         timeId: j.time_atual,
         timeSigla: time?.sigla ?? '—',
         FC: o.FC, FS: o.FS, Tk: o.Tk,
-        cartoesFaltaTecnicaGraveAmarelo: v?.cartoes_falta_tecnica_grave_amarelo ?? 0,
-        cartoesFaltaTecnicaGraveVermelho: v?.cartoes_falta_tecnica_grave_vermelho ?? 0,
+        cartoesFaltaAmarelo: v?.cartoes_falta_amarelo ?? 0,
+        cartoesFaltaVermelho: v?.cartoes_falta_vermelho ?? 0,
       };
       return item;
     })

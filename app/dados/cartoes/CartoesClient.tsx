@@ -54,7 +54,8 @@ export interface RankingCartaoItem {
   quantidade: number;
 }
 
-// Migrado de Dados/Analítico ("Vínculos e Índices" — Faltas e Desarmes)
+// Migrado de Dados/Analítico ("Vínculos e Índices" — Faltas e Desarmes).
+// Ranking principal por Tk (desarmes) — ver FaltasDesarmesTable abaixo.
 export interface FaltaDesarmeItem {
   jogador_id: string;
   nome: string;
@@ -63,8 +64,8 @@ export interface FaltaDesarmeItem {
   FC: number;
   FS: number;
   Tk: number;
-  cartoesFaltaTecnicaGraveAmarelo: number;
-  cartoesFaltaTecnicaGraveVermelho: number;
+  cartoesFaltaAmarelo: number;
+  cartoesFaltaVermelho: number;
 }
 
 interface Props {
@@ -230,21 +231,26 @@ function BlocoDescricao({
 }
 
 // Migrada de Dados/Analítico ("Vínculos e Índices" — Faltas e Desarmes).
+// Ordenação principal (ver page.tsx): Tk desc, FC desc — por isso a coluna
+// Tk recebe destaque visual aqui (maior, em negrito e na cor de destaque),
+// deixando claro que é o critério que ranqueia a tabela.
 // Índice FS/FC = faltas sofridas ÷ faltas cometidas. Índice Desarme =
 // Tk ÷ (Tk + FC). As duas últimas colunas contam cartões amarelos/vermelhos
-// cujo motivo foi lançado exatamente como "Falta Técnica" ou "Falta Grave".
+// cujo motivo comece com "Falta" (ex.: "Falta tática", "Falta violenta").
 function FaltasDesarmesTable({ dados, times }: { dados: FaltaDesarmeItem[]; times: Time[] }) {
   return (
     <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
         <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
           <tr>
-            {['Jogador', 'Time', 'FC', 'FS', 'Índice FS/FC', 'Tk', 'Índice Desarme', '🟨 Falta Téc/Grave', '🟥 Falta Téc/Grave'].map(h => (
+            {['Jogador', 'Time', 'FC', 'FS', 'Índice FS/FC', 'Tk ▼', 'Índice Desarme', '🟨 Cartões por Falta', '🟥 Cartões por Falta'].map(h => (
               <th key={h} style={{
                 padding: '.55rem .6rem',
                 textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
                 fontFamily: "'Bebas Neue',sans-serif", fontSize: '.78rem',
-                letterSpacing: '.04em', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+                letterSpacing: '.04em',
+                color: h === 'Tk ▼' ? 'var(--verde)' : 'var(--text-muted)',
+                whiteSpace: 'nowrap',
               }}>{h}</th>
             ))}
           </tr>
@@ -266,13 +272,26 @@ function FaltasDesarmesTable({ dados, times }: { dados: FaltaDesarmeItem[]; time
                 <td style={{ textAlign: 'center' }}>{r.FC || '—'}</td>
                 <td style={{ textAlign: 'center' }}>{r.FS || '—'}</td>
                 <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatRatio(r.FS, r.FC)}</td>
-                <td style={{ textAlign: 'center' }}>{r.Tk || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.Tk, r.Tk + r.FC)}</td>
-                <td style={{ textAlign: 'center', color: r.cartoesFaltaTecnicaGraveAmarelo > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: r.cartoesFaltaTecnicaGraveAmarelo > 0 ? 700 : 400 }}>
-                  {r.cartoesFaltaTecnicaGraveAmarelo || '—'}
+                <td style={{
+                  textAlign: 'center',
+                  padding: '.5rem .6rem',
+                  background: 'rgba(0,168,79,.06)',
+                  borderLeft: '1px solid rgba(0,168,79,.25)',
+                  borderRight: '1px solid rgba(0,168,79,.25)',
+                }}>
+                  <span style={{
+                    fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.25rem',
+                    color: 'var(--verde)', fontWeight: 700,
+                  }}>
+                    {r.Tk || 0}
+                  </span>
                 </td>
-                <td style={{ textAlign: 'center', color: r.cartoesFaltaTecnicaGraveVermelho > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)', fontWeight: r.cartoesFaltaTecnicaGraveVermelho > 0 ? 700 : 400 }}>
-                  {r.cartoesFaltaTecnicaGraveVermelho || '—'}
+                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.Tk, r.Tk + r.FC)}</td>
+                <td style={{ textAlign: 'center', color: r.cartoesFaltaAmarelo > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: r.cartoesFaltaAmarelo > 0 ? 700 : 400 }}>
+                  {r.cartoesFaltaAmarelo || '—'}
+                </td>
+                <td style={{ textAlign: 'center', color: r.cartoesFaltaVermelho > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)', fontWeight: r.cartoesFaltaVermelho > 0 ? 700 : 400 }}>
+                  {r.cartoesFaltaVermelho || '—'}
                 </td>
               </tr>
             );
@@ -366,7 +385,8 @@ export function CartoesClient({
                 </span>
               </h3>
               <p style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-                A 1 cartão amarelo de cumprir suspensão (2, 5, 8, 11...).
+                A 1 cartão amarelo de cumprir suspensão (2, 5, 8, 11...). Ordenado por número de cartões
+                e, dentro do mesmo número, agrupado por time (ordem alfabética).
               </p>
               {pendurados.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Ninguém pendurado no momento.</p>
@@ -431,10 +451,12 @@ export function CartoesClient({
             🥊 Faltas e Desarmes
           </h2>
           <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 780 }}>
-            Índice FS/FC = faltas sofridas ÷ faltas cometidas. Índice Desarme = Tk ÷ (Tk + FC). As duas últimas
-            colunas contam cartões amarelos/vermelhos cujo motivo foi lançado exatamente como &quot;Falta
-            Técnica&quot; ou &quot;Falta Grave&quot; (o campo Motivo do cartão é texto livre). Dados vêm das
-            estatísticas lançadas na aba Stats de cada partida (Admin → Partida → Eventos → Stats).
+            Tabela ordenada por <strong style={{ color: 'var(--verde)' }}>Tk (desarmes)</strong> — destacado na coluna
+            central — e, em caso de empate, por FC. Índice FS/FC = faltas sofridas ÷ faltas cometidas.
+            Índice Desarme = Tk ÷ (Tk + FC). As duas últimas colunas contam cartões amarelos/vermelhos cujo
+            motivo comece com &quot;Falta&quot; (ex.: &quot;Falta tática&quot;, &quot;Falta violenta&quot;,
+            &quot;Falta violenta grave&quot;). Dados vêm das estatísticas lançadas na aba Stats de cada
+            partida (Admin → Partida → Eventos → Stats).
           </p>
           <FaltasDesarmesTable dados={faltasDesarmes} times={times} />
         </section>
