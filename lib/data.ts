@@ -182,12 +182,8 @@ export function uid() {
 export { formatDate } from './utils';
 
 // NOTE: A função `zonaClassificacao` foi removida deste arquivo.
-// Havia aqui uma versão hardcoded (Lib 1-5, Sula 6-11, Reb >=17), diferente
-// da versão de `lib/utils.ts` (Lib 1-4, Sula 5-6, Reb >=18) e também
-// diferente da usada de fato pela tela de Tabela. A única fonte de verdade
-// agora é `lib/config.ts`, que recebe as vagas configuradas em
-// /admin/config: zonaClassificacao(posicao, timeId, config, totalTimes).
-// Importe de '@/lib/config' quando precisar dessa lógica.
+// A única fonte de verdade é `lib/config.ts`, que recebe as vagas
+// configuradas em /admin/config: zonaClassificacao(posicao, timeId, config, totalTimes).
 
 // ── Peso dos gols na pontuação da partida ────────────────────────────────
 // Cada gol "vale" a fração dos pontos que o resultado deu ao time, dividida
@@ -371,34 +367,41 @@ export function somaStatsOptaPorJogador(partidas: Partida[]): Record<string, Sta
 //   já sugeridas nos chips da aba Gols (Admin → Partida → Eventos → Gols).
 //   O vínculo com escanteios (Crn) usa "Cabeceio em escanteio"; o vínculo
 //   com cruzamentos (C) usa "Cabeceio após cruzamento".
-// - "Falta Técnica" e "Falta Grave" NÃO fazem parte da lista de motivos
-//   sugeridos hoje (que tem "Falta tática", "Falta violenta" etc.) — o
-//   campo "Motivo" do cartão é texto livre, então esses vínculos contam
-//   apenas cartões cujo motivo tenha sido digitado exatamente como
-//   "Falta Técnica" ou "Falta Grave" (sem diferenciar maiúsculas/minúsculas
-//   ou espaços nas pontas). Se quiser ampliar a lista de motivos sugeridos
-//   nos chips do admin para incluir esses dois, é só avisar.
+// - Cartões "por falta": o campo Motivo do cartão é texto livre, mas os
+//   chips sugeridos no admin (Admin → Partida → Eventos → Cartões) incluem
+//   "Falta tática" e "Falta violenta" (amarelo) e "Falta violenta grave"
+//   (vermelho). Antes esta função comparava o motivo com o texto exato
+//   "falta técnica" ou "falta grave" — opções que **não existem** na lista
+//   de chips do admin, então a contagem sempre vinha zerada. O critério
+//   agora é: o motivo (normalizado) COMEÇA com a palavra "falta". Isso
+//   cobre qualquer variação futura de motivo de falta sem exigir texto
+//   idêntico. Motivos onde "falta" aparece no meio da frase — como
+//   "Negação de gol com falta (DOGSO)" — não entram aqui, pois descrevem
+//   outra infração, não uma falta em si.
 export interface VinculoJogador {
-  assist_gol_escanteio: number;                // assistências em gols com descrição "Cabeceio em escanteio"
-  assist_gol_cruzamento: number;                // assistências em gols com descrição "Cabeceio após cruzamento"
-  cartoes_falta_tecnica_grave_amarelo: number;  // cartões amarelos com motivo "Falta Técnica" ou "Falta Grave"
-  cartoes_falta_tecnica_grave_vermelho: number; // cartões vermelhos com motivo "Falta Técnica" ou "Falta Grave"
+  assist_gol_escanteio: number;   // assistências em gols com descrição "Cabeceio em escanteio"
+  assist_gol_cruzamento: number;  // assistências em gols com descrição "Cabeceio após cruzamento"
+  cartoes_falta_amarelo: number;  // cartões amarelos cujo motivo começa com "Falta" (tática, violenta...)
+  cartoes_falta_vermelho: number; // cartões vermelhos cujo motivo começa com "Falta" (violenta grave...)
 }
 
 const DESC_GOL_ESCANTEIO = 'cabeceio em escanteio';
 const DESC_GOL_CRUZAMENTO = 'cabeceio após cruzamento';
-const MOTIVOS_FALTA_TECNICA_GRAVE = new Set(['falta técnica', 'falta grave']);
 
 function normalizarTexto(s: string | null | undefined): string {
   return (s ?? '').trim().toLowerCase();
+}
+
+function motivoEhFalta(motivo: string | null | undefined): boolean {
+  return normalizarTexto(motivo).startsWith('falta');
 }
 
 function vinculoVazio(): VinculoJogador {
   return {
     assist_gol_escanteio: 0,
     assist_gol_cruzamento: 0,
-    cartoes_falta_tecnica_grave_amarelo: 0,
-    cartoes_falta_tecnica_grave_vermelho: 0,
+    cartoes_falta_amarelo: 0,
+    cartoes_falta_vermelho: 0,
   };
 }
 
@@ -419,10 +422,9 @@ export function calcularVinculosJogadores(partidas: Partida[]): Record<string, V
     }
     for (const c of p.cartoes) {
       if (!c.jogador_id || c.jogador_id === '__tecnico__') continue; // cartão de técnico não conta aqui
-      const motivo = normalizarTexto(c.motivo);
-      if (!MOTIVOS_FALTA_TECNICA_GRAVE.has(motivo)) continue;
-      if (c.tipo === 'amarelo') get(c.jogador_id).cartoes_falta_tecnica_grave_amarelo++;
-      else if (c.tipo === 'vermelho') get(c.jogador_id).cartoes_falta_tecnica_grave_vermelho++;
+      if (!motivoEhFalta(c.motivo)) continue;
+      if (c.tipo === 'amarelo') get(c.jogador_id).cartoes_falta_amarelo++;
+      else if (c.tipo === 'vermelho') get(c.jogador_id).cartoes_falta_vermelho++;
     }
   }
 
