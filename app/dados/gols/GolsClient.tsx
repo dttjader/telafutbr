@@ -116,7 +116,6 @@ export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols, de
   const [modalJogos, setModalJogos] = useState<{ titulo: string; itens: GolDetalhe[] } | null>(null);
 
   const maxCategoria = Math.max(...categorias.map(c => c.gols), 1);
-  const maxNumero = Math.max(...golsPorNumero.map(n => n.gols), 1);
   const maxDescricao = Math.max(...descricoesGolsNormais.map(d => d.quantidade), 1);
 
   // ── Tabela de tempo: totais gerais + agrupamento 1º/2º tempo ────────────────
@@ -139,33 +138,31 @@ export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols, de
     };
   }, [segmentos]);
 
-  const linhaSegmento = (seg: SegmentoTempo) => (
-    <tr key={seg.label} style={{ borderBottom: '1px solid #1a1a1a' }}>
-      <td style={{ padding: '.6rem .75rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{seg.label}&apos;</td>
-      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.15rem', color: 'var(--amarelo)' }}>{seg.gols}</div>
-        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(seg.gols, tempoStats.totalGolsSeg).toFixed(1)}%</div>
-      </td>
-      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.15rem', color: '#60a5fa' }}>{seg.assistencias}</div>
-        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(seg.assistencias, tempoStats.totalAstSeg).toFixed(1)}%</div>
-      </td>
-    </tr>
-  );
+  // Colunas da tabela invertida: os 8 blocos de tempo, com uma coluna de
+  // resumo "1º Tempo" inserida após o bloco 45+ e "2º Tempo" após o 90+ —
+  // mesmo agrupamento que a versão anterior mostrava como linhas.
+  interface ColunaTempo {
+    label: string;
+    gols: number;
+    assistencias: number;
+    isGrupo: boolean;
+  }
+  const colunasTempo: ColunaTempo[] = useMemo(() => {
+    const seg = (s: SegmentoTempo): ColunaTempo => ({ label: s.label, gols: s.gols, assistencias: s.assistencias, isGrupo: false });
+    const grupo = (label: string, dados: { gols: number; assistencias: number }): ColunaTempo => ({ label, gols: dados.gols, assistencias: dados.assistencias, isGrupo: true });
+    return [
+      ...segmentos.slice(0, 4).map(seg),
+      grupo('1º Tempo', tempoStats.primeiroTempo),
+      ...segmentos.slice(4, 8).map(seg),
+      grupo('2º Tempo', tempoStats.segundoTempo),
+    ];
+  }, [segmentos, tempoStats]);
 
-  const linhaGrupo = (label: string, grupo: { gols: number; assistencias: number }) => (
-    <tr key={label} style={{ background: 'rgba(0,168,79,.06)', borderBottom: '2px solid var(--verde)', borderTop: '1px solid var(--verde)' }}>
-      <td style={{ padding: '.6rem .75rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem', color: 'var(--verde)' }}>{label}</td>
-      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.25rem', color: 'var(--verde)' }}>{grupo.gols}</div>
-        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(grupo.gols, tempoStats.totalGolsSeg).toFixed(1)}%</div>
-      </td>
-      <td style={{ textAlign: 'center', padding: '.6rem .75rem' }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.25rem', color: 'var(--verde)' }}>{grupo.assistencias}</div>
-        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{tempoStats.pct(grupo.assistencias, tempoStats.totalAstSeg).toFixed(1)}%</div>
-      </td>
-    </tr>
-  );
+  const colunaStyle = (isGrupo: boolean): React.CSSProperties => isGrupo ? {
+    background: 'rgba(0,168,79,.06)',
+    borderLeft: '1px solid var(--verde)',
+    borderRight: '1px solid var(--verde)',
+  } : {};
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -293,7 +290,7 @@ export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols, de
           )}
         </section>
 
-        {/* 2. Gols e assistências por parte do tempo — tabela */}
+        {/* 2. Gols e assistências por parte do tempo — linhas = Gols/Assistências, colunas = blocos de tempo */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.6rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             ⏱️ Gols e Assistências por Parte do Tempo
@@ -302,33 +299,78 @@ export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols, de
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
               <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
                 <tr>
-                  {['Parte do Tempo', 'Gols', 'Assistências'].map(h => (
-                    <th key={h} style={{ padding: '.65rem .75rem', textAlign: h === 'Parte do Tempo' ? 'left' : 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.88rem', letterSpacing: '.06em', color: 'var(--text-muted)' }}>{h}</th>
+                  <th style={{ padding: '.65rem .75rem', textAlign: 'left', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.88rem', letterSpacing: '.06em', color: 'var(--text-muted)' }} />
+                  {colunasTempo.map(col => (
+                    <th key={col.label} style={{
+                      padding: '.65rem .6rem', textAlign: 'center',
+                      fontFamily: "'Bebas Neue',sans-serif",
+                      fontSize: col.isGrupo ? '1rem' : '.88rem',
+                      letterSpacing: '.06em',
+                      color: col.isGrupo ? 'var(--verde)' : 'var(--text-muted)',
+                      whiteSpace: 'nowrap',
+                      ...colunaStyle(col.isGrupo),
+                    }}>
+                      {col.isGrupo ? col.label : `${col.label}'`}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {segmentos.slice(0, 4).map(linhaSegmento)}
-                {linhaGrupo('1º Tempo', tempoStats.primeiroTempo)}
-                {segmentos.slice(4, 8).map(linhaSegmento)}
-                {linhaGrupo('2º Tempo', tempoStats.segundoTempo)}
+                <tr style={{ borderBottom: '1px solid #1a1a1a' }}>
+                  <td style={{ padding: '.6rem .75rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem', color: 'var(--amarelo)', whiteSpace: 'nowrap' }}>
+                    ⚽ Gols
+                  </td>
+                  {colunasTempo.map(col => (
+                    <td key={col.label} style={{ textAlign: 'center', padding: '.6rem .6rem', ...colunaStyle(col.isGrupo) }}>
+                      <div style={{
+                        fontFamily: "'Bebas Neue',sans-serif",
+                        fontSize: col.isGrupo ? '1.35rem' : '1.15rem',
+                        color: col.isGrupo ? 'var(--verde)' : 'var(--amarelo)',
+                      }}>
+                        {col.gols}
+                      </div>
+                      <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>
+                        {tempoStats.pct(col.gols, tempoStats.totalGolsSeg).toFixed(1)}%
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={{ padding: '.6rem .75rem', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem', color: '#60a5fa', whiteSpace: 'nowrap' }}>
+                    🎯 Assistências
+                  </td>
+                  {colunasTempo.map(col => (
+                    <td key={col.label} style={{ textAlign: 'center', padding: '.6rem .6rem', ...colunaStyle(col.isGrupo) }}>
+                      <div style={{
+                        fontFamily: "'Bebas Neue',sans-serif",
+                        fontSize: col.isGrupo ? '1.35rem' : '1.15rem',
+                        color: col.isGrupo ? 'var(--verde)' : '#60a5fa',
+                      }}>
+                        {col.assistencias}
+                      </div>
+                      <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>
+                        {tempoStats.pct(col.assistencias, tempoStats.totalAstSeg).toFixed(1)}%
+                      </div>
+                    </td>
+                  ))}
+                </tr>
               </tbody>
             </table>
           </div>
         </section>
 
-        {/* 3. Gols por número da camisa */}
+        {/* 3. Gols por número da camisa — cards clicáveis */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.6rem', marginBottom: '.25rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             👕 Gols por Número da Camisa
           </h2>
           <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Considera o número usado por cada jogador em cada partida específica (escalação), não o número atual do cadastro. Clique em um número para ver os jogos.
+            Considera o número usado por cada jogador em cada partida específica (escalação), não o número atual do cadastro. Clique em um card para ver os jogos.
           </p>
           {golsPorNumero.length === 0 ? (
             <p style={{ color: 'var(--text-muted)', padding: '2rem 0' }}>Nenhum gol registrado ainda.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: '.6rem' }}>
               {golsPorNumero.map((n, i) => {
                 const destaque = i < 3;
                 return (
@@ -336,29 +378,27 @@ export function GolsClient({ categorias, segmentos, golsPorNumero, totalGols, de
                     key={n.numero}
                     onClick={() => setModalJogos({ titulo: `Camisa ${n.numero}`, itens: n.jogos })}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '.85rem', cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left',
+                      textAlign: 'center', cursor: 'pointer', font: 'inherit', color: 'inherit',
                       background: destaque ? 'rgba(255,223,0,.04)' : 'var(--surface)',
                       border: `1px solid ${destaque ? 'rgba(255,223,0,.25)' : 'var(--border)'}`,
-                      borderRadius: 10, padding: '.7rem 1rem',
+                      borderRadius: 10, padding: '.85rem .5rem',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.35rem',
+                      transition: 'border-color .15s',
                     }}
                   >
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', minWidth: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-                      {medalha(i)}
-                    </span>
+                    {destaque && <span style={{ fontSize: '.68rem', lineHeight: 1 }}>{medalha(i)}</span>}
                     <span style={{
-                      width: 38, height: 38, borderRadius: '50%', background: 'var(--surface2)', border: '2px solid var(--verde)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 38, height: 38, borderRadius: '50%', background: 'var(--surface2)',
+                      border: '2px solid var(--verde)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--verde)', flexShrink: 0,
                     }}>
                       {n.numero}
                     </span>
-                    <div style={{ flex: 1, minWidth: 60 }}>
-                      <div style={{ background: 'var(--surface2)', borderRadius: 3, height: 6 }}>
-                        <div style={{ width: `${(n.gols / maxNumero) * 100}%`, height: '100%', background: 'var(--verde)', borderRadius: 3 }} />
-                      </div>
-                    </div>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.3rem', color: 'var(--amarelo)', minWidth: 40, textAlign: 'right' }}>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.4rem', color: 'var(--amarelo)', lineHeight: 1 }}>
                       {n.gols}
+                    </span>
+                    <span style={{ fontSize: '.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                      {n.gols === 1 ? 'gol' : 'gols'}
                     </span>
                   </button>
                 );
