@@ -6,7 +6,7 @@ import { clientGetPartidas, clientGetTimes, clientUpsertPartida, clientDeletePar
 import { VincularPartidaApiFootball } from '@/components/VincularPartidaApiFootball';
 
 const STATUS_OPTS = [{value:'agendada',label:'Agendada'},{value:'ao_vivo',label:'Ao Vivo'},{value:'encerrada',label:'Encerrada'},{value:'adiada',label:'Adiada'}];
-const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_casa_id:'',time_visitante_id:'',estadio_id:'',placar_casa:'0',placar_visitante:'0',publico:'',acrescimo_primeiro:'0',acrescimo_segundo:'0',arb_principal:'',arb_ass1:'',arb_ass2:'',arb_quarto:'',arb_var:'',tecnico_casa_id:'',tecnico_visitante_id:'',link_transfermarkt:'',link_cbf:'',link_opta:''});
+const emptyForm = () => ({rodada:'',data:'',hora:'16:00',status:'agendada',time_casa_id:'',time_visitante_id:'',estadio_id:'',placar_casa:'0',placar_visitante:'0',publico:'',acrescimo_primeiro:'0',acrescimo_segundo:'0',arb_principal:'',arb_ass1:'',arb_ass2:'',arb_quarto:'',arb_var:'',tecnico_casa_id:'',tecnico_visitante_id:'',link_transfermarkt:'',link_cbf:'',link_adendo:'',link_opta:''});
 
 const PSEUDO_IDS = new Set(['outros']);
 const filtrarTimesReais = (times: Time[]) => times.filter(t => !PSEUDO_IDS.has(t.id));
@@ -78,6 +78,7 @@ export default function AdminPartidas() {
         arbitragem:{principal:form.arb_principal,assistente1:form.arb_ass1,assistente2:form.arb_ass2,quarto:form.arb_quarto,var:form.arb_var},
         link_transfermarkt: form.link_transfermarkt.trim() || undefined,
         link_cbf: form.link_cbf.trim() || undefined,
+        link_adendo: form.link_adendo.trim() || undefined,
         link_opta: form.link_opta.trim() || undefined,
         escalacao_casa: existente?.escalacao_casa ?? [],
         escalacao_visitante: existente?.escalacao_visitante ?? [],
@@ -93,7 +94,7 @@ export default function AdminPartidas() {
   };
 
   const edit=(p:Partida)=>{
-    setForm({rodada:p.rodada.toString(),data:p.data,hora:p.hora,status:p.status,time_casa_id:p.time_casa_id,time_visitante_id:p.time_visitante_id,estadio_id:p.estadio_id,publico:p.publico.toString(),placar_casa:p.placar_casa.toString(),placar_visitante:p.placar_visitante.toString(),acrescimo_primeiro:p.acrescimo_primeiro.toString(),acrescimo_segundo:p.acrescimo_segundo.toString(),arb_principal:p.arbitragem.principal,arb_ass1:p.arbitragem.assistente1,arb_ass2:p.arbitragem.assistente2,arb_quarto:p.arbitragem.quarto,arb_var:p.arbitragem.var,tecnico_casa_id:p.tecnico_casa_id??'',tecnico_visitante_id:p.tecnico_visitante_id??'',link_transfermarkt:p.link_transfermarkt??'',link_cbf:p.link_cbf??'',link_opta:p.link_opta??''});
+    setForm({rodada:p.rodada.toString(),data:p.data,hora:p.hora,status:p.status,time_casa_id:p.time_casa_id,time_visitante_id:p.time_visitante_id,estadio_id:p.estadio_id,publico:p.publico.toString(),placar_casa:p.placar_casa.toString(),placar_visitante:p.placar_visitante.toString(),acrescimo_primeiro:p.acrescimo_primeiro.toString(),acrescimo_segundo:p.acrescimo_segundo.toString(),arb_principal:p.arbitragem.principal,arb_ass1:p.arbitragem.assistente1,arb_ass2:p.arbitragem.assistente2,arb_quarto:p.arbitragem.quarto,arb_var:p.arbitragem.var,tecnico_casa_id:p.tecnico_casa_id??'',tecnico_visitante_id:p.tecnico_visitante_id??'',link_transfermarkt:p.link_transfermarkt??'',link_cbf:p.link_cbf??'',link_adendo:p.link_adendo??'',link_opta:p.link_opta??''});
     setEditId(p.id); setShowForm(true); setMostrarTecnicosInativos(false); window.scrollTo({top:0,behavior:'smooth'});
   };
 
@@ -261,6 +262,13 @@ export default function AdminPartidas() {
               <div className="grid-3">
                 <div className="form-group" style={{margin:0}}><label>Link Transfermarkt</label><input type="url" placeholder="https://www.transfermarkt.com.br/..." value={form.link_transfermarkt} onChange={f('link_transfermarkt')} /></div>
                 <div className="form-group" style={{margin:0}}><label>Link CBF</label><input type="url" placeholder="https://www.cbf.com.br/..." value={form.link_cbf} onChange={f('link_cbf')} /></div>
+                <div className="form-group" style={{margin:0}}>
+                  <label>Link Adendo</label>
+                  <input type="url" placeholder="https://... (retificação/errata da súmula)" value={form.link_adendo} onChange={f('link_adendo')} />
+                  <span style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginTop: '.2rem', display: 'block' }}>
+                    Opcional — só preencha quando houver um adendo/errata publicado para esta partida.
+                  </span>
+                </div>
                 <div className="form-group" style={{margin:0}}><label>Link Opta</label><input type="url" placeholder="https://opta.com/..." value={form.link_opta} onChange={f('link_opta')} /></div>
               </div>
             </div>
@@ -305,10 +313,11 @@ export default function AdminPartidas() {
                       </div>
                       <div style={{fontSize:'.78rem',color:'var(--text-muted)'}}>{p.data ? p.data.split('-').reverse().join('/') : 'A definir'} · {p.hora} · {nomeEstadio(p.estadio_id)}</div>
                     </div>
-                    {(p.link_transfermarkt||p.link_cbf||p.link_opta) && (
+                    {(p.link_transfermarkt||p.link_cbf||p.link_adendo||p.link_opta) && (
                       <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap'}}>
                         {p.link_transfermarkt&&<a href={p.link_transfermarkt} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 TM</a>}
                         {p.link_cbf&&<a href={p.link_cbf} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 CBF</a>}
+                        {p.link_adendo&&<a href={p.link_adendo} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.3)',borderRadius:4,padding:'.15rem .45rem',color:'#f59e0b',textDecoration:'none',fontWeight:600}}>📎 Adendo</a>}
                         {p.link_opta&&<a href={p.link_opta} target="_blank" rel="noopener noreferrer" style={{fontSize:'.68rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,padding:'.15rem .45rem',color:'var(--text-muted)',textDecoration:'none'}}>🔗 Opta</a>}
                       </div>
                     )}
