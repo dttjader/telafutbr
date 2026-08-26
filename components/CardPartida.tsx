@@ -66,22 +66,40 @@ export function CardPartida({ partida, times, estadios }: Props) {
         {enc && partida.publico > 0 && <span>{partida.publico.toLocaleString('pt-BR')} presentes</span>}
       </div>
 
-      {partida.link_cbf && (
-        <div
-          role="link"
-          tabIndex={0}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(partida.link_cbf, '_blank', 'noopener,noreferrer'); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); window.open(partida.link_cbf, '_blank', 'noopener,noreferrer'); } }}
-          style={{
-            marginTop: '.6rem', fontSize: '.7rem', color: 'var(--verde)',
-            textDecoration: 'none', borderTop: '1px solid var(--border)',
-            paddingTop: '.5rem', cursor: 'pointer', display: 'inline-flex',
-            alignItems: 'center', gap: '.3rem',
-          }}
-        >
-          🔗 Súmula CBF
+      {(partida.link_cbf || partida.link_adendo) && (
+        <div style={{ marginTop: '.6rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '.5rem' }}>
+          {partida.link_cbf && (
+            <div
+              role="link"
+              tabIndex={0}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(partida.link_cbf, '_blank', 'noopener,noreferrer'); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); window.open(partida.link_cbf, '_blank', 'noopener,noreferrer'); } }}
+              style={{
+                fontSize: '.7rem', color: 'var(--verde)',
+                textDecoration: 'none', cursor: 'pointer', display: 'inline-flex',
+                alignItems: 'center', gap: '.3rem',
+              }}
+            >
+              🔗 Súmula CBF
+            </div>
+          )}
+          {partida.link_adendo && (
+            <div
+              role="link"
+              tabIndex={0}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(partida.link_adendo, '_blank', 'noopener,noreferrer'); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); window.open(partida.link_adendo, '_blank', 'noopener,noreferrer'); } }}
+              style={{
+                fontSize: '.7rem', color: '#f59e0b',
+                textDecoration: 'none', cursor: 'pointer', display: 'inline-flex',
+                alignItems: 'center', gap: '.3rem', fontWeight: 600,
+              }}
+            >
+              📎 Adendo
+            </div>
+          )}
         </div>
       )}
     </Link>
   );
-      }
+}
