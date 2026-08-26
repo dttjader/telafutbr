@@ -151,6 +151,9 @@ export interface Partida {
   stats_jogadores: StatsJogador[];
   link_transfermarkt?: string;
   link_cbf?: string;
+  // Link opcional para um adendo/errata da súmula — só existe em algumas
+  // partidas (ex: quando a CBF publica uma retificação após o jogo).
+  link_adendo?: string;
   link_opta?: string;
   api_football_id?: number | null;
 }
