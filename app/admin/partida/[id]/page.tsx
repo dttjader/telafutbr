@@ -1022,6 +1022,34 @@ export default function AdminPartidaEventos() {
           <span>{timeVis?.nome}</span>
           <span className="badge badge-cinza" style={{fontSize:'.8rem',fontFamily:'sans-serif'}}>{partida.rodada}ª Rodada</span>
         </div>
+        {(partida.link_transfermarkt || partida.link_cbf || partida.link_adendo || partida.link_opta) && (
+          <div style={{display:'flex',gap:'.5rem',flexWrap:'wrap',marginTop:'.75rem'}}>
+            {partida.link_transfermarkt && (
+              <a href={partida.link_transfermarkt} target="_blank" rel="noopener noreferrer"
+                style={{fontSize:'.72rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'.2rem .6rem',color:'var(--text-muted)',textDecoration:'none'}}>
+                🔗 Transfermarkt
+              </a>
+            )}
+            {partida.link_cbf && (
+              <a href={partida.link_cbf} target="_blank" rel="noopener noreferrer"
+                style={{fontSize:'.72rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'.2rem .6rem',color:'var(--text-muted)',textDecoration:'none'}}>
+                🔗 Súmula CBF
+              </a>
+            )}
+            {partida.link_adendo && (
+              <a href={partida.link_adendo} target="_blank" rel="noopener noreferrer"
+                style={{fontSize:'.72rem',background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.3)',borderRadius:5,padding:'.2rem .6rem',color:'#f59e0b',textDecoration:'none',fontWeight:600}}>
+                📎 Adendo
+              </a>
+            )}
+            {partida.link_opta && (
+              <a href={partida.link_opta} target="_blank" rel="noopener noreferrer"
+                style={{fontSize:'.72rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'.2rem .6rem',color:'var(--text-muted)',textDecoration:'none'}}>
+                🔗 Opta
+              </a>
+            )}
+          </div>
+        )}
       </div>
       {msg&&<div className="toast toast-success">{msg}</div>}
       {error&&<div className="toast toast-error">{error}</div>}
