@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const publicLinks = [
-  { href: '/',           label: 'Rodadas'    },
+  { href: '/rodadas',    label: 'Rodadas'    },
   { href: '/tabela',     label: 'Tabela'     },
   { href: '/confrontos', label: 'Confrontos' },
   { href: '/dados',      label: 'Dados'      },
@@ -45,7 +45,7 @@ export function Nav() {
     <header style={{ background: '#111', borderBottom: '3px solid var(--verde)', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 20px rgba(0,168,79,.15)' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
 
-        {/* Logo */}
+        {/* Logo — leva para a página Resumo (agora a página principal, "/") */}
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', textDecoration: 'none' }}>
           <span style={{ fontSize: '1.7rem', lineHeight: 1 }}>🇧🇷</span>
           <div>
