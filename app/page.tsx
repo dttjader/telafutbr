@@ -15,13 +15,13 @@ interface DiaResumo {
   jogos: Partida[];
 }
 
-// Gera os 7 dias da linha do tempo: 3 no passado, hoje, 3 no futuro
+// Gera os 5 dias da linha do tempo: 2 no passado, hoje, 2 no futuro (D-2 até D+2)
 function gerarDias(partidas: Partida[]): DiaResumo[] {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
   const dias: DiaResumo[] = [];
-  for (let offset = -3; offset <= 3; offset++) {
+  for (let offset = -2; offset <= 2; offset++) {
     const d = new Date(hoje);
     d.setDate(d.getDate() + offset);
     const y = d.getFullYear();
@@ -406,6 +406,20 @@ export default async function Home() {
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
+      <style>{`
+        .resumo-top5-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 1rem;
+          justify-content: flex-start;
+        }
+        @media (max-width: 480px) {
+          .resumo-top5-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: .6rem;
+          }
+        }
+      `}</style>
       <div style={{ background: 'linear-gradient(135deg,#0a0a0a 0%,#0d1f0d 50%,#0a0a0a 100%)', borderBottom: '1px solid var(--border)', padding: '2.5rem 0 2rem', marginBottom: '2rem' }}>
         <div className="container">
           <p style={{ fontSize: '.75rem', color: 'var(--verde)', textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, marginBottom: '.4rem' }}>Painel</p>
@@ -417,12 +431,12 @@ export default async function Home() {
       </div>
 
       <div className="container">
-        {/* 📅 Linha do tempo — 7 dias */}
+        {/* 📅 Linha do tempo — 5 dias (D-2 até D+2) */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             📅 Próximos Jogos
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '.6rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '.6rem' }}>
             {dias.map(dia => (
               <div key={dia.data} style={{
                 background: dia.isHoje ? 'rgba(0,168,79,.08)' : 'var(--surface)',
@@ -615,7 +629,7 @@ export default async function Home() {
           <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             🏅 Top 5
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 210px))', gap: '1rem', justifyContent: 'flex-start' }}>
+          <div className="resumo-top5-grid">
 
             {/* Top 5 Placares */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
