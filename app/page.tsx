@@ -1,4 +1,4 @@
-import { getPartidas, getTimes, getJogadores, getTecnicos, calcularPesoGols, somaPesoGolsPorJogador } from '@/lib/data';
+import { getPartidas, getTimes, getJogadores, getTecnicos, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador, calcularGolsSofridosPorJogador } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Partida, Jogador, Time } from '@/lib/types';
 
@@ -320,6 +320,31 @@ export default async function Home() {
 
   // Top 5 Goleiros (maior ciclo sem sofrer gol)
   const top5Ciclos = calcularTopCiclos(encerradas, jogadores, times);
+
+  // Top 5 Goleiros por SAV% — defesas (Sav, lançadas na aba Stats de cada
+  // partida) ÷ (defesas + gols sofridos). Mesma fórmula usada em
+  // Dados/Goleiros → "Aproveitamento (SAV%)". Aqui mostramos só o percentual.
+  const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
+  const golsSofridosPorJogador = calcularGolsSofridosPorJogador(partidas);
+  const top5SavPct = jogadores
+    .filter(j => j.posicao === 'GOL')
+    .map(j => {
+      const sav = statsOptaPorJogador[j.id]?.Sav ?? 0;
+      const golsSofridos = golsSofridosPorJogador[j.id] ?? 0;
+      const den = sav + golsSofridos;
+      const time = times.find(t => t.id === j.time_atual);
+      return {
+        jogador_id: j.id,
+        nome: j.nome,
+        time_id: j.time_atual,
+        timeSigla: time?.sigla ?? '—',
+        savPct: den > 0 ? (sav / den) * 100 : -1,
+        den,
+      };
+    })
+    .filter(g => g.den > 0)
+    .sort((a, b) => b.savPct - a.savPct)
+    .slice(0, 5);
 
   // Top 5 Técnicos por aproveitamento — só entre os que já dirigiram em mais
   // da metade das rodadas disputadas até aqui
@@ -688,6 +713,30 @@ export default async function Home() {
                       <EscudoTime time={time} size={20} />
                       <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
                       <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>{g.maiorCiclo}&apos;</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Top 5 Goleiros (SAV%) */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🥅 Top 5 Goleiros (SAV%)</h3>
+              <p style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '.6rem' }}>
+                Defesas ÷ (defesas + gols sofridos) — lançadas na aba Stats
+              </p>
+              {top5SavPct.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5SavPct.map((g, i) => {
+                  const time = times.find(t => t.id === g.time_id);
+                  return (
+                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={time} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>
+                        {g.savPct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                      </span>
                     </div>
                   );
                 })}
