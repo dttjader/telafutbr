@@ -61,6 +61,28 @@ function th(align: 'left' | 'center', extra?: React.CSSProperties): React.CSSPro
 
 const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
+// Minutos jogados por um jogador em uma partida (mesma lógica usada em
+// Dados/Analítico e Dados/Times) — usado para calcular o índice
+// "Passes por Minuto" no Resumo.
+function calcularMinutosJogador(jogadorId: string, partida: Partida, ehTitular: boolean): number {
+  const acr1 = partida.acrescimo_primeiro ?? 0;
+  const acr2 = partida.acrescimo_segundo ?? 0;
+  const totalPartida = 45 + acr1 + 45 + acr2;
+  const vermelho = partida.cartoes.find(c => c.jogador_id === jogadorId && c.tipo === 'vermelho');
+  const minutoVermelho = vermelho?.minuto ?? Infinity;
+  if (ehTitular) {
+    const sub = partida.substituicoes.find(s => s.sai_id === jogadorId);
+    const minutoSaida = sub ? Math.min(sub.minuto, minutoVermelho) : minutoVermelho;
+    return Math.min(minutoSaida, totalPartida);
+  } else {
+    const entrada = partida.substituicoes.find(s => s.entra_id === jogadorId);
+    if (!entrada) return 0;
+    const sub = partida.substituicoes.find(s => s.sai_id === jogadorId);
+    const minutoSaida = sub ? Math.min(sub.minuto, minutoVermelho) : minutoVermelho;
+    return Math.min(minutoSaida, totalPartida) - entrada.minuto;
+  }
+}
+
 // Maior ciclo de minutos sem sofrer gols de cada goleiro (mesma lógica de
 // app/dados/goleiros, mas retornando só o recorde — usado no Top 5 do Resumo).
 function calcularTopCiclos(encerradas: Partida[], jogadores: Jogador[], times: Time[], limite = 5) {
@@ -318,14 +340,54 @@ export default async function Home() {
     .sort((a, b) => b.pontuacao - a.pontuacao)
     .slice(0, 5);
 
+  // Estatísticas Opta (aba Stats) — usadas no índice Passes/Minuto e no SAV%.
+  const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
+  const golsSofridosPorJogador = calcularGolsSofridosPorJogador(partidas);
+
+  // Minutos totais por jogador (mesma lógica usada em Dados/Analítico) —
+  // usado para calcular o índice "Passes por Minuto" abaixo.
+  const minutosPorJogador: Record<string, number> = {};
+  for (const p of encerradas) {
+    const todosEscalados = [
+      ...p.escalacao_casa.map(e => ({ ...e })),
+      ...p.escalacao_visitante.map(e => ({ ...e })),
+    ];
+    for (const esc of todosEscalados) {
+      const mins = calcularMinutosJogador(esc.jogador_id, p, esc.titular);
+      if (mins === 0 && !esc.titular) continue;
+      minutosPorJogador[esc.jogador_id] = (minutosPorJogador[esc.jogador_id] ?? 0) + mins;
+    }
+  }
+
+  // Top 5 Passes por Minuto — Passes (P, lançados na aba Stats) ÷ minutos
+  // jogados, sem converter para a base de 90 minutos. Considera apenas
+  // jogadores com mais de 100 passes (P > 100), por enquanto, para evitar
+  // amostras pequenas distorcerem o ranking.
+  const top5PassesMinuto = jogadores
+    .map(j => {
+      const passes = statsOptaPorJogador[j.id]?.P ?? 0;
+      const minutos = minutosPorJogador[j.id] ?? 0;
+      const time = times.find(t => t.id === j.time_atual);
+      return {
+        jogador_id: j.id,
+        nome: j.nome,
+        time_id: j.time_atual,
+        timeSigla: time?.sigla ?? '—',
+        passes,
+        minutos,
+        indice: minutos > 0 ? passes / minutos : 0,
+      };
+    })
+    .filter(j => j.passes > 100 && j.minutos > 0)
+    .sort((a, b) => b.indice - a.indice)
+    .slice(0, 5);
+
   // Top 5 Goleiros (maior ciclo sem sofrer gol)
   const top5Ciclos = calcularTopCiclos(encerradas, jogadores, times);
 
   // Top 5 Goleiros por SAV% — defesas (Sav, lançadas na aba Stats de cada
   // partida) ÷ (defesas + gols sofridos). Mesma fórmula usada em
   // Dados/Goleiros → "Aproveitamento (SAV%)". Aqui mostramos só o percentual.
-  const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
-  const golsSofridosPorJogador = calcularGolsSofridosPorJogador(partidas);
   const top5SavPct = jogadores
     .filter(j => j.posicao === 'GOL')
     .map(j => {
@@ -708,6 +770,30 @@ export default async function Home() {
                       <EscudoTime time={time} size={20} />
                       <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{jog?.nome ?? a.jogador_id}</span>
                       <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#60a5fa' }}>{a.quantidade}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Top 5 Passes/Minuto */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>📨 Top 5 Passes/Minuto</h3>
+              <p style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '.6rem' }}>
+                Passes ÷ minutos jogados · só jogadores com mais de 100 passes
+              </p>
+              {top5PassesMinuto.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5PassesMinuto.map((g, i) => {
+                  const time = times.find(t => t.id === g.time_id);
+                  return (
+                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={time} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#a78bfa' }}>
+                        {g.indice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                   );
                 })}
