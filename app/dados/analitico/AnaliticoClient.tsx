@@ -291,13 +291,17 @@ function EscanteiosCruzamentoTable({ dados, times }: { dados: StatJogador[]; tim
   );
 }
 
+// Tabela de Passes por 90 Minutos + Passes por Minuto (raw, sem converter
+// para base de 90). Passes/90 e Passes/Minuto seguem exatamente a mesma
+// ordenação (um é múltiplo escalar do outro) — por isso a mesma lista já
+// ordenada (dadosPasses90) serve para as duas colunas.
 function PassesPorNoventaTable({ dados, times }: { dados: StatJogador[]; times: Time[] }) {
   return (
     <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
         <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
           <tr>
-            {['Jogador', 'Time', 'Passes (P)', 'Minutos', 'Passes/90'].map(h => (
+            {['Jogador', 'Time', 'Passes (P)', 'Minutos', 'Passes/90', 'Passes/Minutos'].map(h => (
               <th key={h} style={{
                 padding: '.55rem .6rem',
                 textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
@@ -309,11 +313,12 @@ function PassesPorNoventaTable({ dados, times }: { dados: StatJogador[]; times: 
         </thead>
         <tbody>
           {dados.length === 0 ? (
-            <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com passes registrados.</td></tr>
+            <tr><td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com passes registrados.</td></tr>
           ) : dados.map((s, i) => {
             const time = times.find(t => t.id === s.jogador.time_atual);
             const o = s.stats_opta;
-            const p90 = s.minutos > 0 ? (o.P / s.minutos) * 90 : 0;
+            const porMinuto = s.minutos > 0 ? o.P / s.minutos : 0;
+            const p90 = porMinuto * 90;
             return (
               <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
                 <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{s.jogador.nome}</td>
@@ -327,6 +332,9 @@ function PassesPorNoventaTable({ dados, times }: { dados: StatJogador[]; times: 
                 <td style={{ textAlign: 'center', color: 'var(--amarelo)' }}>{s.minutos}</td>
                 <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>
                   {p90.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                </td>
+                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>
+                  {porMinuto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>
             );
@@ -753,11 +761,12 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
             <EscanteiosCruzamentoTable dados={dadosEscanteiosCruz} times={times} />
           </div>
 
-          {/* Passes por 90 minutos */}
+          {/* Passes por 90 minutos + Passes por Minuto */}
           <div style={{ marginBottom: '1rem' }}>
             <h3 style={{ fontSize: '1.15rem', color: 'var(--verde)', marginBottom: '.4rem' }}>🎯 Passes por 90 Minutos</h3>
             <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-              Passes/90 = (total de passes ÷ minutos jogados) × 90.
+              Passes/90 = (total de passes ÷ minutos jogados) × 90. Passes/Minutos = total de passes ÷ minutos
+              jogados, sem converter para a base de 90 minutos.
             </p>
             <PassesPorNoventaTable dados={dadosPasses90} times={times} />
           </div>
