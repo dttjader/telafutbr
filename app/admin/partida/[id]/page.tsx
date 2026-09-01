@@ -736,17 +736,17 @@ function EscalacaoTab({
 // Ordem: Crn | S, SoT, SB | P | C, Tk, Off | FC, FS | Sav — "Validado" fica
 // como a última coluna da tabela.
 const STAT_COLS: { key: keyof Omit<StatsJogador, 'jogador_id' | 'validado'>; label: string; title: string; max: number; sep?: boolean }[] = [
-  { key: 'Crn', label: 'Crn', title: 'Escanteios a favor',         max: 20, sep: true },
-  { key: 'S',   label: 'S',   title: 'Finalizações',              max: 20 },
-  { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo',       max: 20 },
-  { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas',    max: 20, sep: true },
+  { key: 'Crn', label: 'Crn', title: 'Escanteios a favor',         max: 30, sep: true },
+  { key: 'S',   label: 'S',   title: 'Finalizações',              max: 30 },
+  { key: 'SoT', label: 'SoT', title: 'Finalizações no Alvo',       max: 30 },
+  { key: 'SB',  label: 'SB',  title: 'Finalizações Bloqueadas',    max: 30, sep: true },
   { key: 'P',   label: 'P',   title: 'Passes',                     max: 150, sep: true },
-  { key: 'C',   label: 'C',   title: 'Cruzamentos',                max: 20 },
-  { key: 'Tk',  label: 'Tk',  title: 'Desarmes',                   max: 20 },
-  { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 20, sep: true },
-  { key: 'FC',  label: 'FC',  title: 'Faltas Cometidas',           max: 20 },
-  { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas',            max: 20, sep: true },
-  { key: 'Sav', label: 'Sav', title: 'Defesas (somente Goleiros)', max: 20 },
+  { key: 'C',   label: 'C',   title: 'Cruzamentos',                max: 30 },
+  { key: 'Tk',  label: 'Tk',  title: 'Desarmes',                   max: 30 },
+  { key: 'Off', label: 'Off', title: 'Impedimentos',               max: 30, sep: true },
+  { key: 'FC',  label: 'FC',  title: 'Faltas Cometidas',           max: 30 },
+  { key: 'FS',  label: 'FS',  title: 'Faltas Sofridas',            max: 30, sep: true },
+  { key: 'Sav', label: 'Sav', title: 'Defesas (somente Goleiros)', max: 30 },
 ];
 
 const SEP_BORDER = '2px solid var(--verde)';
