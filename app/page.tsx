@@ -62,8 +62,8 @@ function th(align: 'left' | 'center', extra?: React.CSSProperties): React.CSSPro
 const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
 // Minutos jogados por um jogador em uma partida (mesma lógica usada em
-// Dados/Analítico e Dados/Times) — usado para calcular o índice
-// "Passes por Minuto" no Resumo.
+// Dados/Analítico e Dados/Times) — usado para calcular os índices
+// "Gols/90 min" e "Passes por Minuto" no Resumo.
 function calcularMinutosJogador(jogadorId: string, partida: Partida, ehTitular: boolean): number {
   const acr1 = partida.acrescimo_primeiro ?? 0;
   const acr2 = partida.acrescimo_segundo ?? 0;
@@ -345,7 +345,7 @@ export default async function Home() {
   const golsSofridosPorJogador = calcularGolsSofridosPorJogador(partidas);
 
   // Minutos totais por jogador (mesma lógica usada em Dados/Analítico) —
-  // usado para calcular o índice "Passes por Minuto" abaixo.
+  // usado para calcular os índices "Gols/90 min" e "Passes por Minuto" abaixo.
   const minutosPorJogador: Record<string, number> = {};
   for (const p of encerradas) {
     const todosEscalados = [
@@ -358,6 +358,26 @@ export default async function Home() {
       minutosPorJogador[esc.jogador_id] = (minutosPorJogador[esc.jogador_id] ?? 0) + mins;
     }
   }
+
+  // Top 5 Gols p/90 min — mesma lógica usada em Dados/Artilharia: gols ÷
+  // minutos jogados × 90, considerando apenas jogadores com pelo menos 90
+  // minutos em campo.
+  const top5G90 = Object.values(artMap)
+    .map(a => {
+      const jog = jogadores.find(j => j.id === a.jogador_id);
+      const minutos = minutosPorJogador[a.jogador_id] ?? 0;
+      return {
+        jogador_id: a.jogador_id,
+        nome: jog?.nome ?? a.jogador_id,
+        time_id: a.time_id,
+        gols: a.quantidade,
+        minutos,
+        g90: minutos > 0 ? (a.quantidade / minutos) * 90 : 0,
+      };
+    })
+    .filter(j => j.minutos >= 90 && j.gols > 0)
+    .sort((a, b) => b.g90 - a.g90)
+    .slice(0, 5);
 
   // Top 5 Passes por Minuto — Passes (P, lançados na aba Stats) ÷ minutos
   // jogados, sem converter para a base de 90 minutos. Considera apenas
@@ -749,6 +769,30 @@ export default async function Home() {
                       <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{jog?.nome ?? a.jogador_id}</span>
                       <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#a78bfa' }}>
                         {a.pontuacao.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Top 5 Gols p/90 min */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>⚡ Top 5 Gols p/90 min</h3>
+              <p style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '.6rem' }}>
+                Só jogadores com pelo menos 90 minutos em campo
+              </p>
+              {top5G90.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5G90.map((g, i) => {
+                  const time = times.find(t => t.id === g.time_id);
+                  return (
+                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={time} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--amarelo)' }}>
+                        {g.g90.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   );
