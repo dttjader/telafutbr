@@ -1,6 +1,6 @@
 import { getPartidas, getTimes, getJogadores, getTecnicos, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador, calcularGolsSofridosPorJogador } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
-import { Partida, Jogador, Time } from '@/lib/types';
+import { Partida, Jogador, Time, Tecnico } from '@/lib/types';
 
 // Página principal do site — mostra o painel Resumo, alimentado por versões
 // condensadas das outras telas do site. Novas seções devem ser adicionadas
@@ -179,6 +179,118 @@ function calcularTopCiclos(encerradas: Partida[], jogadores: Jogador[], times: T
   return resultados.sort((a, b) => b.maiorCiclo - a.maiorCiclo).slice(0, limite);
 }
 
+// ── Suspensos para a próxima rodada ──────────────────────────────────────────
+// Mesma lógica usada em Dados/Cartões: cartão vermelho ou 3º/6º/9º... amarelo
+// recebido na última partida disputada pelo time = suspenso para o próximo jogo.
+interface EventoCartaoResumo {
+  partidaId: string;
+  rodada: number;
+  data: string;
+}
+
+interface SuspensoResumo {
+  nome: string;
+  tipo: 'Jogador' | 'Técnico';
+  timeId: string;
+  timeSigla: string;
+  motivo: string;
+}
+
+function calcularSuspensos(
+  encerradas: Partida[], times: Time[], jogadores: Jogador[], tecnicos: Tecnico[],
+): SuspensoResumo[] {
+  const jogadorCartoes: Record<string, { amarelos: EventoCartaoResumo[]; vermelhos: EventoCartaoResumo[] }> = {};
+  const tecnicoCartoes: Record<string, { amarelos: EventoCartaoResumo[]; vermelhos: EventoCartaoResumo[] }> = {};
+
+  for (const p of encerradas) {
+    for (const c of p.cartoes) {
+      const tipoStr = c.tipo as string;
+      const tecnicoId = (c as { tecnico_id?: string }).tecnico_id;
+      const evento: EventoCartaoResumo = { partidaId: p.id, rodada: p.rodada, data: p.data };
+
+      if (tipoStr === 'amarelo') {
+        if (!jogadorCartoes[c.jogador_id]) jogadorCartoes[c.jogador_id] = { amarelos: [], vermelhos: [] };
+        jogadorCartoes[c.jogador_id].amarelos.push(evento);
+      } else if (tipoStr === 'vermelho') {
+        if (!jogadorCartoes[c.jogador_id]) jogadorCartoes[c.jogador_id] = { amarelos: [], vermelhos: [] };
+        jogadorCartoes[c.jogador_id].vermelhos.push(evento);
+      } else if (tipoStr === 'amarelo_tecnico' && tecnicoId) {
+        if (!tecnicoCartoes[tecnicoId]) tecnicoCartoes[tecnicoId] = { amarelos: [], vermelhos: [] };
+        tecnicoCartoes[tecnicoId].amarelos.push(evento);
+      } else if (tipoStr === 'vermelho_tecnico' && tecnicoId) {
+        if (!tecnicoCartoes[tecnicoId]) tecnicoCartoes[tecnicoId] = { amarelos: [], vermelhos: [] };
+        tecnicoCartoes[tecnicoId].vermelhos.push(evento);
+      }
+    }
+  }
+
+  // Um cartão vermelho já suspende automaticamente na próxima partida — se
+  // o jogador/técnico recebeu amarelo E vermelho na MESMA partida, esse
+  // amarelo não deve contar para a contagem cumulativa (senão avançaria
+  // indevidamente o ciclo de 3 em 3 mesmo já estando suspenso pelo vermelho).
+  const removerAmarelosDaPartidaDoVermelho = (
+    mapa: Record<string, { amarelos: EventoCartaoResumo[]; vermelhos: EventoCartaoResumo[] }>,
+  ) => {
+    for (const dados of Object.values(mapa)) {
+      const partidasComVermelho = new Set(dados.vermelhos.map(v => v.partidaId));
+      if (partidasComVermelho.size === 0) continue;
+      dados.amarelos = dados.amarelos.filter(a => !partidasComVermelho.has(a.partidaId));
+    }
+  };
+  removerAmarelosDaPartidaDoVermelho(jogadorCartoes);
+  removerAmarelosDaPartidaDoVermelho(tecnicoCartoes);
+
+  // Última partida disputada por cada time (por data, com rodada como desempate)
+  const ultimaPartidaPorTime: Record<string, Partida> = {};
+  for (const t of times) {
+    const jogosDoTime = encerradas.filter(p => p.time_casa_id === t.id || p.time_visitante_id === t.id);
+    if (jogosDoTime.length === 0) continue;
+    const ultima = [...jogosDoTime].sort((a, b) => a.data.localeCompare(b.data) || a.rodada - b.rodada).pop()!;
+    ultimaPartidaPorTime[t.id] = ultima;
+  }
+
+  const suspensos: SuspensoResumo[] = [];
+
+  const avaliarSuspensao = (
+    nome: string, tipo: 'Jogador' | 'Técnico', timeId: string, timeSigla: string,
+    amarelos: EventoCartaoResumo[], vermelhos: EventoCartaoResumo[], ultimaPartida: Partida | undefined,
+  ) => {
+    if (!ultimaPartida) return;
+    const totalAmarelos = amarelos.length;
+
+    if (vermelhos.some(v => v.partidaId === ultimaPartida.id)) {
+      suspensos.push({ nome, tipo, timeId, timeSigla, motivo: 'Cartão vermelho' });
+      return;
+    }
+
+    if (totalAmarelos > 0 && totalAmarelos % 3 === 0) {
+      const ordenados = [...amarelos].sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
+      const ultimoAmarelo = ordenados[ordenados.length - 1];
+      if (ultimoAmarelo.partidaId === ultimaPartida.id) {
+        suspensos.push({ nome, tipo, timeId, timeSigla, motivo: `${totalAmarelos}º amarelo` });
+      }
+    }
+  };
+
+  for (const t of times) {
+    const ultimaPartida = ultimaPartidaPorTime[t.id];
+
+    const jogadoresDoTime = jogadores.filter(j => j.time_atual === t.id);
+    for (const j of jogadoresDoTime) {
+      const eventos = jogadorCartoes[j.id];
+      avaliarSuspensao(j.nome, 'Jogador', t.id, t.sigla, eventos?.amarelos ?? [], eventos?.vermelhos ?? [], ultimaPartida);
+    }
+
+    const tecnicoDoTime = tecnicos.find(tc => tc.time_atual === t.id && tc.ativo);
+    if (tecnicoDoTime) {
+      const eventos = tecnicoCartoes[tecnicoDoTime.id];
+      avaliarSuspensao(tecnicoDoTime.nome, 'Técnico', t.id, t.sigla, eventos?.amarelos ?? [], eventos?.vermelhos ?? [], ultimaPartida);
+    }
+  }
+
+  return suspensos.sort((a, b) => a.timeSigla.localeCompare(b.timeSigla) || a.nome.localeCompare(b.nome));
+}
+
 export default async function Home() {
   const [partidas, times, jogadores, tecnicos] = await Promise.all([
     getPartidas(), getTimes(), getJogadores(), getTecnicos(),
@@ -283,6 +395,9 @@ export default async function Home() {
   const mediaGeral = formatarMedia(totGols);
   const mediaGolsMandante = formatarMedia(totGolsMan);
   const mediaGolsVisitante = formatarMedia(totGolsVis);
+
+  // Suspensos para a próxima rodada
+  const suspensos = calcularSuspensos(encerradas, times, jogadores, tecnicos);
 
   // Top 5 Placares mais frequentes
   const placarMap: Record<string, { count: number; vitVisitante: number; empates: number }> = {};
@@ -704,6 +819,38 @@ export default async function Home() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        {/* 🚫 Suspensos para a próxima rodada */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            🚫 Suspensos para a Próxima Rodada
+          </h2>
+          {suspensos.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Ninguém suspenso no momento.</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.6rem' }}>
+              {suspensos.map((s, i) => {
+                const time = times.find(t => t.id === s.timeId);
+                return (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '.5rem',
+                    background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)',
+                    borderRadius: 8, padding: '.5rem .75rem', minWidth: 170,
+                  }}>
+                    <EscudoTime time={time} size={26} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '.8rem', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                        {s.tipo === 'Técnico' && <span style={{ fontSize: '.78rem' }}>🧑‍💼</span>}
+                        {s.nome}
+                      </div>
+                      <div style={{ fontSize: '.66rem', color: 'var(--rebaixamento)' }}>{s.timeSigla} · {s.motivo}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* 🏅 Top 5 */}
