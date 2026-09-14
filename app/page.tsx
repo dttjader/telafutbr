@@ -61,6 +61,13 @@ function th(align: 'left' | 'center', extra?: React.CSSProperties): React.CSSPro
 
 const medalha = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
 
+function formatarData(d: string): string {
+  if (!d) return '—';
+  const partes = d.split('-');
+  if (partes.length !== 3) return d;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
 // Minutos jogados por um jogador em uma partida (mesma lógica usada em
 // Dados/Analítico e Dados/Times) — usado para calcular os índices
 // "Gols/90 min" e "Passes por Minuto" no Resumo.
@@ -567,6 +574,22 @@ export default async function Home() {
     .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v)
     .slice(0, 5);
 
+  // Novas Contratações — 20 jogadores com a data de chegada (última
+  // transferência registrada) mais recente. Ignora entradas cujo destino é o
+  // pseudo-time "outros" (usado para marcar jogador inativo/transferido).
+  interface NovaContratacao { jogador_id: string; nome: string; time_id: string; data: string; }
+  const novasContratacoes: NovaContratacao[] = jogadores
+    .map(j => {
+      const transferencias = j.transferencias ?? [];
+      if (transferencias.length === 0) return null;
+      const ultima = [...transferencias].sort((a, b) => b.data.localeCompare(a.data))[0];
+      if (!ultima || ultima.time_id === 'outros') return null;
+      return { jogador_id: j.id, nome: j.nome, time_id: ultima.time_id, data: ultima.data };
+    })
+    .filter((x): x is NovaContratacao => x !== null)
+    .sort((a, b) => b.data.localeCompare(a.data))
+    .slice(0, 20);
+
   const tabela = Object.values(baseMap)
     .filter(t => t.jogos > 0)
     .sort((a, b) => b.pontos - a.pontos || (b.gols_pro - b.gols_contra) - (a.gols_pro - a.gols_contra) || b.gols_pro - a.gols_pro)
@@ -614,6 +637,17 @@ export default async function Home() {
           .resumo-top5-grid {
             grid-template-columns: repeat(2, 1fr);
             gap: .6rem;
+          }
+        }
+        .resumo-contratacoes-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          gap: .6rem;
+        }
+        @media (max-width: 480px) {
+          .resumo-contratacoes-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: .5rem;
           }
         }
       `}</style>
@@ -1058,6 +1092,39 @@ export default async function Home() {
             </div>
 
           </div>
+        </section>
+
+        {/* 🆕 Novas Contratações */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
+            🆕 Novas Contratações
+          </h2>
+          {novasContratacoes.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>Nenhuma contratação registrada.</p>
+          ) : (
+            <div className="resumo-contratacoes-grid">
+              {novasContratacoes.map(c => {
+                const time = times.find(t => t.id === c.time_id);
+                return (
+                  <div key={`${c.jogador_id}-${c.data}`} style={{
+                    display: 'flex', alignItems: 'center', gap: '.6rem',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '.55rem .75rem',
+                  }}>
+                    <EscudoTime time={time} size={28} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.nome}
+                      </div>
+                      <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>
+                        {time?.sigla ?? c.time_id} · {formatarData(c.data)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       </div>
     </div>
