@@ -888,7 +888,7 @@ export default async function Home() {
         </section>
 
         {/* 🏅 Top 5 */}
-        <section style={{ marginBottom: '2.5rem' }}>
+        <section style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             🏅 Top 5
           </h2>
@@ -935,9 +935,6 @@ export default async function Home() {
             {/* Top 5 Maiores Pontuadores */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
               <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>⚖️ Top 5 Pontuadores</h3>
-              <p style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '.6rem' }}>
-                Soma do peso de cada gol na pontuação da partida
-              </p>
               {top5Pontuadores.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {top5Pontuadores.map((a, i) => {
@@ -960,9 +957,6 @@ export default async function Home() {
             {/* Top 5 Gols p/90 min */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
               <h3 style={{ fontSize: '1rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>⚡ Top 5 Gols p/90 min</h3>
-              <p style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '.6rem' }}>
-                Só jogadores com pelo menos 90 minutos em campo
-              </p>
               {top5G90.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {top5G90.map((g, i) => {
@@ -1004,9 +998,6 @@ export default async function Home() {
             {/* Top 5 Passes/Minuto */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
               <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>📨 Top 5 Passes/Minuto</h3>
-              <p style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '.6rem' }}>
-                Passes ÷ minutos jogados · só jogadores com mais de 100 passes
-              </p>
               {top5PassesMinuto.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {top5PassesMinuto.map((g, i) => {
@@ -1047,9 +1038,6 @@ export default async function Home() {
             {/* Top 5 Goleiros (SAV%) */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
               <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🥅 Top 5 Goleiros (SAV%)</h3>
-              <p style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '.6rem' }}>
-                Defesas ÷ (defesas + gols sofridos) — lançadas na aba Stats
-              </p>
               {top5SavPct.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {top5SavPct.map((g, i) => {
@@ -1070,10 +1058,7 @@ export default async function Home() {
 
             {/* Top 5 Técnicos (%) */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.4rem' }}>🧑‍💼 Top 5 Técnicos</h3>
-              <p style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-                Só entre quem dirigiu {limiar50}+ partidas (mais da metade das {totalRodadas} rodadas)
-              </p>
+              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>🧑‍💼 Top 5 Técnicos</h3>
               {top5Tecnicos.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados suficientes.</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {top5Tecnicos.map((r, i) => {
@@ -1093,6 +1078,23 @@ export default async function Home() {
 
           </div>
         </section>
+
+        {/* 📌 Legenda dos critérios usados em alguns cards do Top 5 */}
+        <div style={{
+          marginBottom: '2.5rem', padding: '1rem 1.25rem',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 8, fontSize: '.72rem', color: 'var(--text-muted)',
+          display: 'flex', flexDirection: 'column', gap: '.45rem',
+        }}>
+          <p style={{ fontSize: '.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, marginBottom: '.15rem' }}>
+            Critérios de alguns Top 5
+          </p>
+          <span><strong style={{ color: '#a78bfa' }}>⚖️ Pontuadores</strong> — soma do peso de cada gol na pontuação da partida</span>
+          <span><strong style={{ color: 'var(--amarelo)' }}>⚡ Gols p/90 min</strong> — só jogadores com pelo menos 90 minutos em campo</span>
+          <span><strong style={{ color: '#a78bfa' }}>📨 Passes/Minuto</strong> — passes ÷ minutos jogados · só jogadores com mais de 100 passes</span>
+          <span><strong style={{ color: 'var(--verde)' }}>🥅 Goleiros (SAV%)</strong> — defesas ÷ (defesas + gols sofridos), lançadas na aba Stats</span>
+          <span><strong style={{ color: '#a78bfa' }}>🧑‍💼 Técnicos</strong> — só entre quem dirigiu {limiar50}+ partidas (mais da metade das {totalRodadas} rodadas)</span>
+        </div>
 
         {/* 🆕 Novas Contratações */}
         <section style={{ marginBottom: '2.5rem' }}>
