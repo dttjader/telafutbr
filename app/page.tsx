@@ -90,11 +90,21 @@ function calcularMinutosJogador(jogadorId: string, partida: Partida, ehTitular: 
   }
 }
 
-// Maior ciclo de minutos sem sofrer gols de cada goleiro (mesma lógica de
-// app/dados/goleiros, mas retornando só o recorde — usado no Top 5 do Resumo).
-function calcularTopCiclos(encerradas: Partida[], jogadores: Jogador[], times: Time[], limite = 5) {
+// Ciclos de minutos sem sofrer gols de cada goleiro (mesma lógica de
+// app/dados/goleiros): calcula tanto o maior ciclo (recorde) quanto o ciclo
+// atual (em aberto, desde o último gol sofrido) — usados nos Top 5 do Resumo.
+interface CicloGoleiroResumo {
+  jogador_id: string;
+  nome: string;
+  time_id: string;
+  timeSigla: string;
+  maiorCiclo: number;
+  cicloAtual: number;
+}
+
+function calcularCiclosGoleiros(encerradas: Partida[], jogadores: Jogador[], times: Time[]): CicloGoleiroResumo[] {
   const goleiros = jogadores.filter(j => j.posicao === 'GOL');
-  const resultados: { jogador_id: string; nome: string; time_id: string; timeSigla: string; maiorCiclo: number }[] = [];
+  const resultados: CicloGoleiroResumo[] = [];
 
   for (const goleiro of goleiros) {
     const time = times.find(t => t.id === goleiro.time_atual);
@@ -180,10 +190,17 @@ function calcularTopCiclos(encerradas: Partida[], jogadores: Jogador[], times: T
     const cicloAtualMin = minutosAcumulados - inicioCicloMin;
     if (cicloAtualMin > maiorCiclo) maiorCiclo = cicloAtualMin;
 
-    resultados.push({ jogador_id: goleiro.id, nome: goleiro.nome, time_id: goleiro.time_atual, timeSigla: time?.sigla ?? '—', maiorCiclo });
+    resultados.push({
+      jogador_id: goleiro.id,
+      nome: goleiro.nome,
+      time_id: goleiro.time_atual,
+      timeSigla: time?.sigla ?? '—',
+      maiorCiclo,
+      cicloAtual: cicloAtualMin,
+    });
   }
 
-  return resultados.sort((a, b) => b.maiorCiclo - a.maiorCiclo).slice(0, limite);
+  return resultados;
 }
 
 // ── Suspensos para a próxima rodada ──────────────────────────────────────────
@@ -524,8 +541,14 @@ export default async function Home() {
     .sort((a, b) => b.indice - a.indice)
     .slice(0, 5);
 
-  // Top 5 Goleiros (maior ciclo sem sofrer gol)
-  const top5Ciclos = calcularTopCiclos(encerradas, jogadores, times);
+  // Ciclos dos goleiros (maior ciclo / ciclo atual) — base para dois Top 5.
+  const ciclosGoleiros = calcularCiclosGoleiros(encerradas, jogadores, times);
+
+  // Top 5 Goleiros (maior ciclo sem sofrer gol — recorde pessoal)
+  const top5Ciclos = [...ciclosGoleiros].sort((a, b) => b.maiorCiclo - a.maiorCiclo).slice(0, 5);
+
+  // Top 5 Goleiros (ciclo atual — em aberto, desde o último gol sofrido)
+  const top5CicloAtual = [...ciclosGoleiros].sort((a, b) => b.cicloAtual - a.cicloAtual).slice(0, 5);
 
   // Top 5 Goleiros por SAV% — defesas (Sav, lançadas na aba Stats de cada
   // partida) ÷ (defesas + gols sofridos). Mesma fórmula usada em
@@ -629,7 +652,7 @@ export default async function Home() {
       <style>{`
         .resumo-top5-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
           gap: 1rem;
           justify-content: flex-start;
         }
@@ -1035,6 +1058,25 @@ export default async function Home() {
               </div>
             </div>
 
+            {/* Top 5 Goleiros (Ciclo Atual) */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🥅 Top 5 Goleiros (Ciclo Atual)</h3>
+              {top5CicloAtual.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {top5CicloAtual.map((g, i) => {
+                  const time = times.find(t => t.id === g.time_id);
+                  return (
+                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
+                      <EscudoTime time={time} size={20} />
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>{g.cicloAtual}&apos;</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Top 5 Goleiros (SAV%) */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
               <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🥅 Top 5 Goleiros (SAV%)</h3>
@@ -1092,6 +1134,7 @@ export default async function Home() {
           <span><strong style={{ color: '#a78bfa' }}>⚖️ Pontuadores</strong> — soma do peso de cada gol na pontuação da partida</span>
           <span><strong style={{ color: 'var(--amarelo)' }}>⚡ Gols p/90 min</strong> — só jogadores com pelo menos 90 minutos em campo</span>
           <span><strong style={{ color: '#a78bfa' }}>📨 Passes/Minuto</strong> — passes ÷ minutos jogados · só jogadores com mais de 100 passes</span>
+          <span><strong style={{ color: 'var(--verde)' }}>🥅 Goleiros (Ciclo Atual)</strong> — minutos sem sofrer gol desde o último gol sofrido (ciclo em aberto)</span>
           <span><strong style={{ color: 'var(--verde)' }}>🥅 Goleiros (SAV%)</strong> — defesas ÷ (defesas + gols sofridos), lançadas na aba Stats</span>
           <span><strong style={{ color: '#a78bfa' }}>🧑‍💼 Técnicos</strong> — só entre quem dirigiu {limiar50}+ partidas (mais da metade das {totalRodadas} rodadas)</span>
         </div>
