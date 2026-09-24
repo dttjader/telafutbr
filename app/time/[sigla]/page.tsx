@@ -194,6 +194,54 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
   const artilheiros = [...listaJogadores].filter(s => s.gols > 0).sort((a, b) => b.gols - a.gols).slice(0, 10);
   const assistentes = [...listaJogadores].filter(s => s.assistencias > 0).sort((a, b) => b.assistencias - a.assistencias).slice(0, 10);
 
+  // ── Jogadores que já defenderam o time e saíram (bloco separado do elenco) ─
+  // Mesmo critério usado em Dados/Times: já teve passagem pelo time (aparece
+  // no histórico de transferências para o id deste time) mas o time_atual já
+  // é outro (ou nenhum).
+  const exElenco = jogadores.filter(j => {
+    if (j.time_atual === time!.id) return false;
+    return (j.transferencias ?? []).some(tr => tr.time_id === time!.id);
+  });
+
+  const statsExMap: Record<string, StatJog> = {};
+  exElenco.forEach(j => { statsExMap[j.id] = { jogador: j, partidas: 0, titular: 0, reserva: 0, minutos: 0, gols: 0, gols_contra: 0, gols_sofridos: 0, assistencias: 0, amarelos: 0, vermelhos: 0 }; });
+
+  for (const { p, isCasa } of jogosTime) {
+    const esc = isCasa ? p.escalacao_casa : p.escalacao_visitante;
+    for (const e of esc) {
+      const s = statsExMap[e.jogador_id];
+      if (!s) continue;
+      const mins = calcularMinutos(e.jogador_id, p, e.titular);
+      if (mins === 0 && !e.titular) continue;
+      s.partidas++; s.minutos += mins;
+      if (e.titular) s.titular++; else s.reserva++;
+    }
+    for (const g of p.gols) {
+      const tipoStr = g.tipo as string;
+      if (tipoStr === 'contra') {
+        if (statsExMap[g.jogador_id]) statsExMap[g.jogador_id].gols_contra++;
+        if (statsExMap[g.goleiro_id]) statsExMap[g.goleiro_id].gols_sofridos++;
+      } else if (tipoStr !== 'penalti_perdido' && tipoStr !== 'penalti_defendido') {
+        if (statsExMap[g.jogador_id]) statsExMap[g.jogador_id].gols++;
+        if (g.assistencia_id && statsExMap[g.assistencia_id]) statsExMap[g.assistencia_id].assistencias++;
+        if (statsExMap[g.goleiro_id]) statsExMap[g.goleiro_id].gols_sofridos++;
+      }
+    }
+    for (const c of p.cartoes) {
+      const s = statsExMap[c.jogador_id];
+      if (!s) continue;
+      if (c.tipo === 'amarelo') s.amarelos++;
+      else if (c.tipo === 'vermelho') s.vermelhos++;
+    }
+  }
+
+  // Só entram quem de fato tem alguma partida registrada com o time
+  const listaExJogadores = Object.values(statsExMap).filter(s => s.partidas > 0).sort((a, b) => b.minutos - a.minutos);
+  const nomeDestino = (j: Jogador) => {
+    if (!j.time_atual || j.time_atual === 'outros') return null;
+    return times.find(t => t.id === j.time_atual)?.nome ?? null;
+  };
+
   // ── Peso dos gols na pontuação (só deste time) ────────────────────────────
   const pesoGolsGeral = calcularPesoGols(partidas, jogadores, times);
   const pesoGolsTime = pesoGolsGeral.filter(it => it.timeId === time!.id);
@@ -302,7 +350,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
           {!linhaTime ? (
             <p style={{ color: 'var(--text-muted)' }}>Nenhuma partida encerrada ainda.</p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(80px,1fr))', gap: '.4rem', marginBottom: '1rem' }}>
               {[
                 { l: 'Posição', v: `${linhaTime.posicao}º`, cor: zonaColor[zona] },
                 { l: 'Pontos', v: linhaTime.pontos, cor: 'var(--amarelo)' },
@@ -314,9 +362,9 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
                 { l: 'Gols Contra', v: linhaTime.gols_contra, cor: 'var(--text)' },
                 { l: 'Saldo', v: linhaTime.saldo > 0 ? `+${linhaTime.saldo}` : linhaTime.saldo, cor: linhaTime.saldo >= 0 ? 'var(--libertadores)' : 'var(--rebaixamento)' },
               ].map(s => (
-                <div key={s.l} style={{ ...card, textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.8rem', color: s.cor, lineHeight: 1 }}>{s.v}</div>
-                  <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginTop: '.3rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{s.l}</div>
+                <div key={s.l} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '.5rem', textAlign: 'center' }}>
+                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: s.cor, lineHeight: 1 }}>{s.v}</div>
+                  <div style={{ fontSize: '.55rem', color: 'var(--text-muted)', marginTop: '.15rem', textTransform: 'uppercase', letterSpacing: '.04em' }}>{s.l}</div>
                 </div>
               ))}
             </div>
@@ -518,6 +566,46 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
                 {listaJogadores.length === 0 && (
                   <tr><td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador no elenco atual.</td></tr>
                 )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* ── Analítico: jogadores que já saíram do time (bloco separado) ────── */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h2 style={sectionTitle}>🚪 Analítico — Jogadores que já Saíram</h2>
+          <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Jogadores que defenderam o time em algum momento da temporada mas não fazem mais parte do elenco atual. Estatísticas somam apenas as partidas em que jogaram por este time.
+          </p>
+          <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+                <tr>
+                  {['Jogador', 'Pos.', 'Destino atual', 'P', 'T', 'R', 'Min', 'Gols', 'GC', 'GS', 'Ast.', '🟨', '🟥'].map(h => <th key={h} style={th}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {listaExJogadores.length === 0 ? (
+                  <tr><td colSpan={13} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum ex-jogador com partidas registradas por este time.</td></tr>
+                ) : listaExJogadores.map((s, i) => (
+                  <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                    <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{s.jogador.nome}</td>
+                    <td style={td}>{posLabel[s.jogador.posicao] ?? s.jogador.posicao}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)', fontSize: '.78rem' }}>{nomeDestino(s.jogador) ?? '—'}</td>
+                    <td style={td}>{s.partidas || '—'}</td>
+                    <td style={{ ...td, color: 'var(--verde)' }}>{s.titular || '—'}</td>
+                    <td style={td}>{s.reserva || '—'}</td>
+                    <td style={{ ...td, fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--amarelo)' }}>{s.minutos || '—'}</td>
+                    <td style={{ ...td, color: s.gols > 0 ? 'var(--libertadores)' : 'var(--text-muted)', fontWeight: s.gols > 0 ? 700 : 400 }}>{s.gols || '—'}</td>
+                    <td style={{ ...td, color: s.gols_contra > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)' }}>{s.gols_contra || '—'}</td>
+                    <td style={{ ...td, color: s.jogador.posicao === 'GOL' ? (s.gols_sofridos > 0 ? 'var(--rebaixamento)' : 'var(--libertadores)') : 'var(--text-muted)' }}>
+                      {s.jogador.posicao === 'GOL' ? s.gols_sofridos : '—'}
+                    </td>
+                    <td style={{ ...td, color: s.assistencias > 0 ? '#60a5fa' : 'var(--text-muted)' }}>{s.assistencias || '—'}</td>
+                    <td style={{ ...td, color: s.amarelos > 0 ? '#f59e0b' : 'var(--text-muted)' }}>{s.amarelos || '—'}</td>
+                    <td style={{ ...td, color: s.vermelhos > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)' }}>{s.vermelhos || '—'}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
