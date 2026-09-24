@@ -56,6 +56,18 @@ const zonaLabel: Record<string, string> = {
 const formaColor: Record<string, string> = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' };
 const posLabel: Record<string, string> = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meia', ATA: 'Atacante' };
 
+// Mapa fixo sigla → id. Identificar o time por aqui (em vez de percorrer
+// times.find comparando t.sigla/t.id de TODO registro) evita que um campo
+// vazio/nulo em QUALQUER OUTRO time do banco derrube a página inteira — foi
+// exatamente isso que causou o crash anterior. Se você renomear a sigla de
+// algum time no /admin, só atualizar aqui também.
+const SIGLA_PARA_ID: Record<string, string> = {
+  fla: 'FLA', pal: 'PAL', cam: 'ATL', bot: 'BOT', flu: 'FLU', vas: 'VAS',
+  spf: 'SAO', sao: 'SAO', cor: 'COR', san: 'SAN', int: 'INT', gre: 'GRE',
+  cru: 'CRU', bah: 'BAH', cap: 'ATG', atg: 'ATG', rbb: 'RBB', mir: 'MIR',
+  cha: 'CHA', cot: 'COT', rem: 'REM', for: 'FOR',
+};
+
 const th: React.CSSProperties = { padding: '.5rem .6rem', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.8rem', letterSpacing: '.05em', color: 'var(--text-muted)', whiteSpace: 'nowrap' };
 const td: React.CSSProperties = { padding: '.45rem .6rem', textAlign: 'center', fontSize: '.85rem' };
 const sectionTitle: React.CSSProperties = { fontSize: '1.4rem', marginBottom: '.9rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' };
@@ -63,13 +75,18 @@ const card: React.CSSProperties = { background: 'var(--surface)', border: '1px s
 
 export default async function TimePerfilPage({ params }: { params: Promise<{ sigla: string }> }) {
   const { sigla } = await params;
-  const siglaAlvo = sigla.toUpperCase();
+  const siglaMinuscula = sigla.toLowerCase();
 
   const [partidas, times, jogadores, estadios, tecnicos, config] = await Promise.all([
     getPartidas(), getTimes(), getJogadores(), getEstadios(), getTecnicos(), getConfig(),
   ]);
 
-  const time = times.find(t => (t.sigla ?? '').toUpperCase() === siglaAlvo) ?? times.find(t => (t.id ?? '').toUpperCase() === siglaAlvo);
+  const idAlvo = SIGLA_PARA_ID[siglaMinuscula];
+  const time = idAlvo
+    ? times.find(t => t.id === idAlvo)
+    // fallback só para times que ainda não estão no mapa fixo acima
+    : times.find(t => String(t.sigla ?? '').toLowerCase() === siglaMinuscula)
+      ?? times.find(t => String(t.id ?? '').toLowerCase() === siglaMinuscula);
   if (!time) notFound();
 
   const estadioTime = estadios.find(e => e.id === time.estadio_id);
