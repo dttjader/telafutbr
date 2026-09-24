@@ -69,7 +69,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
     getPartidas(), getTimes(), getJogadores(), getEstadios(), getTecnicos(), getConfig(),
   ]);
 
-  const time = times.find(t => t.sigla.toUpperCase() === siglaAlvo) ?? times.find(t => t.id.toUpperCase() === siglaAlvo);
+  const time = times.find(t => (t.sigla ?? '').toUpperCase() === siglaAlvo) ?? times.find(t => (t.id ?? '').toUpperCase() === siglaAlvo);
   if (!time) notFound();
 
   const estadioTime = estadios.find(e => e.id === time.estadio_id);
@@ -208,7 +208,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
   const jogadoresComOpta = listaJogadores.filter(s => (statsOptaGeral[s.jogador.id]?.partidas_com_stats ?? 0) > 0);
 
   // ── Técnicos ligados ao time (atual + histórico) ──────────────────────────
-  const tecnicosDoTime = tecnicos.filter(t => t.time_atual === time!.id || t.historico.some(h => h.time_id === time!.id));
+  const tecnicosDoTime = tecnicos.filter(t => t.time_atual === time!.id || (t.historico ?? []).some(h => h.time_id === time!.id));
   interface TecStat { tecnico: Tecnico; j: number; v: number; e: number; d: number; }
   const tecStats: TecStat[] = tecnicosDoTime.map(t => {
     let j = 0, v = 0, e = 0, d = 0;
@@ -252,7 +252,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
     <div style={{ paddingBottom: '4rem' }}>
       {/* Hero */}
       <div style={{
-        background: `linear-gradient(135deg, #0a0a0a 0%, ${time.cor_primaria}18 50%, #0a0a0a 100%)`,
+        background: `linear-gradient(135deg, #0a0a0a 0%, ${time.cor_primaria || '#333333'}18 50%, #0a0a0a 100%)`,
         borderBottom: '1px solid var(--border)', padding: '2.5rem 0 2rem', marginBottom: '2rem',
       }}>
         <div className="container">
