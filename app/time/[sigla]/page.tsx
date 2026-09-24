@@ -442,7 +442,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
         <section style={{ marginBottom: '2.5rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
             <div>
-              <h2 style={sectionTitle}>⚽ Artilharia do Time</h2>
+              <h2 style={sectionTitle}>⚽ Artilharia</h2>
               {artilheiros.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>Sem gols registrados.</p> : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
                   {artilheiros.map((s, i) => (
@@ -456,7 +456,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
               )}
             </div>
             <div>
-              <h2 style={sectionTitle}>🎯 Assistências do Time</h2>
+              <h2 style={sectionTitle}>🎯 Assistências</h2>
               {assistentes.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>Sem assistências registradas.</p> : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
                   {assistentes.map((s, i) => (
