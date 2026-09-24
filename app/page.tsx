@@ -749,9 +749,9 @@ export default async function Home() {
               </div>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex' }}>
                 {[
-                  { l: 'Vit. mandante', v: totManVit, cor: '#1a7a40' },
+                  { l: 'Mandante', v: totManVit, cor: '#1a7a40' },
                   { l: 'Empates', v: totEmp, cor: 'var(--amarelo)' },
-                  { l: 'Vit. visitante', v: totVisVit, cor: '#a81a1a' },
+                  { l: 'Visitante', v: totVisVit, cor: '#a81a1a' },
                 ].map((s, i, arr) => (
                   <div key={s.l} style={{ flex: 1, textAlign: 'center', padding: '10px 6px', borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
                     <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.2 }}>{s.l}</div>
@@ -772,9 +772,9 @@ export default async function Home() {
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex' }}>
                 {[
                   { l: 'Gols mandante', v: totGolsMan },
-                  { l: 'Média Gols Mandante', v: mediaGolsMandante },
+                  { l: 'Média Mandante', v: mediaGolsMandante },
                   { l: 'Gols visitante', v: totGolsVis },
-                  { l: 'Média Gols Visitante', v: mediaGolsVisitante },
+                  { l: 'Média Visitante', v: mediaGolsVisitante },
                 ].map((s, i, arr) => (
                   <div key={s.l} style={{ flex: 1, textAlign: 'center', padding: '10px 4px', borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
                     <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', marginBottom: 3, lineHeight: 1.15 }}>{s.l}</div>
