@@ -8,8 +8,8 @@ import { getConfig, zonaClassificacao } from '@/lib/config';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Partida, Jogador, Tecnico } from '@/lib/types';
 
-// Página oculta — não aparece em nenhum menu, acessada via /times/{sigla}
-// (ex: /times/vas → Vasco, /times/cor → Corinthians). O time é identificado
+// Página oculta — não aparece em nenhum menu, acessada via /time/{sigla}
+// (ex: /time/vas → Vasco, /time/cor → Corinthians). O time é identificado
 // pela SIGLA (não pelo id interno), então funciona mesmo para os poucos
 // casos em que id e sigla divergem (ex: id "ATL" / sigla "CAM").
 export const dynamic = 'force-dynamic';
