@@ -139,9 +139,9 @@ const posLabel: Record<string, string> = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT:
 // exatamente isso que causou o crash anterior. Se você renomear a sigla de
 // algum time no /admin, só atualizar aqui também.
 const SIGLA_PARA_ID: Record<string, string> = {
-  fla: 'FLA', pal: 'PAL', cam: 'ATL', bot: 'BOT', flu: 'FLU', vas: 'VAS',
+  fla: 'FLA', pal: 'PAL', cam: 'CAM', bot: 'BOT', flu: 'FLU', vas: 'VAS',
   spf: 'SAO', sao: 'SAO', cor: 'COR', san: 'SAN', int: 'INT', gre: 'GRE',
-  cru: 'CRU', bah: 'BAH', cap: 'ATG', atg: 'ATG', rbb: 'RBB', mir: 'MIR',
+  cru: 'CRU', bah: 'BAH', cap: 'CAP', atg: 'ATG', rbb: 'RBB', mir: 'MIR',
   cha: 'CHA', cot: 'COT', rem: 'REM', for: 'FOR',
 };
 
