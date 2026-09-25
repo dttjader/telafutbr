@@ -43,6 +43,83 @@ function calcularMinutos(jogadorId: string, partida: Partida, ehTitular: boolean
   }
 }
 
+// Mesma lógica de ciclos de minutos sem sofrer gol usada em Dados/Goleiros,
+// mas restrita apenas às partidas de UM time específico (jogosTime), em vez
+// de todas as partidas do campeonato.
+function calcularCiclosGoleiroTime(
+  golId: string,
+  partidasDoTime: { p: Partida; isCasa: boolean }[],
+): { maiorCiclo: number; cicloAtual: number; totalMinutos: number; totalPartidas: number } {
+  const eventos: { minutosJogados: number; golsSofridos: { minuto: number }[]; minutoEntrada: number; minutoSaida: number }[] = [];
+
+  for (const { p, isCasa } of partidasDoTime) {
+    const esc = isCasa ? p.escalacao_casa : p.escalacao_visitante;
+    const escGoleiro = esc.find(e => e.jogador_id === golId);
+    if (!escGoleiro) continue;
+
+    const acr1 = p.acrescimo_primeiro ?? 0;
+    const acr2 = p.acrescimo_segundo ?? 0;
+    const totalPartida = 45 + acr1 + 45 + acr2;
+
+    const vermelho = p.cartoes.find(c => c.jogador_id === golId && c.tipo === 'vermelho');
+    const minutoVermelho = vermelho?.minuto ?? Infinity;
+
+    let minutoEntrada = 0;
+    let minutoSaida = Math.min(minutoVermelho, totalPartida);
+
+    if (escGoleiro.titular) {
+      const sub = p.substituicoes.find(s => s.sai_id === golId);
+      minutoSaida = Math.min(sub?.minuto ?? totalPartida, minutoVermelho, totalPartida);
+    } else {
+      const entrada = p.substituicoes.find(s => s.entra_id === golId);
+      if (!entrada) continue;
+      minutoEntrada = entrada.minuto;
+      const saida = p.substituicoes.find(s => s.sai_id === golId);
+      minutoSaida = Math.min(saida?.minuto ?? totalPartida, minutoVermelho, totalPartida);
+    }
+
+    const minutosJogados = Math.max(0, minutoSaida - minutoEntrada);
+    if (minutosJogados === 0) continue;
+
+    const golsSofridos: { minuto: number }[] = [];
+    for (const g of p.gols) {
+      if (g.goleiro_id !== golId) continue;
+      if (g.minuto < minutoEntrada || g.minuto > minutoSaida) continue;
+      golsSofridos.push({ minuto: g.minuto });
+    }
+
+    eventos.push({ minutosJogados, golsSofridos: golsSofridos.sort((a, b) => a.minuto - b.minuto), minutoEntrada, minutoSaida });
+  }
+
+  if (eventos.length === 0) return { maiorCiclo: 0, cicloAtual: 0, totalMinutos: 0, totalPartidas: 0 };
+
+  let minutosAcumulados = 0;
+  let inicioCicloMin = 0;
+  let maiorCiclo = 0;
+
+  for (const ev of eventos) {
+    if (ev.golsSofridos.length === 0) {
+      minutosAcumulados += ev.minutosJogados;
+    } else {
+      let cursorLocal = ev.minutoEntrada;
+      for (const gol of ev.golsSofridos) {
+        const minutosAteGol = gol.minuto - cursorLocal;
+        minutosAcumulados += Math.max(0, minutosAteGol);
+        const duracaoCiclo = minutosAcumulados - inicioCicloMin;
+        if (duracaoCiclo > maiorCiclo) maiorCiclo = duracaoCiclo;
+        inicioCicloMin = minutosAcumulados;
+        cursorLocal = gol.minuto;
+      }
+      const minutosRestantes = ev.minutoSaida - cursorLocal;
+      minutosAcumulados += Math.max(0, minutosRestantes);
+    }
+  }
+  const cicloAtualMin = minutosAcumulados - inicioCicloMin;
+  if (cicloAtualMin > maiorCiclo) maiorCiclo = cicloAtualMin;
+
+  return { maiorCiclo, cicloAtual: cicloAtualMin, totalMinutos: minutosAcumulados, totalPartidas: eventos.length };
+}
+
 const zonaColor: Record<string, string> = {
   libertadores: 'var(--libertadores)', 'libertadores-direta': '#a3e635',
   sulamericana: 'var(--sulamericana)', 'sulamericana-direta': '#60a5fa',
@@ -242,6 +319,13 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
     return times.find(t => t.id === j.time_atual)?.nome ?? null;
   };
 
+  // ── Ciclos de minutos sem sofrer gol (goleiros do elenco) ─────────────────
+  const goleirosDoTime = elenco.filter(j => j.posicao === 'GOL');
+  const ciclosGoleiros = goleirosDoTime
+    .map(g => ({ jogador: g, ...calcularCiclosGoleiroTime(g.id, jogosTime) }))
+    .filter(c => c.totalPartidas > 0)
+    .sort((a, b) => b.cicloAtual - a.cicloAtual);
+
   // ── Peso dos gols na pontuação (só deste time) ────────────────────────────
   const pesoGolsGeral = calcularPesoGols(partidas, jogadores, times);
   const pesoGolsTime = pesoGolsGeral.filter(it => it.timeId === time!.id);
@@ -256,15 +340,14 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
   const rankingAmarelos = [...listaJogadores].filter(s => s.amarelos > 0).sort((a, b) => b.amarelos - a.amarelos);
   const rankingVermelhos = [...listaJogadores].filter(s => s.vermelhos > 0).sort((a, b) => b.vermelhos - a.vermelhos);
 
-  const pendurados = listaJogadores.filter(s => s.amarelos > 0 && s.amarelos % 3 === 2);
   const suspensos: { nome: string; motivo: string }[] = [];
   if (ultimaPartidaTime) {
     for (const c of ultimaPartidaTime.cartoes) {
       if (c.time_id !== time!.id) continue;
+      if (c.tipo !== 'vermelho') continue;
       const s = statsMap[c.jogador_id];
       if (!s) continue;
-      if (c.tipo === 'vermelho') suspensos.push({ nome: s.jogador.nome, motivo: 'Cartão vermelho na última rodada' });
-      else if (c.tipo === 'amarelo' && s.amarelos > 0 && s.amarelos % 3 === 0) suspensos.push({ nome: s.jogador.nome, motivo: `${s.amarelos}º cartão amarelo` });
+      suspensos.push({ nome: s.jogador.nome, motivo: 'Cartão vermelho na última rodada' });
     }
   }
 
@@ -496,14 +579,23 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
         {/* ── Cartões ────────────────────────────────────────────────────────── */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={sectionTitle}>🟨 Cartões</h2>
+          <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            No ranking de amarelos: linha em <strong style={{ color: '#f59e0b' }}>amarelo</strong> = pendurado (2, 5, 8, 11, 14, 17...) · linha em <strong style={{ color: 'var(--rebaixamento)' }}>vermelho</strong> = suspenso (3, 6, 9, 12, 15, 18...).
+          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div>
               <h3 style={{ fontSize: '1rem', color: '#f59e0b', marginBottom: '.6rem' }}>🟨 Ranking de Amarelos</h3>
-              {rankingAmarelos.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>Nenhum.</p> : rankingAmarelos.map(s => (
-                <div key={s.jogador.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.82rem', padding: '.35rem .6rem', background: 'var(--surface2)', borderRadius: 6, marginBottom: '.25rem' }}>
-                  <span>{s.jogador.nome}</span><strong style={{ color: '#f59e0b' }}>{s.amarelos}</strong>
-                </div>
-              ))}
+              {rankingAmarelos.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>Nenhum.</p> : rankingAmarelos.map(s => {
+                const suspenso = s.amarelos % 3 === 0;
+                const pendurado = s.amarelos % 3 === 2;
+                const bg = suspenso ? 'rgba(239,68,68,.12)' : pendurado ? 'rgba(245,158,11,.12)' : 'var(--surface2)';
+                const cor = suspenso ? 'var(--rebaixamento)' : pendurado ? '#f59e0b' : 'var(--text)';
+                return (
+                  <div key={s.jogador.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.82rem', padding: '.35rem .6rem', background: bg, borderRadius: 6, marginBottom: '.25rem', color: cor }}>
+                    <span>{s.jogador.nome}</span><strong style={{ color: cor }}>{s.amarelos}</strong>
+                  </div>
+                );
+              })}
             </div>
             <div>
               <h3 style={{ fontSize: '1rem', color: 'var(--rebaixamento)', marginBottom: '.6rem' }}>🟥 Ranking de Vermelhos</h3>
@@ -514,23 +606,13 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
               ))}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1rem', color: '#f59e0b', marginBottom: '.6rem' }}>⚠️ Pendurados</h3>
-              {pendurados.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>Ninguém pendurado.</p> : pendurados.map(s => (
-                <div key={s.jogador.id} style={{ fontSize: '.82rem', padding: '.35rem .6rem', background: 'var(--surface2)', borderRadius: 6, marginBottom: '.25rem' }}>
-                  {s.jogador.nome} <span style={{ color: 'var(--text-muted)' }}>({s.amarelos} amarelos)</span>
-                </div>
-              ))}
-            </div>
-            <div>
-              <h3 style={{ fontSize: '1rem', color: 'var(--rebaixamento)', marginBottom: '.6rem' }}>🚫 Suspensos</h3>
-              {suspensos.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>Ninguém suspenso.</p> : suspensos.map((s, i) => (
-                <div key={i} style={{ fontSize: '.82rem', padding: '.35rem .6rem', background: 'rgba(239,68,68,.08)', borderRadius: 6, marginBottom: '.25rem' }}>
-                  {s.nome} <span style={{ color: 'var(--rebaixamento)' }}>· {s.motivo}</span>
-                </div>
-              ))}
-            </div>
+          <div>
+            <h3 style={{ fontSize: '1rem', color: 'var(--rebaixamento)', marginBottom: '.6rem' }}>🚫 Suspensos por Cartão Vermelho</h3>
+            {suspensos.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>Ninguém suspenso por cartão vermelho na última rodada.</p> : suspensos.map((s, i) => (
+              <div key={i} style={{ fontSize: '.82rem', padding: '.35rem .6rem', background: 'rgba(239,68,68,.08)', borderRadius: 6, marginBottom: '.25rem' }}>
+                {s.nome} <span style={{ color: 'var(--rebaixamento)' }}>· {s.motivo}</span>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -650,6 +732,36 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
               </tbody>
             </table>
           </div>
+        </section>
+
+        {/* ── Ciclos de Minutos dos Goleiros ─────────────────────────────────── */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <h2 style={sectionTitle}>🧤 Ciclos de Minutos dos Goleiros</h2>
+          <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Ciclo atual = minutos sem sofrer gol desde o último gol sofrido (em aberto). Maior ciclo = recorde pessoal, considerando só as partidas deste time.
+          </p>
+          {ciclosGoleiros.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)' }}>Nenhum goleiro do elenco com partidas registradas.</p>
+          ) : (
+            <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
+                  <tr>{['Goleiro', 'Partidas', 'Total de Minutos', 'Ciclo Atual', 'Maior Ciclo'].map(h => <th key={h} style={th}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {ciclosGoleiros.map((c, i) => (
+                    <tr key={c.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
+                      <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{c.jogador.nome}</td>
+                      <td style={td}>{c.totalPartidas}</td>
+                      <td style={{ ...td, color: '#60a5fa', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem' }}>{c.totalMinutos}&apos;</td>
+                      <td style={{ ...td, color: c.cicloAtual === 0 ? 'var(--rebaixamento)' : 'var(--verde)', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem' }}>{c.cicloAtual}&apos;</td>
+                      <td style={{ ...td, color: 'var(--amarelo)', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem' }}>{c.maiorCiclo}&apos;</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         {/* ── Técnicos ──────────────────────────────────────────────────────── */}
