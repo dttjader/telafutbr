@@ -120,6 +120,327 @@ function calcularCiclosGoleiroTime(
   return { maiorCiclo, cicloAtual: cicloAtualMin, totalMinutos: minutosAcumulados, totalPartidas: eventos.length };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MELHOR TIME DA TEMPORADA — mesma lógica usada em Dados/Times/TimesClient.tsx,
+// adaptada para trabalhar só com os jogadores/estatísticas de UM time.
+// ─────────────────────────────────────────────────────────────────────────────
+interface MelhorTimeStats {
+  gols: number; gols_contra: number; gols_sofridos: number; assistencias: number;
+  cartoes_amarelos: number; cartoes_vermelhos: number; minutos: number; partidas: number;
+}
+interface MelhorTimeJogador extends Jogador {
+  stats: MelhorTimeStats;
+}
+
+function scoreJogoLimpo(j: MelhorTimeJogador): number {
+  if (j.stats.minutos === 0 || j.stats.partidas === 0) return -Infinity;
+  const totalCartoes = j.stats.cartoes_amarelos + j.stats.cartoes_vermelhos * 3;
+  const jogoLimpo = totalCartoes === 0 ? j.stats.minutos : j.stats.minutos / (totalCartoes + 1);
+  return jogoLimpo + j.stats.gols * 15;
+}
+
+function scoreGoleiro(j: MelhorTimeJogador): number {
+  if (j.stats.minutos === 0 || j.stats.partidas === 0) return -Infinity;
+  if (j.stats.gols_sofridos === 0) return j.stats.minutos;
+  return j.stats.minutos / j.stats.gols_sofridos;
+}
+
+function sortByScore<T>(arr: T[], fn: (x: T) => number): T[] {
+  return [...arr].sort((a, b) => fn(b) - fn(a));
+}
+
+function sp(j: MelhorTimeJogador): string { return j.sub_posicao ?? ''; }
+function isLD(j: MelhorTimeJogador) { return j.posicao === 'LAT' && sp(j) === 'LD'; }
+function isLE(j: MelhorTimeJogador) { return j.posicao === 'LAT' && sp(j) === 'LE'; }
+function isLAT(j: MelhorTimeJogador) { return j.posicao === 'LAT'; }
+function isZAG(j: MelhorTimeJogador) { return j.posicao === 'ZAG'; }
+function isVOL(j: MelhorTimeJogador) { return j.posicao === 'VOL' || (j.posicao === 'MEI' && sp(j) === 'VOL'); }
+function isMC(j: MelhorTimeJogador) { return j.posicao === 'MEI' && (sp(j) === 'MC' || sp(j) === ''); }
+function isMO(j: MelhorTimeJogador) { return j.posicao === 'MEI' && sp(j) === 'MO'; }
+function isCA(j: MelhorTimeJogador) { return j.posicao === 'ATA' && sp(j) === 'CA'; }
+function isPD(j: MelhorTimeJogador) { return j.posicao === 'ATA' && sp(j) === 'PD'; }
+function isPE(j: MelhorTimeJogador) { return j.posicao === 'ATA' && sp(j) === 'PE'; }
+
+interface BestTeamResult {
+  goleiro: MelhorTimeJogador | null;
+  defesa: { jogador: MelhorTimeJogador; role: string }[];
+  meios: { jogador: MelhorTimeJogador; role: string }[];
+  ataque: { jogador: MelhorTimeJogador; role: string }[];
+  lateraisNoMeio: boolean;
+  nDef: number;
+  nMei: number;
+  nAta: number;
+}
+
+function calcBestTeam(jogadoresList: MelhorTimeJogador[], totalMinutos: number): BestTeamResult {
+  const limiar = totalMinutos * 0.5;
+  const com = jogadoresList.filter(j => j.stats.partidas > 0);
+  const comLinha = com.filter(j => j.posicao !== 'GOL' && j.stats.minutos >= limiar);
+
+  const goleiro = sortByScore(com.filter(j => j.posicao === 'GOL'), scoreGoleiro)[0] ?? null;
+  const usedIds = new Set<string>(goleiro ? [goleiro.id] : []);
+
+  const defPool = sortByScore(comLinha.filter(j => (isZAG(j) || isLAT(j)) && !usedIds.has(j.id)), scoreJogoLimpo);
+  const top5def = defPool.slice(0, 5);
+
+  const bestLDinTop5 = top5def.find(isLD) ?? null;
+  const bestLEinTop5 = top5def.find(isLE) ?? null;
+
+  let defesa: { jogador: MelhorTimeJogador; role: string }[] = [];
+
+  if (bestLDinTop5 && bestLEinTop5) {
+    const zagsTop5 = top5def
+      .filter(j => j.id !== bestLDinTop5.id && j.id !== bestLEinTop5.id)
+      .filter(j => isZAG(j))
+      .slice(0, 2);
+
+    const zagsOuDef = zagsTop5.length >= 2
+      ? zagsTop5
+      : top5def
+          .filter(j => j.id !== bestLDinTop5.id && j.id !== bestLEinTop5.id)
+          .slice(0, 2);
+
+    defesa = [
+      { jogador: bestLDinTop5, role: 'LD' },
+      ...zagsOuDef.map(j => ({ jogador: j, role: isLD(j) ? 'LD' : isLE(j) ? 'LE' : 'ZAG' })),
+      { jogador: bestLEinTop5, role: 'LE' },
+    ];
+  } else {
+    const zagsTop5 = top5def.filter(isZAG).slice(0, 3);
+    defesa = zagsTop5.map(j => ({ jogador: j, role: 'ZAG' }));
+  }
+
+  defesa.forEach(d => usedIds.add(d.jogador.id));
+  const nDef = defesa.length;
+  const lateraisNaDefesa = nDef === 4;
+
+  const meiPoolBase = sortByScore(comLinha.filter(j => (isVOL(j) || isMC(j) || isMO(j)) && !usedIds.has(j.id)), scoreJogoLimpo);
+
+  let meios: { jogador: MelhorTimeJogador; role: string }[] = [];
+  let lateraisNoMeio = false;
+
+  if (!lateraisNaDefesa) {
+    const latDisponiveis = sortByScore(comLinha.filter(j => isLAT(j) && !usedIds.has(j.id)), scoreJogoLimpo);
+    const poolAmpliado = sortByScore([...latDisponiveis, ...meiPoolBase], scoreJogoLimpo);
+    const top7 = poolAmpliado.slice(0, 7);
+
+    const ldNoTop7 = top7.find(isLD) ?? null;
+    const leNoTop7 = top7.find(isLE) ?? null;
+
+    if (ldNoTop7 && leNoTop7) {
+      lateraisNoMeio = true;
+      const excl = new Set<string>();
+      excl.add(ldNoTop7.id);
+      excl.add(leNoTop7.id);
+
+      const vol = meiPoolBase.find(j => isVOL(j) && !excl.has(j.id)) ?? null;
+      if (vol) excl.add(vol.id);
+      const mc = meiPoolBase.find(j => isMC(j) && !excl.has(j.id)) ?? null;
+      if (mc) excl.add(mc.id);
+      const mo = meiPoolBase.find(j => isMO(j) && !excl.has(j.id)) ?? null;
+
+      const centroMeio = [
+        ...(vol ? [{ jogador: vol, role: 'VOL' }] : []),
+        ...(mc ? [{ jogador: mc, role: 'MC' }] : []),
+        ...(mo ? [{ jogador: mo, role: 'MO' }] : []),
+      ];
+
+      meios = [
+        { jogador: ldNoTop7, role: 'LD' },
+        ...centroMeio,
+        { jogador: leNoTop7, role: 'LE' },
+      ];
+      meios.forEach(m => usedIds.add(m.jogador.id));
+    } else {
+      meios = buildMeiosCom5(meiPoolBase, usedIds);
+      meios.forEach(m => usedIds.add(m.jogador.id));
+    }
+  } else {
+    meios = buildMeiosCom5(meiPoolBase, usedIds);
+    meios.forEach(m => usedIds.add(m.jogador.id));
+  }
+
+  const nMei = meios.length;
+  const vagasAta = 11 - 1 - nDef - nMei;
+
+  const ataPool = sortByScore(comLinha.filter(j => j.posicao === 'ATA' && !usedIds.has(j.id)), scoreJogoLimpo);
+  const caPool = ataPool.filter(isCA);
+  const pdPool = ataPool.filter(isPD);
+  const pePool = ataPool.filter(isPE);
+  const semSub = ataPool.filter(j => !j.sub_posicao);
+
+  const pick1CA = (excl: Set<string>) => [...caPool, ...semSub].find(j => !excl.has(j.id)) ?? null;
+  const pick1PD = (excl: Set<string>) => pdPool.find(j => !excl.has(j.id)) ?? null;
+  const pick1PE = (excl: Set<string>) => pePool.find(j => !excl.has(j.id)) ?? null;
+
+  let ataque: { jogador: MelhorTimeJogador; role: string }[] = [];
+
+  if (vagasAta <= 0) {
+    ataque = [];
+  } else if (vagasAta === 1) {
+    const ca = pick1CA(usedIds);
+    if (ca) ataque = [{ jogador: ca, role: 'CA' }];
+  } else if (vagasAta === 2) {
+    const top4 = ataPool.slice(0, 4);
+    const excl = new Set(usedIds);
+    if (top4.some(isPD) && top4.some(isPE)) {
+      const pd = pick1PD(excl);
+      if (pd) excl.add(pd.id);
+      const pe = pick1PE(excl);
+      ataque = [
+        ...(pd ? [{ jogador: pd, role: 'PD' }] : []),
+        ...(pe ? [{ jogador: pe, role: 'PE' }] : []),
+      ];
+      while (ataque.length < 2) {
+        const ataExcl = new Set([...excl, ...ataque.map(a => a.jogador.id)]);
+        const ca = pick1CA(ataExcl);
+        if (!ca) break;
+        ataque.push({ jogador: ca, role: 'CA' });
+      }
+    } else {
+      const ca1 = pick1CA(excl);
+      if (ca1) excl.add(ca1.id);
+      const ca2 = pick1CA(excl);
+      ataque = [
+        ...(ca1 ? [{ jogador: ca1, role: 'CA' }] : []),
+        ...(ca2 ? [{ jogador: ca2, role: 'CA' }] : []),
+      ];
+    }
+  } else {
+    const excl = new Set(usedIds);
+    const ca = pick1CA(excl); if (ca) excl.add(ca.id);
+    const pd = pick1PD(excl); if (pd) excl.add(pd.id);
+    const pe = pick1PE(excl); if (pe) excl.add(pe.id);
+    ataque = [
+      ...(ca ? [{ jogador: ca, role: 'CA' }] : []),
+      ...(pd ? [{ jogador: pd, role: 'PD' }] : []),
+      ...(pe ? [{ jogador: pe, role: 'PE' }] : []),
+    ];
+    while (ataque.length < vagasAta) {
+      const ataExcl = new Set([...excl, ...ataque.map(a => a.jogador.id)]);
+      const extra = ataPool.find(j => !ataExcl.has(j.id));
+      if (!extra) break;
+      ataque.push({ jogador: extra, role: isCA(extra) ? 'CA' : isPD(extra) ? 'PD' : isPE(extra) ? 'PE' : 'ATA' });
+    }
+  }
+
+  return { goleiro, defesa, meios, ataque, lateraisNoMeio, nDef, nMei, nAta: ataque.length };
+}
+
+function buildMeiosCom5(meiPool: MelhorTimeJogador[], usedIds: Set<string>): { jogador: MelhorTimeJogador; role: string }[] {
+  const top5 = meiPool.filter(j => !usedIds.has(j.id)).slice(0, 5);
+  const cntVOL = top5.filter(isVOL).length;
+  const cntMC = top5.filter(isMC).length;
+  const cntMO = top5.filter(isMO).length;
+  const roleLabel = (j: MelhorTimeJogador) => isVOL(j) ? 'VOL' : isMO(j) ? 'MO' : 'MC';
+  const bestOf = (fn: (j: MelhorTimeJogador) => boolean, excl: Set<string>) =>
+    meiPool.find(j => fn(j) && !excl.has(j.id) && !usedIds.has(j.id)) ?? null;
+
+  if (cntVOL >= 3) {
+    const excl = new Set<string>();
+    const vols = top5.filter(isVOL).slice(0, 2); vols.forEach(j => excl.add(j.id));
+    const mc = bestOf(isMC, excl); if (mc) excl.add(mc.id);
+    const mo = bestOf(isMO, excl);
+    return [...vols, ...(mc ? [mc] : []), ...(mo ? [mo] : [])].map(j => ({ jogador: j, role: roleLabel(j) }));
+  }
+  if (cntMC >= 3) {
+    const excl = new Set<string>();
+    const mcs = top5.filter(isMC).slice(0, 2); mcs.forEach(j => excl.add(j.id));
+    const vol = bestOf(isVOL, excl); if (vol) excl.add(vol.id);
+    const mo = bestOf(isMO, excl);
+    return [...mcs, ...(vol ? [vol] : []), ...(mo ? [mo] : [])].map(j => ({ jogador: j, role: roleLabel(j) }));
+  }
+  if (cntMO >= 3) {
+    const excl = new Set<string>();
+    const mos = top5.filter(isMO).slice(0, 2); mos.forEach(j => excl.add(j.id));
+    const vol = bestOf(isVOL, excl); if (vol) excl.add(vol.id);
+    const mc = bestOf(isMC, excl);
+    return [...mos, ...(vol ? [vol] : []), ...(mc ? [mc] : [])].map(j => ({ jogador: j, role: roleLabel(j) }));
+  }
+
+  const pares = (cntVOL >= 2 ? 1 : 0) + (cntMC >= 2 ? 1 : 0) + (cntMO >= 2 ? 1 : 0);
+  if (pares >= 2) return top5.map(j => ({ jogador: j, role: roleLabel(j) }));
+
+  const excl = new Set<string>();
+  const vol = bestOf(isVOL, excl); if (vol) excl.add(vol.id);
+  const mc = bestOf(isMC, excl); if (mc) excl.add(mc.id);
+  const mo = bestOf(isMO, excl);
+  return [
+    ...(vol ? [vol] : []),
+    ...(mc ? [mc] : []),
+    ...(mo ? [mo] : []),
+  ].map(j => ({ jogador: j, role: roleLabel(j) }));
+}
+
+function corTextoVisivel(hex: string): string {
+  const c = (hex || '').replace('#', '').trim();
+  if (c.length !== 6) return hex;
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return hex;
+  const luminancia = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminancia < 30 ? '#ffffff' : hex;
+}
+
+function BestPlayerCard({ jogador, role, cor }: { jogador: MelhorTimeJogador | null; role: string; cor: string }) {
+  if (!jogador) return (
+    <div style={{ background: 'var(--surface2)', border: '1px dashed var(--border)', borderRadius: 8, padding: '.6rem .75rem', textAlign: 'center', flex: 1, minWidth: 88 }}>
+      <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '.3rem' }}>{role}</div>
+      <div style={{ fontSize: '.75rem', color: '#444' }}>—</div>
+    </div>
+  );
+
+  const minVal = jogador.stats.minutos;
+  const gs = jogador.posicao === 'GOL'
+    ? (jogador.stats.gols_sofridos > 0 ? `${Math.round(minVal / jogador.stats.gols_sofridos)}'∕gol` : '∞ min/gol')
+    : null;
+  const temGols = jogador.stats.gols > 0;
+  const temAmarelo = jogador.stats.cartoes_amarelos > 0;
+  const temVermelho = jogador.stats.cartoes_vermelhos > 0;
+
+  return (
+    <div style={{ background: `${cor}12`, border: `1px solid ${cor}30`, borderRadius: 8, padding: '.65rem .75rem', textAlign: 'center', flex: 1, minWidth: 110 }}>
+      <div style={{ fontSize: '.58rem', color: cor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.07em', marginBottom: '.2rem' }}>
+        {role}
+      </div>
+      {jogador.numero && (
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: cor, lineHeight: 1.1 }}>
+          #{jogador.numero}
+        </div>
+      )}
+      <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--text)', margin: '.2rem 0', lineHeight: 1.3 }}>
+        {jogador.nome}
+      </div>
+      <div style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>
+        {jogador.stats.partidas}j · {minVal}&apos;
+      </div>
+      {gs && <div style={{ fontSize: '.62rem', color: cor, marginTop: '.15rem', fontWeight: 600 }}>{gs}</div>}
+      {!gs && (
+        <div style={{ display: 'flex', gap: '.3rem', justifyContent: 'center', marginTop: '.25rem', flexWrap: 'wrap' }}>
+          {temGols && <span style={{ fontSize: '.62rem', color: '#22c55e', fontWeight: 600 }}>⚽{jogador.stats.gols}</span>}
+          {temAmarelo && <span style={{ fontSize: '.62rem', color: '#f59e0b', fontWeight: 600 }}>🟨{jogador.stats.cartoes_amarelos}</span>}
+          {temVermelho && <span style={{ fontSize: '.62rem', color: '#ef4444', fontWeight: 600 }}>🟥{jogador.stats.cartoes_vermelhos}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FieldRow({ label, cor, players }: { label: string; cor: string; players: { jogador: MelhorTimeJogador | null; role: string }[] }) {
+  if (players.length === 0) return null;
+  return (
+    <div style={{ marginBottom: '1rem' }}>
+      <div style={{ fontSize: '.63rem', color: cor, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 700, marginBottom: '.4rem' }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+        {players.map((p, i) => <BestPlayerCard key={p.jogador?.id ?? i} jogador={p.jogador} role={p.role} cor={cor} />)}
+      </div>
+    </div>
+  );
+}
+
 const zonaColor: Record<string, string> = {
   libertadores: 'var(--libertadores)', 'libertadores-direta': '#a3e635',
   sulamericana: 'var(--sulamericana)', 'sulamericana-direta': '#60a5fa',
@@ -133,17 +454,22 @@ const zonaLabel: Record<string, string> = {
 const formaColor: Record<string, string> = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' };
 const posLabel: Record<string, string> = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meia', ATA: 'Atacante' };
 
-// Mapa fixo sigla → id. Identificar o time por aqui (em vez de percorrer
-// times.find comparando t.sigla/t.id de TODO registro) evita que um campo
-// vazio/nulo em QUALQUER OUTRO time do banco derrube a página inteira — foi
-// exatamente isso que causou o crash anterior. Se você renomear a sigla de
-// algum time no /admin, só atualizar aqui também.
-const SIGLA_PARA_ID: Record<string, string> = {
-  fla: 'FLA', pal: 'PAL', cam: 'CAM', bot: 'BOT', flu: 'FLU', vas: 'VAS',
-  spf: 'SAO', sao: 'SAO', cor: 'COR', san: 'SAN', int: 'INT', gre: 'GRE',
-  cru: 'CRU', bah: 'BAH', cap: 'CAP', atg: 'ATG', rbb: 'RBB', mir: 'MIR',
-  cha: 'CHA', cot: 'COT', rem: 'REM', for: 'FOR',
-};
+// Alguns clubes têm mais de uma sigla "oficial" em uso (o cadastro no banco
+// pode ter qualquer uma delas em `sigla` OU em `id`, dependendo de quando/como
+// o time foi criado). Cada grupo abaixo é tratado como sinônimo: se a URL usar
+// qualquer sigla do grupo, procuramos o time cujo `sigla` OU `id` bata com
+// QUALQUER uma delas — funciona não importa qual das duas está no banco.
+// Adicione novos grupos aqui se algum outro time também tiver mais de uma sigla.
+const GRUPOS_SIGLA: string[][] = [
+  ['atl', 'cam'],          // Atlético-MG
+  ['atg', 'cap', 'ath'],   // Athletico-PR
+  ['sao', 'spf'],          // São Paulo
+  ['cot', 'cfc'],          // Coritiba
+];
+
+function grupoDaSigla(sigla: string): string[] {
+  return GRUPOS_SIGLA.find(g => g.includes(sigla)) ?? [sigla];
+}
 
 const th: React.CSSProperties = { padding: '.5rem .6rem', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.8rem', letterSpacing: '.05em', color: 'var(--text-muted)', whiteSpace: 'nowrap' };
 const td: React.CSSProperties = { padding: '.45rem .6rem', textAlign: 'center', fontSize: '.85rem' };
@@ -158,12 +484,10 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
     getPartidas(), getTimes(), getJogadores(), getEstadios(), getTecnicos(), getConfig(),
   ]);
 
-  const idAlvo = SIGLA_PARA_ID[siglaMinuscula];
-  const time = idAlvo
-    ? times.find(t => t.id === idAlvo)
-    // fallback só para times que ainda não estão no mapa fixo acima
-    : times.find(t => String(t.sigla ?? '').toLowerCase() === siglaMinuscula)
-      ?? times.find(t => String(t.id ?? '').toLowerCase() === siglaMinuscula);
+  const grupo = grupoDaSigla(siglaMinuscula);
+  const time = times.find(t =>
+    grupo.includes(String(t.sigla ?? '').toLowerCase()) || grupo.includes(String(t.id ?? '').toLowerCase())
+  );
   if (!time) notFound();
 
   const estadioTime = estadios.find(e => e.id === time.estadio_id);
@@ -325,6 +649,29 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
     .map(g => ({ jogador: g, ...calcularCiclosGoleiroTime(g.id, jogosTime) }))
     .filter(c => c.totalPartidas > 0)
     .sort((a, b) => b.cicloAtual - a.cicloAtual);
+
+  // ── Melhor Time da Temporada ───────────────────────────────────────────────
+  const totalMinutosTime = jogosTime.reduce((soma, { p }) => {
+    const acr1 = p.acrescimo_primeiro ?? 0;
+    const acr2 = p.acrescimo_segundo ?? 0;
+    return soma + 45 + acr1 + 45 + acr2;
+  }, 0);
+
+  const jogadoresParaMelhorTime: MelhorTimeJogador[] = listaJogadores.map(s => ({
+    ...s.jogador,
+    stats: {
+      gols: s.gols, gols_contra: s.gols_contra, gols_sofridos: s.gols_sofridos,
+      assistencias: s.assistencias, cartoes_amarelos: s.amarelos, cartoes_vermelhos: s.vermelhos,
+      minutos: s.minutos, partidas: s.partidas,
+    },
+  }));
+
+  const bestTeam = jogadoresParaMelhorTime.some(j => j.stats.partidas > 0)
+    ? calcBestTeam(jogadoresParaMelhorTime, totalMinutosTime)
+    : null;
+  const formacaoBestTeam = bestTeam ? `1-${bestTeam.nDef}-${bestTeam.nMei}-${bestTeam.nAta}` : '';
+  const corTime = time.cor_primaria || '#888888';
+  const corTimeTexto = corTextoVisivel(corTime);
 
   // ── Peso dos gols na pontuação (só deste time) ────────────────────────────
   const pesoGolsGeral = calcularPesoGols(partidas, jogadores, times);
@@ -733,6 +1080,53 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
             </table>
           </div>
         </section>
+
+        {/* ── Melhor Time da Temporada ────────────────────────────────────────── */}
+        {bestTeam ? (
+          <section style={{ marginBottom: '2.5rem' }}>
+            <h2 style={sectionTitle}>⭐ Melhor Time da Temporada</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.5rem', color: corTimeTexto, letterSpacing: '.08em' }}>
+                {formacaoBestTeam}
+              </span>
+              <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>
+                <div>Goleiro: menor média de gols sofridos · Demais: jogo limpo (min/cartão) + gols</div>
+                {bestTeam.lateraisNoMeio && (
+                  <div style={{ color: '#22c55e', marginTop: '.2rem' }}>
+                    ↳ Laterais não encontrados nos top-5 da defesa — incluídos no meio-campo
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--surface)', border: `1px solid ${corTime}33`, borderRadius: 12, padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, right: 0, width: 220, height: 220, background: `${corTime}06`, borderRadius: '50%', transform: 'translate(70px,-70px)', pointerEvents: 'none' }} />
+
+              <FieldRow label="Goleiro" cor="#f59e0b" players={bestTeam.goleiro ? [{ jogador: bestTeam.goleiro, role: 'GOL' }] : []} />
+              <FieldRow label={`Defesa (${bestTeam.nDef})`} cor="#3b82f6" players={bestTeam.defesa} />
+              <FieldRow
+                label={bestTeam.lateraisNoMeio ? `Meio-campo com Laterais (${bestTeam.nMei})` : `Meio-campo (${bestTeam.nMei})`}
+                cor={bestTeam.lateraisNoMeio ? '#22c55e' : '#8b5cf6'}
+                players={bestTeam.meios}
+              />
+              {bestTeam.ataque.length > 0 && (
+                <FieldRow label={`Ataque (${bestTeam.nAta})`} cor="#ef4444" players={bestTeam.ataque} />
+              )}
+
+              <div style={{ marginTop: '1rem', paddingTop: '.75rem', borderTop: '1px solid var(--border)', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '.67rem', color: 'var(--text-muted)' }}>
+                <span><strong style={{ color: 'var(--text)' }}>j</strong> Partidas disputadas</span>
+                <span><strong style={{ color: 'var(--amarelo)' }}>&apos;</strong> Minutos em campo</span>
+                <span><strong style={{ color: '#22c55e' }}>⚽</strong> Gols marcados</span>
+                <span><strong style={{ color: '#f59e0b' }}>GOL</strong> min/gol sofrido (∞ = nenhum gol sofrido)</span>
+                <span>Defesa 3 ZAG ou LD+2ZAG+LE · Meio 3–5 · Ataque 1–3</span>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', fontSize: '.85rem', marginBottom: '2.5rem' }}>
+            Nenhuma partida encerrada com jogadores deste time para montar o melhor time.
+          </div>
+        )}
 
         {/* ── Ciclos de Minutos dos Goleiros ─────────────────────────────────── */}
         <section style={{ marginBottom: '2.5rem' }}>
