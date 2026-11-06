@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { Partida, Time, Jogador, Tecnico, Gol, Cartao, Substituicao, EscalacaoJogador, StatsJogador } from '@/lib/types';
 import { clientGetPartida, clientGetTimes, clientGetJogadores, clientUpsertPartida, clientGetTecnicos, uid } from '@/lib/client';
 import { ImportarApiFootballTab } from './ImportarApiFootballTab';
+import { ImportarStatsImagem } from '@/components/ImportarStatsImagem';
 
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
 const TIPO_GOL = ['normal','penalti','falta','contra','penalti_perdido','penalti_defendido'];
@@ -887,7 +888,7 @@ function StatsTeamTable({
 }
 
 function StatsTab({
-  partida, timeCasa, timeVis, timeCasaNome, timeVisNome, jogadores, save,
+  partida, timeCasa, timeVis, timeCasaNome, timeVisNome, jogadores, save, flash,
 }: {
   partida: Partida;
   timeCasa: Time | undefined;
@@ -896,6 +897,7 @@ function StatsTab({
   timeVisNome: string;
   jogadores: Jogador[];
   save: (updated: Partida) => Promise<void> | void;
+  flash: (ok: boolean, t: string) => void;
 }) {
   const statsAtuais = partida.stats_jogadores ?? [];
 
@@ -931,6 +933,16 @@ function StatsTab({
         <strong> Sav</strong> (defesas) só fica disponível para jogadores na posição Goleiro.
         Ao marcar <strong>Validado</strong> (última coluna), os números daquele jogador ficam bloqueados para edição. A última linha de cada tabela mostra o somatório de cada coluna.
       </p>
+      <ImportarStatsImagem
+        partida={partida}
+        jogadores={jogadores}
+        getStats={getStats}
+        flash={flash}
+        onAplicar={async (novos) => {
+          const ids = new Set(novos.map(n => n.jogador_id));
+          await save({ ...partida, stats_jogadores: [...statsAtuais.filter(s => !ids.has(s.jogador_id)), ...novos] });
+        }}
+      />
       <div style={{display:'flex',flexDirection:'column',gap:'2rem'}}>
         <div>
           <h3 style={{fontSize:'1.1rem',marginBottom:'.6rem',color:'var(--verde)'}}>{timeCasa?.nome ?? timeCasaNome} <span style={{color:'var(--text-muted)',fontSize:'.8rem'}}>(Mandante)</span></h3>
@@ -1096,7 +1108,7 @@ export default function AdminPartidaEventos() {
         <StatsTab
           partida={partida} timeCasa={timeCasa} timeVis={timeVis}
           timeCasaNome={timeCasaNome} timeVisNome={timeVisNome}
-          jogadores={jogadores} save={save}
+          jogadores={jogadores} save={save} flash={flash}
         />
       )}
       {tab==='apifootball'&&(
