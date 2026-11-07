@@ -147,7 +147,7 @@ function GolsTab({
   const cancelarEdicao=()=>{setForm(emptyGol());setEditId(null);};
 
   const salvar=()=>{
-    if(!form.minuto||!form.jogador_id) return flash(false,'Preencha o minuto e o jogador.');
+    if(!form.minuto||!form.jogador_id||!form.goleiro_id) return flash(false,'Preencha o minuto, o jogador e o goleiro.');
     const novoGol:Gol={
       id:editId??`g${uid()}`, minuto:+form.minuto, acrescimo:+form.acrescimo,
       time_id:form.time_id, jogador_id:form.jogador_id,
@@ -209,7 +209,7 @@ function GolsTab({
             </div>
           )}
           <div className="form-group" style={{width:190,margin:0}}>
-            <label>Goleiro adversário</label>
+            <label>Goleiro adversário *</label>
             <select className="evt-field" style={selectSt} value={form.goleiro_id} onChange={f('goleiro_id')}>
               <option value="">Selecione...</option>
               {goleirosAdv.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
@@ -490,6 +490,22 @@ function SubsTab({
             />
           </div>
           <div className="form-group" style={{width:190,margin:0}}><label>↑ Entra *</label>
+            {quemPodeEntrar.length>0&&(
+              <div style={{display:'flex',flexWrap:'wrap',gap:'.3rem',marginBottom:'.45rem'}}>
+                {quemPodeEntrar.map(e=>{
+                  const ativo=form.entra_id===e.jogador_id;
+                  return (
+                    <button key={e.jogador_id} type="button" onClick={()=>setForm(v=>({...v,entra_id:e.jogador_id}))} style={{
+                      fontSize:'.72rem', padding:'.2rem .55rem', borderRadius:20,
+                      border:`1px solid ${ativo?'var(--verde)':'var(--border)'}`,
+                      background:ativo?'rgba(0,168,79,.15)':'var(--surface2)',
+                      color:ativo?'var(--verde)':'var(--text-muted)',
+                      cursor:'pointer', transition:'all .12s', whiteSpace:'nowrap',
+                    }}>{nomeJog(e.jogador_id)}</button>
+                  );
+                })}
+              </div>
+            )}
             <select className="evt-field" style={selectSt} value={form.entra_id} onChange={f('entra_id')}>
               <option value="">Selecione...</option>
               {quemPodeEntrar.map(e=><option key={e.jogador_id} value={e.jogador_id}>{nomeJog(e.jogador_id)}</option>)}
@@ -546,7 +562,7 @@ function SubsTab({
 // recarregamento residual.
 function EscalacaoBlock({
   isCasa, esc, time, lista,
-  addJog, completarEscalacao, adicionarTodosAZ, updJogador, upd, rem,
+  addJog, completarEscalacao, adicionarTodosAZ, ordenarEscalacao, updJogador, upd, rem,
 }: {
   isCasa: boolean;
   esc: EscalacaoJogador[];
@@ -555,6 +571,7 @@ function EscalacaoBlock({
   addJog: (isCasa: boolean) => void;
   completarEscalacao: (isCasa: boolean) => void;
   adicionarTodosAZ: (isCasa: boolean) => void;
+  ordenarEscalacao: (isCasa: boolean, modo: 'titular' | 'posicao') => void;
   updJogador: (isCasa: boolean, idx: number, novoJogadorId: string) => void;
   upd: (isCasa: boolean, idx: number, field: string, value: string | boolean) => void;
   rem: (isCasa: boolean, idx: number) => void;
@@ -573,6 +590,8 @@ function EscalacaoBlock({
         <div style={{display:'flex',gap:'.5rem'}}>
           <button className="btn btn-ghost btn-sm" onClick={()=>completarEscalacao(isCasa)} title="Preenche automaticamente os titulares que faltam">⚡ Completar</button>
           <button className="btn btn-ghost btn-sm" onClick={()=>adicionarTodosAZ(isCasa)} title="Adiciona todos os jogadores restantes em ordem alfabética, sem marcar titular">🔤 A/Z</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>ordenarEscalacao(isCasa,'titular')} title="Ordena Titulares primeiro, depois Reservas (A–Z dentro de cada grupo)">↕ Titular/Reserva</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>ordenarEscalacao(isCasa,'posicao')} title="Ordena por posição (Goleiro, Zagueiros, Laterais, Volantes, Meias, Atacantes), A–Z dentro de cada posição">↕ Posição</button>
           <button className="btn btn-primary btn-sm" onClick={()=>addJog(isCasa)}>+ Jogador</button>
         </div>
       </div>
@@ -689,6 +708,23 @@ function EscalacaoTab({
     flash(true,`${novos.length} jogador(es) adicionado(s) em ordem alfabética!`);
   };
 
+  const ordenarEscalacao=(isCasa:boolean,modo:'titular'|'posicao')=>{
+    const nome=(id:string)=>jogadores.find(j=>j.id===id)?.nome??'';
+    const ordemPos=(p:string)=>{const i=POSICOES.indexOf(p);return i<0?POSICOES.length:i;};
+    const alfa=(a:EscalacaoJogador,b:EscalacaoJogador)=>nome(a.jogador_id).localeCompare(nome(b.jogador_id),'pt-BR');
+    const esc=[...(isCasa?partida.escalacao_casa:partida.escalacao_visitante)];
+    if(esc.length<2) return;
+    esc.sort((a,b)=>{
+      const primario = modo==='titular'
+        ? Number(b.titular)-Number(a.titular)
+        : ordemPos(a.posicao)-ordemPos(b.posicao);
+      return primario!==0 ? primario : alfa(a,b);
+    });
+    const u={...partida};
+    if(isCasa) u.escalacao_casa=esc; else u.escalacao_visitante=esc;
+    save(u as Partida);
+  };
+
   const updJogador=(isCasa:boolean,idx:number,novoJogadorId:string)=>{
     const jog=jogadores.find(j=>j.id===novoJogadorId);
     const u={...partida};
@@ -720,11 +756,13 @@ function EscalacaoTab({
       <EscalacaoBlock
         isCasa={true} esc={partida.escalacao_casa} time={timeCasa} lista={jogCasa}
         addJog={addJog} completarEscalacao={completarEscalacao} adicionarTodosAZ={adicionarTodosAZ}
+        ordenarEscalacao={ordenarEscalacao}
         updJogador={updJogador} upd={upd} rem={rem}
       />
       <EscalacaoBlock
         isCasa={false} esc={partida.escalacao_visitante} time={timeVis} lista={jogVis}
         addJog={addJog} completarEscalacao={completarEscalacao} adicionarTodosAZ={adicionarTodosAZ}
+        ordenarEscalacao={ordenarEscalacao}
         updJogador={updJogador} upd={upd} rem={rem}
       />
     </div>
