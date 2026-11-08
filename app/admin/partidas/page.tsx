@@ -286,6 +286,13 @@ export default function AdminPartidas() {
         // Só considera COMPLETA quando há 10 partidas de fato ENCERRADAS
         const countEncerradas = ps.filter(p => p.status === 'encerrada').length;
         const completa = countEncerradas >= PARTIDAS_POR_RODADA;
+        // "Stats": todas as partidas da rodada têm escalação e todos os jogadores escalados validados na aba Stats
+        const statsCompleto = ps.length > 0 && ps.every(p => {
+          const escalados = [...(p.escalacao_casa ?? []), ...(p.escalacao_visitante ?? [])];
+          if (escalados.length === 0) return false;
+          const validados = new Set((p.stats_jogadores ?? []).filter(s => s.validado).map(s => s.jogador_id));
+          return escalados.every(e => validados.has(e.jogador_id));
+        });
         const isOpen=openRodadas[rod]??false;
         return (
           <section key={rod} style={{marginBottom:'1rem'}}>
@@ -293,6 +300,7 @@ export default function AdminPartidas() {
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:'1.5rem',color:'var(--text)'}}>{rod}ª Rodada</span>
               <span style={{fontSize:'.75rem',color:'var(--text-muted)',flex:1}}>{ps.length} partida(s) · {countEncerradas} encerrada(s)</span>
               {completa&&<span style={{fontSize:'.68rem',background:'rgba(0,168,79,.12)',color:'var(--verde)',border:'1px solid rgba(0,168,79,.25)',borderRadius:4,padding:'.15rem .5rem',fontWeight:700}}>COMPLETA</span>}
+              {statsCompleto&&<span title="Todos os jogadores das partidas da rodada estão validados na aba Stats" style={{fontSize:'.68rem',background:'rgba(0,168,79,.12)',color:'var(--verde)',border:'1px solid rgba(0,168,79,.25)',borderRadius:4,padding:'.15rem .5rem',fontWeight:700}}>STATS</span>}
               <span style={{color:'var(--text-muted)',fontSize:'1.1rem',transform:isOpen?'rotate(180deg)':'none',transition:'transform .2s'}}>▾</span>
             </button>
             {isOpen&&(
