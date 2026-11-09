@@ -36,6 +36,8 @@ export function parseColunas(texto: string): { colunas: (StatKey | null)[]; inva
 function lerNumero(t: string): number | null {
   if (/^[-–—]+$/.test(t)) return 0;
   if (/^\d+$/.test(t)) return parseInt(t, 10);
+  // "11" lido como "ll", "Il", "||": só letras parecidas com 1, até 2 caracteres
+  if (/^[lI|]{2}$/.test(t)) return 11;
   const corrigido = t.replace(/[Oo]/g, '0').replace(/[lI|]/g, '1');
   const temDigito = /\d/.test(t);
   if ((temDigito || t.length === 1) && /^\d+$/.test(corrigido)) return parseInt(corrigido, 10);
@@ -47,6 +49,7 @@ export interface LinhaOcr {
   nome: string;        // nome lido
   prefixos: number[];  // números antes do nome (registro, camisa...)
   valores: number[];   // números depois do nome, na ordem das colunas
+  brutos: string[];    // tokens numéricos originais (para reunir dígitos separados pelo OCR)
 }
 
 export function parseLinhas(textoOcr: string): LinhaOcr[] {
@@ -65,6 +68,7 @@ export function parseLinhas(textoOcr: string): LinhaOcr[] {
       fim--;
     }
     const valores = rev.reverse();
+    const brutos = tokens.slice(fim);
 
     let ini = 0;
     const prefixos: number[] = [];
@@ -72,9 +76,55 @@ export function parseLinhas(textoOcr: string): LinhaOcr[] {
 
     const nome = tokens.slice(ini, fim).join(' ').replace(/[^\p{L}\s.'-]/gu, '').replace(/\s+/g, ' ').trim();
     if (!nome || valores.length === 0) continue;
-    linhas.push({ texto, nome, prefixos, valores });
+    linhas.push({ texto, nome, prefixos, valores, brutos });
   }
   return linhas;
+}
+
+// O OCR costuma separar números com "1" ("11" → "1 1", "41" → "4 1"), o que gera
+// valores a mais e desloca todas as colunas seguintes. Quando há mais valores do que
+// colunas, testa juntar pares de dígitos soltos e escolhe a combinação que respeita os
+// limites de cada coluna; em caso de dúvida, prefere a que dá o maior valor em "P".
+export function ajustarValores(
+  linha: Pick<LinhaOcr, 'valores' | 'brutos'>,
+  colunas: (StatKey | null)[],
+): number[] {
+  const { valores, brutos } = linha;
+  const n = valores.length;
+  const k = n - colunas.length;
+  if (k <= 0 || brutos.length !== n) return valores;
+
+  const digitoSolto = (i: number) => /^\d$/.test(brutos[i]);
+  const pares: number[] = [];
+  for (let i = 0; i < n - 1; i++) if (digitoSolto(i) && digitoSolto(i + 1)) pares.push(i);
+  if (pares.length < k) return valores;
+
+  let melhor: { v: number[]; violacoes: number; p: number } | null = null;
+  const idxP = colunas.indexOf('P');
+
+  const tentar = (escolhidos: number[]) => {
+    const v: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (escolhidos.includes(i)) { v.push(valores[i] * 10 + valores[i + 1]); i++; }
+      else v.push(valores[i]);
+    }
+    let violacoes = 0;
+    colunas.forEach((c, idx) => { if (c && v[idx] > STAT_MAX[c]) violacoes++; });
+    const p = idxP >= 0 ? v[idxP] ?? 0 : 0;
+    if (!melhor || violacoes < melhor.violacoes || (violacoes === melhor.violacoes && p > melhor.p)) {
+      melhor = { v, violacoes, p };
+    }
+  };
+
+  const combinar = (ini: number, escolhidos: number[]) => {
+    if (escolhidos.length === k) { tentar(escolhidos); return; }
+    for (let j = ini; j < pares.length; j++) {
+      if (escolhidos.length && pares[j] === escolhidos[escolhidos.length - 1] + 1) continue; // sem sobreposição
+      combinar(j + 1, [...escolhidos, pares[j]]);
+    }
+  };
+  combinar(0, []);
+  return melhor ? (melhor as { v: number[] }).v : valores;
 }
 
 export interface Candidato {
