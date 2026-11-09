@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Partida, Jogador, StatsJogador } from '@/lib/types';
 import {
-  STAT_KEYS, STAT_MAX, parseColunas, parseLinhas, casarLinha,
+  STAT_KEYS, STAT_MAX, parseColunas, parseLinhas, casarLinha, ajustarValores,
   type StatKey, type Candidato, type MetodoCasamento,
 } from '@/lib/statsImagem';
 
@@ -111,12 +111,13 @@ export function ImportarStatsImagem({ partida, jogadores, getStats, onAplicar, f
     const novas: Linha[] = lidas.map((l, i) => {
       const c = casarLinha(l, candidatos);
       const valores: Partial<Record<StatKey, number>> = {};
-      cols.forEach((k, idx) => { if (k && l.valores[idx] !== undefined) valores[k] = l.valores[idx]; });
+      const v = ajustarValores(l, cols);
+      cols.forEach((k, idx) => { if (k && v[idx] !== undefined) valores[k] = v[idx]; });
       return {
         key: i, nomeLido: l.nome, textoOriginal: l.texto,
         jogador_id: c.jogador_id ?? '', metodo: c.metodo, valores,
-        sobrando: Math.max(0, l.valores.length - cols.length),
-        faltando: Math.max(0, cols.length - l.valores.length),
+        sobrando: Math.max(0, v.length - cols.length),
+        faltando: Math.max(0, cols.length - v.length),
         incluir: !!c.jogador_id,
       };
     });
