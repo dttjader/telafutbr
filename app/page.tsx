@@ -1,6 +1,11 @@
 import { getPartidas, getTimes, getJogadores, getTecnicos, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador, calcularGolsSofridosPorJogador } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Partida, Jogador, Time, Tecnico } from '@/lib/types';
+import { TopSelector } from '@/components/TopSelector';
+import {
+  MINIMOS, calcularMinutosPorJogador, topJogadores, razao, por90,
+  fmtInt, fmtDec, fmtPct, TAMANHO_TOP, type RankingItem,
+} from '@/lib/rankings';
 
 // Página principal do site — mostra o painel Resumo, alimentado por versões
 // condensadas das outras telas do site. Novas seções devem ser adicionadas
@@ -66,28 +71,6 @@ function formatarData(d: string): string {
   const partes = d.split('-');
   if (partes.length !== 3) return d;
   return `${partes[2]}/${partes[1]}/${partes[0]}`;
-}
-
-// Minutos jogados por um jogador em uma partida (mesma lógica usada em
-// Dados/Analítico e Dados/Times) — usado para calcular os índices
-// "Gols/90 min" e "Passes por Minuto" no Resumo.
-function calcularMinutosJogador(jogadorId: string, partida: Partida, ehTitular: boolean): number {
-  const acr1 = partida.acrescimo_primeiro ?? 0;
-  const acr2 = partida.acrescimo_segundo ?? 0;
-  const totalPartida = 45 + acr1 + 45 + acr2;
-  const vermelho = partida.cartoes.find(c => c.jogador_id === jogadorId && c.tipo === 'vermelho');
-  const minutoVermelho = vermelho?.minuto ?? Infinity;
-  if (ehTitular) {
-    const sub = partida.substituicoes.find(s => s.sai_id === jogadorId);
-    const minutoSaida = sub ? Math.min(sub.minuto, minutoVermelho) : minutoVermelho;
-    return Math.min(minutoSaida, totalPartida);
-  } else {
-    const entrada = partida.substituicoes.find(s => s.entra_id === jogadorId);
-    if (!entrada) return 0;
-    const sub = partida.substituicoes.find(s => s.sai_id === jogadorId);
-    const minutoSaida = sub ? Math.min(sub.minuto, minutoVermelho) : minutoVermelho;
-    return Math.min(minutoSaida, totalPartida) - entrada.minuto;
-  }
 }
 
 // Ciclos de minutos sem sofrer gols de cada goleiro (mesma lógica de
@@ -438,7 +421,7 @@ export default async function Home() {
   }
   const top5Placares = Object.entries(placarMap)
     .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 5)
+    .slice(0, TAMANHO_TOP)
     .map(([placar, d]) => ({
       placar: placar.replace('x', '\u00d7'),
       count: d.count,
@@ -461,8 +444,8 @@ export default async function Home() {
       }
     }
   }
-  const top5Artilheiros = Object.values(artMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
-  const top5Assist = Object.values(assistMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
+  const top5Artilheiros = Object.values(artMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, TAMANHO_TOP);
+  const top5Assist = Object.values(assistMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, TAMANHO_TOP);
 
   // Top 5 Maiores Pontuadores — soma do peso de cada gol/pênalti defendido na
   // pontuação da partida (mesmo critério usado em Dados/Artilharia e
@@ -477,135 +460,24 @@ export default async function Home() {
     })
     .filter(j => j.pontuacao > 0)
     .sort((a, b) => b.pontuacao - a.pontuacao)
-    .slice(0, 5);
+    .slice(0, TAMANHO_TOP);
 
   // Estatísticas Opta (aba Stats) — usadas no índice Passes/Minuto e no SAV%.
   const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
   const golsSofridosPorJogador = calcularGolsSofridosPorJogador(partidas);
 
-  // Minutos totais por jogador (mesma lógica usada em Dados/Analítico) —
-  // usado para calcular os índices "Gols/90 min" e "Passes por Minuto" abaixo.
-  const minutosPorJogador: Record<string, number> = {};
-  for (const p of encerradas) {
-    const todosEscalados = [
-      ...p.escalacao_casa.map(e => ({ ...e })),
-      ...p.escalacao_visitante.map(e => ({ ...e })),
-    ];
-    for (const esc of todosEscalados) {
-      const mins = calcularMinutosJogador(esc.jogador_id, p, esc.titular);
-      if (mins === 0 && !esc.titular) continue;
-      minutosPorJogador[esc.jogador_id] = (minutosPorJogador[esc.jogador_id] ?? 0) + mins;
-    }
-  }
-
-  // Top 5 Gols p/90 min — mesma lógica usada em Dados/Artilharia: gols ÷
-  // minutos jogados × 90, considerando apenas jogadores com pelo menos 90
-  // minutos em campo.
-  const top5G90 = Object.values(artMap)
-    .map(a => {
-      const jog = jogadores.find(j => j.id === a.jogador_id);
-      const minutos = minutosPorJogador[a.jogador_id] ?? 0;
-      return {
-        jogador_id: a.jogador_id,
-        nome: jog?.nome ?? a.jogador_id,
-        time_id: a.time_id,
-        gols: a.quantidade,
-        minutos,
-        g90: minutos > 0 ? (a.quantidade / minutos) * 90 : 0,
-      };
-    })
-    .filter(j => j.minutos >= 90 && j.gols > 0)
-    .sort((a, b) => b.g90 - a.g90)
-    .slice(0, 5);
-
-  // Top 5 Passes por Minuto — Passes (P, lançados na aba Stats) ÷ minutos
-  // jogados, sem converter para a base de 90 minutos. Considera apenas
-  // jogadores com mais de 100 passes (P > 100), por enquanto, para evitar
-  // amostras pequenas distorcerem o ranking.
-  const top5PassesMinuto = jogadores
-    .map(j => {
-      const passes = statsOptaPorJogador[j.id]?.P ?? 0;
-      const minutos = minutosPorJogador[j.id] ?? 0;
-      const time = times.find(t => t.id === j.time_atual);
-      return {
-        jogador_id: j.id,
-        nome: j.nome,
-        time_id: j.time_atual,
-        timeSigla: time?.sigla ?? '—',
-        passes,
-        minutos,
-        indice: minutos > 0 ? passes / minutos : 0,
-      };
-    })
-    .filter(j => j.passes > 100 && j.minutos > 0)
-    .sort((a, b) => b.indice - a.indice)
-    .slice(0, 5);
-
-  // Top 5 Eficácia — índice G/(Off+S) da tela Dados > Artilharia.
-  const top5Eficacia = jogadores
-    .map(j => {
-      const o = statsOptaPorJogador[j.id];
-      if (!o || o.Off + o.S <= 0) return null;
-      const gols = artMap[j.id]?.quantidade ?? 0;
-      return { jogador_id: j.id, nome: j.nome, time_id: j.time_atual, indice: (gols / (o.Off + o.S)) * 100 };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-    .sort((a, b) => b.indice - a.indice)
-    .slice(0, 5);
-
-  // Top 5 Desarmadores — Índice Desarme Tk/(Tk+FC) da tela Dados > Cartões.
-  const top5Desarmadores = jogadores
-    .map(j => {
-      const o = statsOptaPorJogador[j.id];
-      if (!o || o.Tk + o.FC <= 0) return null;
-      return { jogador_id: j.id, nome: j.nome, time_id: j.time_atual, indice: (o.Tk / (o.Tk + o.FC)) * 100 };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-    .sort((a, b) => b.indice - a.indice)
-    .slice(0, 5);
-
-  // Top 5 Razão Faltas — Índice FS/FC da tela Dados > Cartões.
-  const top5RazaoFaltas = jogadores
-    .map(j => {
-      const o = statsOptaPorJogador[j.id];
-      if (!o || o.FC <= 0) return null;
-      return { jogador_id: j.id, nome: j.nome, time_id: j.time_atual, indice: o.FS / o.FC };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-    .sort((a, b) => b.indice - a.indice)
-    .slice(0, 5);
+  // Minutos e partidas por jogador (mesma lógica de Dados/Analítico) — base
+  // dos índices "por 90 min", Passes/Minuto e Defesas/jogo.
+  const { minutos: minutosPorJogador, partidas: partidasPorJogador } = calcularMinutosPorJogador(partidas);
 
   // Ciclos dos goleiros (maior ciclo / ciclo atual) — base para dois Top 5.
   const ciclosGoleiros = calcularCiclosGoleiros(encerradas, jogadores, times);
 
   // Top 5 Goleiros (maior ciclo sem sofrer gol — recorde pessoal)
-  const top5Ciclos = [...ciclosGoleiros].sort((a, b) => b.maiorCiclo - a.maiorCiclo).slice(0, 5);
+  const top5Ciclos = [...ciclosGoleiros].sort((a, b) => b.maiorCiclo - a.maiorCiclo).slice(0, TAMANHO_TOP);
 
   // Top 5 Goleiros (ciclo atual — em aberto, desde o último gol sofrido)
-  const top5CicloAtual = [...ciclosGoleiros].sort((a, b) => b.cicloAtual - a.cicloAtual).slice(0, 5);
-
-  // Top 5 Goleiros por SAV% — defesas (Sav, lançadas na aba Stats de cada
-  // partida) ÷ (defesas + gols sofridos). Mesma fórmula usada em
-  // Dados/Goleiros → "Aproveitamento (SAV%)". Aqui mostramos só o percentual.
-  const top5SavPct = jogadores
-    .filter(j => j.posicao === 'GOL')
-    .map(j => {
-      const sav = statsOptaPorJogador[j.id]?.Sav ?? 0;
-      const golsSofridos = golsSofridosPorJogador[j.id] ?? 0;
-      const den = sav + golsSofridos;
-      const time = times.find(t => t.id === j.time_atual);
-      return {
-        jogador_id: j.id,
-        nome: j.nome,
-        time_id: j.time_atual,
-        timeSigla: time?.sigla ?? '—',
-        savPct: den > 0 ? (sav / den) * 100 : -1,
-        den,
-      };
-    })
-    .filter(g => g.den > 0)
-    .sort((a, b) => b.savPct - a.savPct)
-    .slice(0, 5);
+  const top5CicloAtual = [...ciclosGoleiros].sort((a, b) => b.cicloAtual - a.cicloAtual).slice(0, TAMANHO_TOP);
 
   // Top 5 Técnicos por aproveitamento — só entre os que já dirigiram em mais
   // da metade das rodadas disputadas até aqui
@@ -629,7 +501,97 @@ export default async function Home() {
     .map(r => ({ ...r, aproveitamento: r.j > 0 ? Math.round((r.v * 3 + r.e) / (r.j * 3) * 100) : 0 }))
     .filter(r => r.j >= limiar50)
     .sort((a, b) => b.aproveitamento - a.aproveitamento || b.v - a.v)
-    .slice(0, 5);
+    .slice(0, TAMANHO_TOP);
+
+  // ── Rankings Top 10 (alimentam o seletor de cards) ─────────────────────────
+  // Cada indicador vira uma lista já formatada; o componente TopSelector deixa
+  // o visitante escolher quais 5 exibir. Mínimos de amostra: lib/rankings.ts.
+  const o = (j: Jogador) => statsOptaPorJogador[j.id];
+  const mins = (j: Jogador) => minutosPorJogador[j.id] ?? 0;
+  const golsDe = (j: Jogador) => artMap[j.id]?.quantidade ?? 0;
+  const jogPorId = new Map(jogadores.map(j => [j.id, j]));
+  const nomeJog = (id: string) => jogPorId.get(id)?.nome ?? id;
+  const deContagem = (lista: { jogador_id: string; time_id: string; quantidade: number }[]): RankingItem[] =>
+    lista.map(a => ({ id: a.jogador_id, nome: nomeJog(a.jogador_id), timeId: a.time_id, valor: fmtInt(a.quantidade) }));
+  const total = (campo: 'S' | 'SoT' | 'SB' | 'P' | 'C' | 'Crn' | 'Tk' | 'Off' | 'FC' | 'Sav') =>
+    (j: Jogador) => (o(j)?.[campo] ?? 0) || null;
+  const jogadoresLinha = jogadores.filter(j => j.posicao !== 'GOL');
+  const goleirosJog = jogadores.filter(j => j.posicao === 'GOL');
+
+  const rankings: Record<string, RankingItem[]> = {
+    // Gols e finalização
+    artilheiros: deContagem(top5Artilheiros),
+    assistencias: deContagem(top5Assist),
+    pontuadores: top5Pontuadores.map(a => ({
+      id: a.jogador_id, nome: nomeJog(a.jogador_id), timeId: a.time_id, valor: fmtDec(2)(a.pontuacao),
+    })),
+    g90: topJogadores(jogadores,
+      j => (mins(j) >= MINIMOS.minutos && golsDe(j) > 0 ? por90(golsDe(j), mins(j)) : null),
+      fmtDec(2), j => `${golsDe(j)} gols · ${mins(j)}min`),
+    eficacia: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).S >= MINIMOS.chutes ? razao(golsDe(j), o(j).Off + o(j).S) : null),
+      v => fmtPct(1)(v * 100), j => `${golsDe(j)} gols · ${o(j).S} chutes · ${o(j).Off} imp.`),
+    conversao: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).SoT >= MINIMOS.chutesAlvo ? razao(golsDe(j), o(j).SoT) : null),
+      v => fmtPct(1)(v * 100), j => `${golsDe(j)} gols · ${o(j).SoT} no alvo`),
+    pontaria: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).S >= MINIMOS.chutes ? razao(o(j).SoT, o(j).S) : null),
+      v => fmtPct(1)(v * 100), j => `${o(j).SoT} no alvo · ${o(j).S} chutes`),
+    chutes: topJogadores(jogadoresLinha, total('S'), fmtInt),
+    chutes90: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).S >= MINIMOS.chutes && mins(j) >= MINIMOS.minutos ? por90(o(j).S, mins(j)) : null),
+      fmtDec(2), j => `${o(j).S} chutes · ${mins(j)}min`),
+    chutesAlvo: topJogadores(jogadoresLinha, total('SoT'), fmtInt),
+    chutesBloq: topJogadores(jogadoresLinha, total('SB'), fmtInt),
+    impedidos: topJogadores(jogadoresLinha, total('Off'), fmtInt),
+    // Passes e bola parada
+    passes: topJogadores(jogadoresLinha, total('P'), fmtInt),
+    passesMin: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).P > MINIMOS.passes && mins(j) > 0 ? o(j).P / mins(j) : null),
+      fmtDec(2), j => `${fmtInt(o(j).P)} passes · ${mins(j)}min`),
+    cruzamentos: topJogadores(jogadoresLinha, total('C'), fmtInt),
+    cruzamentos90: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).C >= MINIMOS.cruzamentos && mins(j) >= MINIMOS.minutos ? por90(o(j).C, mins(j)) : null),
+      fmtDec(2), j => `${o(j).C} cruz. · ${mins(j)}min`),
+    escanteios: topJogadores(jogadoresLinha, total('Crn'), fmtInt),
+    // Defesa e faltas
+    desarmadores: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).Tk + o(j).FC >= MINIMOS.duelos ? razao(o(j).Tk, o(j).Tk + o(j).FC) : null),
+      v => fmtPct(1)(v * 100), j => `${o(j).Tk} desarmes · ${o(j).FC} faltas`),
+    divididas: topJogadores(jogadoresLinha, total('Tk'), fmtInt),
+    divididas90: topJogadores(jogadoresLinha,
+      j => (o(j) && mins(j) >= MINIMOS.minutos ? por90(o(j).Tk, mins(j)) : null),
+      fmtDec(2), j => `${o(j).Tk} desarmes · ${mins(j)}min`),
+    razaoFaltas: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).FC >= MINIMOS.faltasCometidas ? razao(o(j).FS, o(j).FC) : null),
+      fmtDec(2), j => `${o(j).FS} sofridas · ${o(j).FC} cometidas`),
+    faltosos: topJogadores(jogadoresLinha, total('FC'), fmtInt),
+    faltas90: topJogadores(jogadoresLinha,
+      j => (o(j) && o(j).FC >= MINIMOS.faltasCometidas && mins(j) >= MINIMOS.minutos ? por90(o(j).FC, mins(j)) : null),
+      fmtDec(2), j => `${o(j).FC} faltas · ${mins(j)}min`),
+    // Goleiros
+    savPct: topJogadores(goleirosJog,
+      j => {
+        const sav = o(j)?.Sav ?? 0;
+        const den = sav + (golsSofridosPorJogador[j.id] ?? 0);
+        return den >= MINIMOS.defesasGoleiro ? razao(sav, den) : null;
+      },
+      v => fmtPct(1)(v * 100), j => `${o(j)?.Sav ?? 0} defesas · ${golsSofridosPorJogador[j.id] ?? 0} gols sofridos`),
+    defesas: topJogadores(goleirosJog, total('Sav'), fmtInt),
+    defesasJogo: topJogadores(goleirosJog,
+      j => ((partidasPorJogador[j.id] ?? 0) >= MINIMOS.partidasGoleiro ? razao(o(j)?.Sav ?? 0, partidasPorJogador[j.id] ?? 0) : null),
+      fmtDec(2), j => `${o(j)?.Sav ?? 0} defesas · ${partidasPorJogador[j.id]} jogos`),
+    cicloMaior: top5Ciclos.map(g => ({ id: g.jogador_id, nome: g.nome, timeId: g.time_id, valor: `${g.maiorCiclo}'` })),
+    cicloAtual: top5CicloAtual.map(g => ({ id: g.jogador_id, nome: g.nome, timeId: g.time_id, valor: `${g.cicloAtual}'` })),
+    // Geral
+    placares: top5Placares.map(d => ({
+      id: d.placar, nome: d.placar, valor: `${d.count}×`, detalhe: d.isEmpate ? 'Empate' : `${d.vitVisitante} vit. visitante`,
+    })),
+    tecnicos: top5Tecnicos.map(r => {
+      const tec = tecnicos.find(t => t.id === r.tecnico_id);
+      return { id: r.tecnico_id, nome: tec?.nome ?? r.tecnico_id, timeId: tec?.time_atual ?? undefined, valor: `${r.aproveitamento}%`, detalhe: `${r.j} jogos` };
+    }),
+  };
 
   // Novas Contratações — 20 jogadores com a data de chegada (última
   // transferência registrada) mais recente. Ignora entradas cujo destino é o
@@ -686,7 +648,7 @@ export default async function Home() {
       <style>{`
         .resumo-top5-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
           gap: 1rem;
           justify-content: flex-start;
         }
@@ -944,300 +906,13 @@ export default async function Home() {
           )}
         </section>
 
-        {/* 🏅 Top 5 */}
-        <section style={{ marginBottom: '1.25rem' }}>
+        {/* 🏅 Top 10 — 5 cards, indicador escolhido pelo visitante */}
+        <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
-            🏅 Top 5
+            🏅 Top 10
           </h2>
-          <div className="resumo-top5-grid">
-
-            {/* Top 5 Placares */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>🏆 Top 5 Placares</h3>
-              {top5Placares.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Placares.map((d, i) => (
-                  <div key={d.placar} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.3rem' }}>{d.placar}</span>
-                    <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--verde)' }}>{d.count}×</div>
-                      <div style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>{d.isEmpate ? 'Empate' : `${d.vitVisitante} vit. visitante`}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Top 5 Artilheiros */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>⚽ Top 5 Artilheiros</h3>
-              {top5Artilheiros.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Artilheiros.map((a, i) => {
-                  const jog = jogadores.find(j => j.id === a.jogador_id);
-                  const time = times.find(t => t.id === a.time_id);
-                  return (
-                    <div key={a.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{jog?.nome ?? a.jogador_id}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--amarelo)' }}>{a.quantidade}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Maiores Pontuadores */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>⚖️ Top 5 Pontuadores</h3>
-              {top5Pontuadores.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Pontuadores.map((a, i) => {
-                  const jog = jogadores.find(j => j.id === a.jogador_id);
-                  const time = times.find(t => t.id === a.time_id);
-                  return (
-                    <div key={a.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{jog?.nome ?? a.jogador_id}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#a78bfa' }}>
-                        {a.pontuacao.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Gols p/90 min */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--amarelo)', marginBottom: '.75rem' }}>⚡ Top 5 Gols p/90 min</h3>
-              {top5G90.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5G90.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--amarelo)' }}>
-                        {g.g90.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Eficácia */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>🎯 Top 5 Eficácia</h3>
-              {top5Eficacia.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Eficacia.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#a78bfa' }}>
-                        {g.indice.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Assistências */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#60a5fa', marginBottom: '.75rem' }}>🎯 Top 5 Assistências</h3>
-              {top5Assist.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Assist.map((a, i) => {
-                  const jog = jogadores.find(j => j.id === a.jogador_id);
-                  const time = times.find(t => t.id === a.time_id);
-                  return (
-                    <div key={a.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{jog?.nome ?? a.jogador_id}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#60a5fa' }}>{a.quantidade}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Passes/Minuto */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>📨 Top 5 Passes/Minuto</h3>
-              {top5PassesMinuto.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5PassesMinuto.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#a78bfa' }}>
-                        {g.indice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Desarmadores */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🛡️ Top 5 Desarmadores</h3>
-              {top5Desarmadores.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Desarmadores.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>
-                        {g.indice.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Razão Faltas */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#f59e0b', marginBottom: '.75rem' }}>🥊 Top 5 Razão Faltas</h3>
-              {top5RazaoFaltas.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5RazaoFaltas.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#f59e0b' }}>
-                        {g.indice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Goleiros (Maior Ciclo) */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🧤 Top 5 Goleiros (Maior Ciclo)</h3>
-              {top5Ciclos.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Ciclos.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>{g.maiorCiclo}&apos;</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Goleiros (Ciclo Atual) */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🥅 Top 5 Goleiros (Ciclo Atual)</h3>
-              {top5CicloAtual.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5CicloAtual.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>{g.cicloAtual}&apos;</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Goleiros (SAV%) */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--verde)', marginBottom: '.75rem' }}>🥅 Top 5 Goleiros (SAV%)</h3>
-              {top5SavPct.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5SavPct.map((g, i) => {
-                  const time = times.find(t => t.id === g.time_id);
-                  return (
-                    <div key={g.jogador_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={time} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{g.nome}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: 'var(--verde)' }}>
-                        {g.savPct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top 5 Técnicos (%) */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '1.1rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '.75rem' }}>🧑‍💼 Top 5 Técnicos</h3>
-              {top5Tecnicos.length === 0 && <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>Sem dados suficientes.</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {top5Tecnicos.map((r, i) => {
-                  const tec = tecnicos.find(t => t.id === r.tecnico_id);
-                  const timeAtual = tec?.time_atual ? times.find(t => t.id === tec.time_atual) : undefined;
-                  return (
-                    <div key={r.tecnico_id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)', minWidth: 26 }}>{medalha(i)}</span>
-                      <EscudoTime time={timeAtual} size={20} />
-                      <span style={{ flex: 1, fontWeight: 600, fontSize: '.85rem' }}>{tec?.nome ?? r.tecnico_id}</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#a78bfa' }}>{r.aproveitamento}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-          </div>
+          <TopSelector rankings={rankings} times={times} />
         </section>
-
-        {/* 📌 Legenda dos critérios usados em alguns cards do Top 5 */}
-        <div style={{
-          marginBottom: '2.5rem', padding: '1rem 1.25rem',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 8, fontSize: '.72rem', color: 'var(--text-muted)',
-          display: 'flex', flexDirection: 'column', gap: '.45rem',
-        }}>
-          <p style={{ fontSize: '.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, marginBottom: '.15rem' }}>
-            Critérios de alguns Top 5
-          </p>
-          <span><strong style={{ color: '#a78bfa' }}>⚖️ Pontuadores</strong> — soma do peso de cada gol na pontuação da partida</span>
-          <span><strong style={{ color: 'var(--amarelo)' }}>⚡ Gols p/90 min</strong> — só jogadores com pelo menos 90 minutos em campo</span>
-          <span><strong style={{ color: '#a78bfa' }}>📨 Passes/Minuto</strong> — passes ÷ minutos jogados · só jogadores com mais de 100 passes</span>
-          <span><strong style={{ color: '#a78bfa' }}>🎯 Eficácia</strong> — gols ÷ (impedimentos + finalizações), como em Dados &gt; Artilharia</span>
-          <span><strong style={{ color: 'var(--verde)' }}>🛡️ Desarmadores</strong> — desarmes ÷ (desarmes + faltas cometidas), como em Dados &gt; Cartões</span>
-          <span><strong style={{ color: '#f59e0b' }}>🥊 Razão Faltas</strong> — faltas sofridas ÷ faltas cometidas, como em Dados &gt; Cartões</span>
-          <span><strong style={{ color: 'var(--verde)' }}>🥅 Goleiros (Ciclo Atual)</strong> — minutos sem sofrer gol desde o último gol sofrido (ciclo em aberto)</span>
-          <span><strong style={{ color: 'var(--verde)' }}>🥅 Goleiros (SAV%)</strong> — defesas ÷ (defesas + gols sofridos), lançadas na aba Stats</span>
-          <span><strong style={{ color: '#a78bfa' }}>🧑‍💼 Técnicos</strong> — só entre quem dirigiu {limiar50}+ partidas (mais da metade das {totalRodadas} rodadas)</span>
-        </div>
 
         {/* 🆕 Novas Contratações */}
         <section style={{ marginBottom: '2.5rem' }}>
