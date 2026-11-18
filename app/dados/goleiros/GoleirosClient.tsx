@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Time } from '@/lib/types';
 import { EscudoTime } from '@/components/EscudoTime';
+import { MINIMOS } from '@/lib/rankings';
 
 export interface CicloGoleiro {
   numero: number;
@@ -136,7 +137,7 @@ function AproveitamentoSavTable({ lista, times }: { lista: StatGoleiro[]; times:
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
         <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
           <tr>
-            {['Goleiro', 'Time', 'Defesas (Sav)', 'Gols Sofridos', 'SAV%'].map(h => (
+            {['Goleiro', 'Time', 'Jogos', 'Defesas (Sav)', 'Gols Sofridos', 'SAV%', 'Defesas/jogo', 'Defesas/gol sofrido'].map(h => (
               <th key={h} style={{
                 padding: '.55rem .6rem',
                 textAlign: (h === 'Goleiro' || h === 'Time') ? 'left' : 'center',
@@ -148,9 +149,11 @@ function AproveitamentoSavTable({ lista, times }: { lista: StatGoleiro[]; times:
         </thead>
         <tbody>
           {dados.length === 0 ? (
-            <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum goleiro com defesas ou gols sofridos lançados na aba Stats.</td></tr>
+            <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum goleiro com defesas ou gols sofridos lançados na aba Stats.</td></tr>
           ) : dados.map((s, i) => {
             const time = times.find(t => t.id === s.jogador.time_atual);
+            const okSav = s.sav + s.golsSofridosTotal >= MINIMOS.defesasGoleiro;
+            const okJogos = s.totalPartidas >= MINIMOS.partidasGoleiro;
             return (
               <tr key={s.jogador.id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
                 <td style={{ padding: '.5rem .6rem', fontWeight: 600 }}>{s.jogador.nome}</td>
@@ -160,9 +163,16 @@ function AproveitamentoSavTable({ lista, times }: { lista: StatGoleiro[]; times:
                     <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{s.timeSigla}</span>
                   </div>
                 </td>
+                <td style={{ textAlign: 'center' }}>{s.totalPartidas || '—'}</td>
                 <td style={{ textAlign: 'center', color: 'var(--verde)', fontWeight: 600 }}>{s.sav || '—'}</td>
                 <td style={{ textAlign: 'center', color: s.golsSofridosTotal > 0 ? 'var(--rebaixamento)' : 'var(--text-muted)' }}>{s.golsSofridosTotal || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(s.sav, s.sav + s.golsSofridosTotal)}</td>
+                <td style={{ textAlign: 'center', fontWeight: okSav ? 700 : 400, color: okSav ? '#a78bfa' : 'var(--text-muted)', opacity: okSav ? 1 : 0.65 }}>{formatPct(s.sav, s.sav + s.golsSofridosTotal)}</td>
+                <td style={{ textAlign: 'center', fontWeight: okJogos ? 700 : 400, color: okJogos ? '#a78bfa' : 'var(--text-muted)', opacity: okJogos ? 1 : 0.65 }}>
+                  {s.totalPartidas > 0 ? (s.sav / s.totalPartidas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                </td>
+                <td style={{ textAlign: 'center', fontWeight: okSav ? 700 : 400, color: okSav ? '#a78bfa' : 'var(--text-muted)', opacity: okSav ? 1 : 0.65 }}>
+                  {s.golsSofridosTotal > 0 ? (s.sav / s.golsSofridosTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                </td>
               </tr>
             );
           })}
@@ -487,7 +497,10 @@ export function GoleirosClient({ lista, times }: Props) {
           </h2>
           <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 720 }}>
             SAV% = defesas (Sav, lançadas na aba Stats de cada partida) ÷ (defesas + gols sofridos). Mostra apenas
-            goleiros com pelo menos uma defesa ou um gol sofrido registrado.
+            goleiros com pelo menos uma defesa ou um gol sofrido registrado. Defesas/jogo = defesas ÷ partidas;
+            Defesas/gol sofrido = defesas ÷ gols sofridos. <strong>Índices esmaecidos</strong> estão abaixo do mínimo
+            ({MINIMOS.defesasGoleiro} entre defesas e gols sofridos; {MINIMOS.partidasGoleiro} partidas para Defesas/jogo)
+            e não entram nos Top 10 do Resumo.
           </p>
           <AproveitamentoSavTable lista={lista} times={times} />
         </section>
