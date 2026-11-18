@@ -10,6 +10,7 @@ import {
   type FaltaDesarmeItem,
 } from './CartoesClient';
 import { Partida, Time } from '@/lib/types';
+import { calcularMinutosPorJogador } from '@/lib/rankings';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,7 @@ export default async function CartoesPage() {
   // migrada de Dados/Analítico.
   const statsOptaPorJogador = somaStatsOptaPorJogador(partidas);
   const vinculosPorJogador = calcularVinculosJogadores(partidas);
+  const { minutos: minutosPorJogador } = calcularMinutosPorJogador(partidas);
 
   // 0. Resumo por tipo de cartão (técnicos) + descrição (amarelo/vermelho de jogador)
   const tipoContagem: Record<string, number> = {};
@@ -264,6 +266,7 @@ export default async function CartoesPage() {
         timeId: j.time_atual,
         timeSigla: time?.sigla ?? '—',
         FC: o.FC, FS: o.FS, Tk: o.Tk,
+        minutos: minutosPorJogador[j.id] ?? 0,
         cartoesFaltaAmarelo: v?.cartoes_falta_amarelo ?? 0,
         cartoesFaltaVermelho: v?.cartoes_falta_vermelho ?? 0,
       };

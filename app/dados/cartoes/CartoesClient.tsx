@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time } from '@/lib/types';
+import { MINIMOS } from '@/lib/rankings';
 
 export interface CartaoDetalhe {
   nome: string;
@@ -64,6 +65,7 @@ export interface FaltaDesarmeItem {
   FC: number;
   FS: number;
   Tk: number;
+  minutos: number;
   cartoesFaltaAmarelo: number;
   cartoesFaltaVermelho: number;
 }
@@ -110,6 +112,23 @@ function formatPct(num: number, den: number): string {
 function formatRatio(num: number, den: number, casas = 2): string {
   if (den <= 0) return '—';
   return (num / den).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+function formatPor90(valor: number, minutos: number): string {
+  if (minutos <= 0) return '—';
+  return ((valor / minutos) * 90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Índices abaixo do mínimo de amostra aparecem esmaecidos (ver MINIMOS em lib/rankings.ts).
+function IndiceCelula({ texto, ok }: { texto: string; ok: boolean }) {
+  return (
+    <td
+      title={ok ? undefined : 'Abaixo do mínimo de amostra'}
+      style={{ textAlign: 'center', fontWeight: ok ? 700 : 400, color: ok ? '#a78bfa' : 'var(--text-muted)', opacity: ok ? 1 : 0.65 }}
+    >
+      {texto}
+    </td>
+  );
 }
 
 function ListaDeJogos({ itens }: { itens: CartaoDetalhe[] }) {
@@ -243,7 +262,7 @@ function FaltasDesarmesTable({ dados, times }: { dados: FaltaDesarmeItem[]; time
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
         <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
           <tr>
-            {['Jogador', 'Time', 'FC', 'FS', 'Índice FS/FC', 'Tk ▼', 'Índice Desarme', '🟨 Cartões por Falta', '🟥 Cartões por Falta'].map(h => (
+            {['Jogador', 'Time', 'FC', 'FS', 'Índice FS/FC', 'FC/90', 'Tk ▼', 'Índice Desarme', 'Tk/90', '🟨 Cartões por Falta', '🟥 Cartões por Falta'].map(h => (
               <th key={h} style={{
                 padding: '.55rem .6rem',
                 textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
@@ -257,7 +276,7 @@ function FaltasDesarmesTable({ dados, times }: { dados: FaltaDesarmeItem[]; time
         </thead>
         <tbody>
           {dados.length === 0 ? (
-            <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com faltas ou desarmes lançados na aba Stats.</td></tr>
+            <tr><td colSpan={11} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com faltas ou desarmes lançados na aba Stats.</td></tr>
           ) : dados.map((r, i) => {
             const time = times.find(t => t.id === r.timeId);
             return (
@@ -271,7 +290,8 @@ function FaltasDesarmesTable({ dados, times }: { dados: FaltaDesarmeItem[]; time
                 </td>
                 <td style={{ textAlign: 'center' }}>{r.FC || '—'}</td>
                 <td style={{ textAlign: 'center' }}>{r.FS || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatRatio(r.FS, r.FC)}</td>
+                <IndiceCelula texto={formatRatio(r.FS, r.FC)} ok={r.FC >= MINIMOS.faltasCometidas} />
+                <IndiceCelula texto={formatPor90(r.FC, r.minutos)} ok={r.FC >= MINIMOS.faltasCometidas && r.minutos >= MINIMOS.minutos} />
                 <td style={{
                   textAlign: 'center',
                   padding: '.5rem .6rem',
@@ -286,7 +306,8 @@ function FaltasDesarmesTable({ dados, times }: { dados: FaltaDesarmeItem[]; time
                     {r.Tk || 0}
                   </span>
                 </td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.Tk, r.Tk + r.FC)}</td>
+                <IndiceCelula texto={formatPct(r.Tk, r.Tk + r.FC)} ok={r.Tk + r.FC >= MINIMOS.duelos} />
+                <IndiceCelula texto={formatPor90(r.Tk, r.minutos)} ok={r.minutos >= MINIMOS.minutos} />
                 <td style={{ textAlign: 'center', color: r.cartoesFaltaAmarelo > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: r.cartoesFaltaAmarelo > 0 ? 700 : 400 }}>
                   {r.cartoesFaltaAmarelo || '—'}
                 </td>
@@ -453,7 +474,10 @@ export function CartoesClient({
           <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 780 }}>
             Tabela ordenada por <strong style={{ color: 'var(--verde)' }}>Tk (desarmes)</strong> — destacado na coluna
             central — e, em caso de empate, por FC. Índice FS/FC = faltas sofridas ÷ faltas cometidas.
-            Índice Desarme = Tk ÷ (Tk + FC). As duas últimas colunas contam cartões amarelos/vermelhos cujo
+            Índice Desarme = Tk ÷ (Tk + FC). FC/90 e Tk/90 = faltas cometidas e desarmes por 90 minutos jogados.{' '}
+            <strong>Índices esmaecidos</strong> estão abaixo do mínimo de amostra (FS/FC: {MINIMOS.faltasCometidas} faltas
+            cometidas · Desarme: {MINIMOS.duelos} entre Tk e FC · por 90: {MINIMOS.minutos} minutos) e não entram nos Top 10
+            do Resumo. As duas últimas colunas contam cartões amarelos/vermelhos cujo
             motivo comece com &quot;Falta&quot; (ex.: &quot;Falta tática&quot;, &quot;Falta violenta&quot;,
             &quot;Falta violenta grave&quot;). Dados vêm das estatísticas lançadas na aba Stats de cada
             partida (Admin → Partida → Eventos → Stats).
