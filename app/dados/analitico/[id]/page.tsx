@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getJogadores, getPartidas, getTimes, getEstadios } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
+import type { StatsJogador } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,24 @@ const NAC_FLAG: Record<string, string> = {
   Brasileiro: '🇧🇷', Argentino: '🇦🇷', Uruguaio: '🇺🇾',
   Chileno: '🇨🇱', Paraguaio: '🇵🇾', Colombiano: '🇨🇴', 'Outros Países': '🌍',
 };
+
+// Estatísticas Opta (aba Stats de cada partida) exibidas na página do jogador.
+// `curto` é o rótulo do mini-card/chip; `goleiro` marca estatística que só faz
+// sentido para goleiros (aparece para os demais apenas se houver valor).
+type CampoStat = 'S' | 'SoT' | 'SB' | 'P' | 'C' | 'Crn' | 'Tk' | 'Off' | 'FC' | 'FS' | 'Sav';
+const STATS_DEF: { k: CampoStat; curto: string; longo: string; cor: string; goleiro?: boolean }[] = [
+  { k: 'S',   curto: 'Chutes',      longo: 'Finalizações',            cor: 'var(--amarelo)' },
+  { k: 'SoT', curto: 'No alvo',     longo: 'Finalizações no alvo',    cor: 'var(--verde)' },
+  { k: 'SB',  curto: 'Bloqueados',  longo: 'Finalizações bloqueadas', cor: '#f59e0b' },
+  { k: 'P',   curto: 'Passes',      longo: 'Passes',                  cor: '#a78bfa' },
+  { k: 'C',   curto: 'Cruzamentos', longo: 'Cruzamentos',             cor: '#60a5fa' },
+  { k: 'Crn', curto: 'Escanteios',  longo: 'Escanteios a favor',      cor: 'var(--verde)' },
+  { k: 'Tk',  curto: 'Desarmes',    longo: 'Desarmes',                cor: 'var(--verde)' },
+  { k: 'Off', curto: 'Impedim.',    longo: 'Impedimentos',            cor: '#f59e0b' },
+  { k: 'FC',  curto: 'Faltas com.', longo: 'Faltas cometidas',        cor: 'var(--rebaixamento)' },
+  { k: 'FS',  curto: 'Faltas sof.', longo: 'Faltas sofridas',         cor: '#60a5fa' },
+  { k: 'Sav', curto: 'Defesas',     longo: 'Defesas',                 cor: 'var(--verde)', goleiro: true },
+];
 
 function calcularMinutos(jogadorId: string, partida: any, ehTitular: boolean): number {
   const acr1 = partida.acrescimo_primeiro ?? 0;
@@ -65,6 +84,7 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
     minutoEntrada: number;
     minutoSaida: number | null;
     eventos: EventoTimeline[];
+    stats: StatsJogador | null;
   }
 
   const historicoPartidas: PartidaTimeline[] = [];
@@ -126,6 +146,7 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
       minutoEntrada,
       minutoSaida,
       eventos,
+      stats: (p.stats_jogadores ?? []).find((st: StatsJogador) => st.jogador_id === id) ?? null,
     });
   }
 
@@ -134,6 +155,15 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
   const totalAmarelos  = historicoPartidas.reduce((acc, h) => acc + h.eventos.filter(e => e.tipo === 'amarelo').length, 0);
   const totalVermelhos = historicoPartidas.reduce((acc, h) => acc + h.eventos.filter(e => e.tipo === 'vermelho').length, 0);
   const totalMinutos   = historicoPartidas.reduce((acc, h) => acc + h.minutos, 0);
+
+  // Totais das estatísticas Opta — somadas só nas partidas com stats lançadas.
+  const partidasComStats = historicoPartidas.filter(h => h.stats !== null);
+  const totaisStats = Object.fromEntries(
+    STATS_DEF.map(d => [d.k, partidasComStats.reduce((acc, h) => acc + (h.stats?.[d.k] ?? 0), 0)]),
+  ) as Record<CampoStat, number>;
+  const ehGoleiro = jogador.posicao === 'GOL';
+  // Defesas só aparece para goleiros (ou se o jogador de linha tiver algum valor).
+  const statsVisiveis = STATS_DEF.filter(d => !d.goleiro || ehGoleiro || totaisStats[d.k] > 0);
 
   const eventoIcon:  Record<string, string> = { entrada: '↑', saida: '↓', gol: '⚽', gol_contra: '🔴', assistencia: '🎯', amarelo: '🟨', vermelho: '🟥' };
   const eventoColor: Record<string, string> = { entrada: 'var(--libertadores)', saida: 'var(--rebaixamento)', gol: '#fbbf24', gol_contra: 'var(--rebaixamento)', assistencia: '#60a5fa', amarelo: '#f59e0b', vermelho: 'var(--rebaixamento)' };
@@ -179,6 +209,28 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
               </div>
             ))}
           </div>
+
+          {/* Totalizadores das estatísticas Opta (mini-cards) */}
+          <div style={{ marginTop: '1.25rem' }}>
+            <p style={{ fontSize: '.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, marginBottom: '.5rem' }}>
+              Estatísticas Opta · totais{' '}
+              <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                ({partidasComStats.length === 0
+                  ? 'nenhuma partida com stats lançadas'
+                  : `somadas em ${partidasComStats.length} de ${historicoPartidas.length} partida${historicoPartidas.length === 1 ? '' : 's'}`})
+              </span>
+            </p>
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+              {statsVisiveis.map(d => (
+                <div key={d.k} title={d.longo} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '.4rem .75rem', textAlign: 'center', minWidth: 72, opacity: partidasComStats.length === 0 ? 0.5 : 1 }}>
+                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.3rem', color: d.cor, lineHeight: 1 }}>
+                    {partidasComStats.length === 0 ? '—' : totaisStats[d.k].toLocaleString('pt-BR')}
+                  </div>
+                  <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', marginTop: '.15rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>{d.curto}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -188,7 +240,7 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {historicoPartidas.map(({ partida: p, timeCasa, timeVis, estadio, titular, minutos, minutoEntrada, minutoSaida, eventos }) => {
+          {historicoPartidas.map(({ partida: p, timeCasa, timeVis, estadio, titular, minutos, minutoEntrada, minutoSaida, eventos, stats }) => {
             const acr1 = p.acrescimo_primeiro ?? 0;
             const acr2 = p.acrescimo_segundo ?? 0;
             const totalPartida = 45 + acr1 + 45 + acr2;
@@ -225,6 +277,25 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
                     </span>
                     <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--amarelo)' }}>{minutos}&apos;</span>
                   </div>
+                </div>
+
+                {/* Estatísticas Opta do jogador nesta partida */}
+                <div style={{ padding: '.65rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
+                  {stats ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
+                      {statsVisiveis.map(d => {
+                        const v = stats[d.k];
+                        return (
+                          <div key={d.k} title={d.longo} style={{ display: 'flex', alignItems: 'baseline', gap: '.35rem', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '.25rem .55rem', opacity: v > 0 ? 1 : 0.45 }}>
+                            <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem', color: v > 0 ? d.cor : 'var(--text-muted)', lineHeight: 1 }}>{v}</span>
+                            <span style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{d.curto}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>Estatísticas Opta não lançadas para esta partida.</span>
+                  )}
                 </div>
 
                 <div style={{ padding: '.75rem 1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
