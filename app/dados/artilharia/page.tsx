@@ -1,5 +1,6 @@
 import { calcularArtilharia, getJogadores, getTimes, getTecnicos, getPartidas, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
+import { MINIMOS } from '@/lib/rankings';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,25 @@ interface FinalizacaoRow {
   SoT: number;
   SB: number;
   Off: number;
+  minutos: number;
+}
+
+// Índices abaixo do mínimo de amostra aparecem esmaecidos (ver MINIMOS em
+// lib/rankings.ts) — o valor continua visível, mas não é confiável ainda.
+function IndiceCelula({ texto, ok }: { texto: string; ok: boolean }) {
+  return (
+    <td
+      title={ok ? undefined : 'Abaixo do mínimo de amostra'}
+      style={{ textAlign: 'center', fontWeight: ok ? 700 : 400, color: ok ? '#a78bfa' : 'var(--text-muted)', opacity: ok ? 1 : 0.65 }}
+    >
+      {texto}
+    </td>
+  );
+}
+
+function formatPor90(valor: number, minutos: number): string {
+  if (minutos <= 0) return '—';
+  return ((valor / minutos) * 90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // Migrada de Dados/Analítico ("Vínculos e Índices"): índices G/(Off+S) e
@@ -32,7 +52,7 @@ function FinalizacaoTable({ dados, times }: { dados: FinalizacaoRow[]; times: im
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
         <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
           <tr>
-            {['Jogador', 'Time', 'Gols', 'S', 'SoT', 'SB', 'Off', 'Índice G/(Off+S)', 'Índice G/SoT'].map(h => (
+            {['Jogador', 'Time', 'Gols', 'S', 'SoT', 'SB', 'Off', 'Índice G/(Off+S)', 'Índice G/SoT', 'Pontaria SoT/S', 'Bloqueio SB/S', 'S/90'].map(h => (
               <th key={h} style={{
                 padding: '.55rem .6rem',
                 textAlign: (h === 'Jogador' || h === 'Time') ? 'left' : 'center',
@@ -44,7 +64,7 @@ function FinalizacaoTable({ dados, times }: { dados: FinalizacaoRow[]; times: im
         </thead>
         <tbody>
           {dados.length === 0 ? (
-            <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com finalizações lançadas na aba Stats.</td></tr>
+            <tr><td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum jogador com finalizações lançadas na aba Stats.</td></tr>
           ) : dados.map((r, i) => {
             const time = times.find(t => t.id === r.timeId);
             return (
@@ -61,8 +81,11 @@ function FinalizacaoTable({ dados, times }: { dados: FinalizacaoRow[]; times: im
                 <td style={{ textAlign: 'center' }}>{r.SoT || '—'}</td>
                 <td style={{ textAlign: 'center' }}>{r.SB || '—'}</td>
                 <td style={{ textAlign: 'center' }}>{r.Off || '—'}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.gols, r.Off + r.S)}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: '#a78bfa' }}>{formatPct(r.gols, r.SoT)}</td>
+                <IndiceCelula texto={formatPct(r.gols, r.Off + r.S)} ok={r.S >= MINIMOS.chutes} />
+                <IndiceCelula texto={formatPct(r.gols, r.SoT)} ok={r.SoT >= MINIMOS.chutesAlvo} />
+                <IndiceCelula texto={formatPct(r.SoT, r.S)} ok={r.S >= MINIMOS.chutes} />
+                <IndiceCelula texto={formatPct(r.SB, r.S)} ok={r.S >= MINIMOS.chutes} />
+                <IndiceCelula texto={formatPor90(r.S, r.minutos)} ok={r.minutos >= MINIMOS.minutos && r.S >= MINIMOS.chutes} />
               </tr>
             );
           })}
@@ -171,6 +194,7 @@ export default async function ArtilhariaPage() {
         timeSigla: time?.sigla ?? '—',
         gols: golsJogador,
         S: o.S, SoT: o.SoT, SB: o.SB, Off: o.Off,
+        minutos: statsJogMap[j.id]?.minutos ?? 0,
       };
       return row;
     })
@@ -294,6 +318,10 @@ export default async function ArtilhariaPage() {
           </h2>
           <p style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginBottom: '1rem', maxWidth: 760 }}>
             Índice G/(Off+S) = gols ÷ (impedimentos + finalizações). Índice G/SoT = gols ÷ finalizações no alvo.
+            Pontaria SoT/S = finalizações no alvo ÷ finalizações. Bloqueio SB/S = finalizações bloqueadas ÷ finalizações.
+            S/90 = finalizações por 90 minutos jogados.{' '}
+            <strong>Índices esmaecidos</strong> ainda estão abaixo do mínimo de amostra ({MINIMOS.chutes} chutes
+            ou {MINIMOS.chutesAlvo} no alvo; S/90 também pede {MINIMOS.minutos} minutos) e não entram nos Top 10 do Resumo.
             Dados vêm das estatísticas lançadas na aba Stats de cada partida (Admin → Partida → Eventos → Stats).
           </p>
           <FinalizacaoTable dados={finalizacaoRanking} times={times} />
