@@ -906,7 +906,7 @@ export default async function Home() {
           )}
         </section>
 
-        {/* 🏅 Top 10 — 5 cards, indicador escolhido pelo visitante */}
+        {/* 🏅 Top 10 — 8 cards, indicador escolhido pelo visitante */}
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.4rem', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
             🏅 Top 10
