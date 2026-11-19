@@ -137,9 +137,12 @@ export const RANKINGS: RankingDef[] = [
 
 export const RANKING_IDS = new Set(RANKINGS.map(r => r.id));
 
-// Seleção inicial dos 5 cards do Resumo.
-export const RANKINGS_PADRAO = ['artilheiros', 'assistencias', 'eficacia', 'desarmadores', 'savPct'];
-export const TOTAL_CARDS = 5;
+// Seleção inicial dos cards do Resumo (TOTAL_CARDS deve ser igual ao tamanho da lista).
+export const RANKINGS_PADRAO = [
+  'artilheiros', 'assistencias', 'pontuadores', 'eficacia',
+  'desarmadores', 'razaoFaltas', 'savPct', 'cicloMaior',
+];
+export const TOTAL_CARDS = 8;
 export const TAMANHO_TOP = 10;
 
 // ── Montagem de um ranking de jogadores ──────────────────────────────────────
