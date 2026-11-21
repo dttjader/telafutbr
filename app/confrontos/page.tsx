@@ -1,4 +1,5 @@
 import { getPartidas, getTimes } from '@/lib/data';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,7 @@ export default async function ConfrontosPage() {
   // Filtrar apenas times reais
   const times = todosOsTimes.filter(t => !PSEUDO_IDS.has(t.id));
 
-  const encerradas = partidas.filter(p => p.status === 'encerrada')
+  const encerradas = partidas.filter(p => partidaContabilizada(p))
     .sort((a, b) => b.data.localeCompare(a.data) || b.hora.localeCompare(a.hora));
 
   const n = times.length;
