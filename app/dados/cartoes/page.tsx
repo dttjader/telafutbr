@@ -11,6 +11,7 @@ import {
 } from './CartoesClient';
 import { Partida, Time } from '@/lib/types';
 import { calcularMinutosPorJogador } from '@/lib/rankings';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +60,7 @@ export default async function CartoesPage() {
   const [jogadores, partidas, times, tecnicos] = await Promise.all([
     getJogadores(), getPartidas(), getTimes(), getTecnicos(),
   ]);
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
 
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
   const tecnicoMap = new Map(tecnicos.map(tc => [tc.id, tc]));
