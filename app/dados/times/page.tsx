@@ -1,5 +1,6 @@
 import { getPartidas, getTimes, getEstadios, getJogadores } from '@/lib/data';
 import { TimesClient } from './TimesClient';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,7 @@ export default async function TimesPage() {
   ]);
 
   const encerradas = partidas
-    .filter(p => p.status === 'encerrada')
+    .filter(p => partidaContabilizada(p))
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
 
   // ── Público por time ───────────────────────────────────────────────────────
