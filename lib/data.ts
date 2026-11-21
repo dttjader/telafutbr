@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Estadio, Time, Jogador, Partida } from './types';
+import { partidaContabilizada } from './utils';
 
 // IDs reservados que não são times reais
 const PSEUDO_TIME_IDS = new Set(['outros']);
@@ -94,7 +95,7 @@ export async function deletePartida(id: string): Promise<void> {
 // ── Tabela ────────────────────────────────────────────────
 export async function calcularTabela() {
   const [partidas, times] = await Promise.all([getPartidas(), getTimes()]);
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
 
   const map: Record<string, {
     time_id: string; pontos: number; jogos: number; vitorias: number;
@@ -132,7 +133,7 @@ export async function getTecnicos(): Promise<import('./types').Tecnico[]> {
 
 export async function calcularRankingTecnicos() {
   const [partidas, tecnicos, times] = await Promise.all([getPartidas(), getTecnicos(), getTimes()]);
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
   const map: Record<string, { tecnico_id: string; j: number; v: number; e: number; d: number; gp: number; gc: number }> = {};
 
   for (const p of encerradas) {
@@ -157,7 +158,7 @@ export async function calcularRankingTecnicos() {
 // ── Artilharia ────────────────────────────────────────────
 export async function calcularArtilharia() {
   const partidas = await getPartidas();
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
   const map: Record<string, { jogador_id: string; time_id: string; quantidade: number }> = {};
 
   for (const p of encerradas) {
@@ -225,7 +226,7 @@ function pontosPorResultado(golsTime: number, golsAdversario: number): number {
 export function calcularPesoGols(partidas: Partida[], jogadores: Jogador[], times: Time[]): PesoGolItem[] {
   const nomeJog = (id: string) => jogadores.find(j => j.id === id)?.nome ?? id;
   const siglaTime = (id: string) => times.find(t => t.id === id)?.sigla ?? id;
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
   const itens: PesoGolItem[] = [];
 
   for (const p of encerradas) {
@@ -342,7 +343,7 @@ function statsOptaVazio(): StatsOptaAgregado {
 // nem toda partida/jogador tem stats registradas — "partidas_com_stats"
 // reflete essa cobertura).
 export function somaStatsOptaPorJogador(partidas: Partida[]): Record<string, StatsOptaAgregado> {
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
   const map: Record<string, StatsOptaAgregado> = {};
 
   for (const p of encerradas) {
@@ -406,7 +407,7 @@ function vinculoVazio(): VinculoJogador {
 }
 
 export function calcularVinculosJogadores(partidas: Partida[]): Record<string, VinculoJogador> {
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
   const map: Record<string, VinculoJogador> = {};
   const get = (id: string): VinculoJogador => {
     if (!map[id]) map[id] = vinculoVazio();
@@ -436,7 +437,7 @@ export function calcularVinculosJogadores(partidas: Partida[]): Record<string, V
 // qualquer tipo, inclusive contra — cujo goleiro_id aponte para o jogador,
 // em partidas encerradas. Usado para calcular o SAV% na aba Goleiros.
 export function calcularGolsSofridosPorJogador(partidas: Partida[]): Record<string, number> {
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
   const map: Record<string, number> = {};
   for (const p of encerradas) {
     for (const g of p.gols) {

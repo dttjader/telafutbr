@@ -1,5 +1,11 @@
 // Utilitários puros — sem imports de Node.js, seguro para Client Components
 
+// Partidas que entram em pontuação, placares e todos os indicadores:
+// encerradas E ao vivo (o placar parcial já é contabilizado).
+export function partidaContabilizada(p: { status: string }): boolean {
+  return p.status === 'encerrada' || p.status === 'ao_vivo';
+}
+
 export function formatDate(d: string) {
   if (!d) return '';
   const [y, m, day] = d.split('-');

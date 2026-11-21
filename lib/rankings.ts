@@ -2,6 +2,7 @@
 // amostra/minutos, catálogo de indicadores e helpers de cálculo/formatação.
 // Para mudar um mínimo, altere apenas o valor em MINIMOS abaixo.
 import type { Jogador, Partida } from './types';
+import { partidaContabilizada } from './utils';
 
 // ── Mínimos de amostra e de minutos ──────────────────────────────────────────
 // Evitam que poucos lançamentos distorçam os índices (ex.: 1 chute e 1 gol =
@@ -48,7 +49,7 @@ export function calcularMinutosPorJogador(partidas: Partida[]): {
   const minutos: Record<string, number> = {};
   const jogos: Record<string, number> = {};
   for (const p of partidas) {
-    if (p.status !== 'encerrada') continue;
+    if (!partidaContabilizada(p)) continue;
     const escalados = [...p.escalacao_casa, ...p.escalacao_visitante];
     for (const esc of escalados) {
       const mins = calcularMinutosJogador(esc.jogador_id, p, esc.titular);
