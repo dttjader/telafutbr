@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Tecnico, Time } from '@/lib/types';
+import { opcoesNacionalidade } from '@/lib/nacionalidades';
 import { clientGetTecnicos, clientGetTimes, clientUpsertTecnico, clientDeleteTecnico, uid } from '@/lib/client';
 
 const emptyForm = () => ({
@@ -238,7 +239,12 @@ export default function AdminTecnicos() {
               </div>
               <div className="form-group">
                 <label>Nacionalidade</label>
-                <input value={form.nacionalidade} onChange={e => setForm(f => ({ ...f, nacionalidade: e.target.value }))} placeholder="Ex: Brasileiro" />
+                <select value={form.nacionalidade} onChange={e => setForm(f => ({ ...f, nacionalidade: e.target.value }))}>
+                  <option value="">Não informada</option>
+                  {opcoesNacionalidade(form.nacionalidade).map(n => (
+                    <option key={n.value} value={n.value}>{n.flag} {n.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
