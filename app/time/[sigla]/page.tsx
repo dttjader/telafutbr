@@ -174,7 +174,7 @@ interface BestTeamResult {
 }
 
 function calcBestTeam(jogadoresList: MelhorTimeJogador[], totalMinutos: number): BestTeamResult {
-  const limiar = totalMinutos * 0.5;
+  const limiar = totalMinutos * 0.25;
   const com = jogadoresList.filter(j => j.stats.partidas > 0);
   const comLinha = com.filter(j => j.posicao !== 'GOL' && j.stats.minutos >= limiar);
 
