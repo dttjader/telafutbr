@@ -1,6 +1,7 @@
 import { getJogadores, getPartidas, getTimes, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador, calcularVinculosJogadores } from '@/lib/data';
 import { Partida } from '@/lib/types';
 import { AnaliticoClient, StatJogador } from './AnaliticoClient';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,7 @@ export default async function AnaliticoPage() {
   const [jogadores, partidas, times] = await Promise.all([
     getJogadores(), getPartidas(), getTimes(),
   ]);
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
 
   // Peso dos gols/pênaltis defendidos na pontuação, somado por jogador
   // (usado na coluna "Pts" das tabelas abaixo)
