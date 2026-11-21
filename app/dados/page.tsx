@@ -1,5 +1,6 @@
 import { getPartidas, getTimes, getEstadios, getJogadores, getTecnicos } from '@/lib/data';
 import { DadosClient } from './DadosClient';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export default async function DadosPage() {
     getPartidas(), getTimes(), getEstadios(), getJogadores(), getTecnicos(),
   ]);
 
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
   const totalJogos = encerradas.length;
   const totalGols = encerradas.reduce((s, p) => s + p.placar_casa + p.placar_visitante, 0);
   const totalGolsCasa = encerradas.reduce((s, p) => s + p.placar_casa, 0);
