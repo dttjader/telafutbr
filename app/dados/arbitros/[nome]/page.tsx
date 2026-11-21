@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getPartidas, getTimes, getEstadios, getJogadores, getTecnicos } from '@/lib/data';
 import { Arbitragem } from '@/lib/types';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,7 @@ export default async function ArbitroDetalhePage({ params }: { params: Promise<{
   ]);
 
   const encerradas = partidas
-    .filter(p => p.status === 'encerrada')
+    .filter(p => partidaContabilizada(p))
     .filter(p => {
       const arb = p.arbitragem;
       return [arb.principal, arb.assistente1, arb.assistente2, arb.quarto, arb.var]
