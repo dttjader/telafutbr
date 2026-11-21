@@ -6,6 +6,7 @@ import {
   MINIMOS, calcularMinutosPorJogador, topJogadores, razao, por90,
   fmtInt, fmtDec, fmtPct, TAMANHO_TOP, type RankingItem,
 } from '@/lib/rankings';
+import { partidaContabilizada } from '@/lib/utils';
 
 // Página principal do site — mostra o painel Resumo, alimentado por versões
 // condensadas das outras telas do site. Novas seções devem ser adicionadas
@@ -307,7 +308,7 @@ export default async function Home() {
 
   // ── Classificação (resumida) ──────────────────────────────────────────────
   const encerradas = partidas
-    .filter(p => p.status === 'encerrada')
+    .filter(p => partidaContabilizada(p))
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
 
   // Base: pontos/vitórias/saldo geral (usado também para ordenar a tabela)
