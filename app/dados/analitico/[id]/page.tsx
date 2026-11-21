@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getJogadores, getPartidas, getTimes, getEstadios } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 import type { StatsJogador } from '@/lib/types';
-import { partidaContabilizada } from '@/lib/utils';
+import { partidaContabilizada, idadeJogador } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -188,7 +188,7 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
               <div style={{ display: 'flex', gap: '.6rem', marginTop: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 {jogador.numero && <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem', color: 'var(--verde)' }}>#{jogador.numero}</span>}
                 <span style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, padding: '.15rem .5rem', fontSize: '.78rem', color: 'var(--text-muted)' }}>{POS_LABEL[jogador.posicao]}</span>
-                {jogador.idade && <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>{jogador.idade} anos</span>}
+                {idadeJogador(jogador) != null && <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>{idadeJogador(jogador)} anos</span>}
                 {isEstrangeiro && <span style={{ fontSize: '.78rem' }}>{nacFlag} {nac}</span>}
                 <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>{time?.nome ?? '—'}</span>
               </div>
