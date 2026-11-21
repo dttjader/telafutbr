@@ -7,6 +7,7 @@ import {
 import { getConfig, zonaClassificacao } from '@/lib/config';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Partida, Jogador, Tecnico } from '@/lib/types';
+import { partidaContabilizada } from '@/lib/utils';
 
 // Página oculta — não aparece em nenhum menu, acessada via /time/{sigla}
 // (ex: /time/vas → Vasco, /time/cor → Corinthians). O time é identificado
@@ -494,7 +495,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
   const totalTimes = times.length || 20;
 
   const encerradas = partidas
-    .filter(p => p.status === 'encerrada')
+    .filter(p => partidaContabilizada(p))
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
 
   // ── Classificação geral (para achar posição/zona do time) ─────────────────
