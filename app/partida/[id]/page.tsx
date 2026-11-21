@@ -27,7 +27,7 @@ export default async function PartidaPage({params}:{params:Promise<{id:string}>}
   const tv=times.find(t=>t.id===partida.time_visitante_id);
   const estadio=estadios.find(e=>e.id===partida.estadio_id);
   const nomeJog=(jid:string)=>jogadores.find(j=>j.id===jid)?.nome??jid;
-  const enc=partida.status==='encerrada';
+  const enc=partida.status==='encerrada'||partida.status==='ao_vivo';
   const nomeTecnico=(tid:string|null)=>tid?(tecnicos.find(t=>t.id===tid)?.nome??tid):'Não informado';
 
   const sS={background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'1.5rem',marginBottom:'1rem'};
