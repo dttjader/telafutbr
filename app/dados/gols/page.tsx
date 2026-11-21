@@ -9,6 +9,7 @@ import {
   type GolDetalhe,
 } from './GolsClient';
 import { Partida, Time } from '@/lib/types';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,7 +92,7 @@ function buildDetalhe(g: Partida['gols'][number], p: Partida, jogadorNome: strin
 
 export default async function GolsPage() {
   const [jogadores, partidas, times] = await Promise.all([getJogadores(), getPartidas(), getTimes()]);
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
 
   const jogadorMap = new Map(jogadores.map(j => [j.id, j]));
 
