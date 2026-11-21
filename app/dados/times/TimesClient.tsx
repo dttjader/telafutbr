@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time, Jogador } from '@/lib/types';
+import { idadeJogador } from '@/lib/utils';
 
 interface JogadorStats {
   jogador_id: string;
@@ -779,7 +780,7 @@ export function TimesClient({ timesData }: Props) {
                         </td>
                         <td style={{ padding: '.5rem .65rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                           {j.nome}
-                          {j.idade && <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginLeft: '.4rem' }}>{j.idade}a</span>}
+                          {idadeJogador(j) != null && <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginLeft: '.4rem' }}>{idadeJogador(j)}a</span>}
                         </td>
                         <td style={{ textAlign: 'center', padding: '.5rem .5rem' }}>
                           <span style={{ background: `${cor}18`, color: cor, border: `1px solid ${cor}33`, borderRadius: 4, fontSize: '.68rem', padding: '.15rem .4rem', fontWeight: 700 }}>
