@@ -1,6 +1,7 @@
 import { getPartidas, getTimes, getJogadores, getTecnicos } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Partida, Jogador, Time } from '@/lib/types';
+import { partidaContabilizada } from '@/lib/utils';
 
 // Página oculta — não aparece em nenhum menu, acessada apenas via /resumo.
 // Serve como painel resumido, alimentado por versões condensadas das outras
@@ -166,7 +167,7 @@ export default async function ResumoPage() {
 
   // ── Classificação (resumida) ──────────────────────────────────────────────
   const encerradas = partidas
-    .filter(p => p.status === 'encerrada')
+    .filter(p => partidaContabilizada(p))
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
 
   // Base: pontos/vitórias/saldo geral (usado também para ordenar a tabela)
