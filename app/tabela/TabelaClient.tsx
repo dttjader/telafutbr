@@ -20,6 +20,9 @@ interface Props {
   timesRecentes: string[];
 }
 
+// Total de partidas que cada time disputa no campeonato
+const TOTAL_PARTIDAS = 38;
+
 const formaColor: Record<string, string> = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' };
 const zonaColor: Record<string, string> = {
   libertadores: 'var(--libertadores)', 'libertadores-direta': '#a3e635',
@@ -64,6 +67,19 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
   const [showChart, setShowChart] = useState(false);
   const [hoveredTime, setHoveredTime] = useState<string | null>(null);
   const totalTimes = times.length || 20;
+
+  // Projeção: melhor posição possível se o time vencer todas as partidas restantes.
+  // Pontos máximos = pontos atuais + 3 × jogos restantes. Os demais times são
+  // considerados com a pontuação atual (o mínimo que terão no fim); só ficam à
+  // frente os que já têm MAIS pontos que o máximo do time. Empate em pontos é
+  // tratado a favor do time (critério de desempate ainda em aberto).
+  const projecaoPorTime: Record<string, { restantes: number; pontosMax: number; posicaoMax: number }> = {};
+  tabela.forEach(row => {
+    const restantes = Math.max(TOTAL_PARTIDAS - row.jogos, 0);
+    const pontosMax = row.pontos + 3 * restantes;
+    const posicaoMax = 1 + tabela.filter(o => o.time_id !== row.time_id && o.pontos > pontosMax).length;
+    projecaoPorTime[row.time_id] = { restantes, pontosMax, posicaoMax };
+  });
 
   // Times with at least 1 match in chart
   const timesComDados = tabela.map(r => r.time_id);
@@ -141,8 +157,10 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
             <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
               <tr>
-                {['#', 'Time', 'P', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'Forma'].map(h => (
-                  <th key={h} style={{ padding: '.7rem .9rem', textAlign: h === 'Time' ? 'left' : 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.9rem', letterSpacing: '.08em', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                {['#', 'Time', 'P', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'Faltam', 'Pos. máx.', 'Forma'].map(h => (
+                  <th key={h}
+                    title={h === 'Faltam' ? 'Partidas restantes (de 38)' : h === 'Pos. máx.' ? 'Melhor posição possível vencendo todas as partidas restantes' : undefined}
+                    style={{ padding: '.7rem .9rem', textAlign: h === 'Time' ? 'left' : 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '.9rem', letterSpacing: '.08em', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -152,6 +170,9 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
                 const t = times.find(t => t.id === row.time_id);
                 const isRecente = timesRecentes.includes(row.time_id);
                 const forma = formaTime[row.time_id] ?? [];
+                const proj = projecaoPorTime[row.time_id];
+                // Cor do agrupamento da posição projetada (sem considerar vaga direta do time)
+                const zonaMax = zonaClassificacao(proj.posicaoMax, '', config, totalTimes);
                 const vagaDireta = [...config.libertadores.vagas_diretas, ...config.sulamericana.vagas_diretas]
                   .find(v => v.time_id === row.time_id);
                 return (
@@ -181,6 +202,15 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
                     <td style={{ textAlign: 'center', fontWeight: 600, padding: '.6rem .9rem', color: row.saldo > 0 ? 'var(--libertadores)' : row.saldo < 0 ? 'var(--rebaixamento)' : 'inherit' }}>
                       {row.saldo > 0 ? `+${row.saldo}` : row.saldo}
                     </td>
+                    <td style={{ textAlign: 'center', padding: '.6rem .9rem' }}>{proj.restantes}</td>
+                    <td style={{ padding: '.6rem .9rem' }}
+                      title={`Vencendo os ${proj.restantes} jogos restantes: ${proj.pontosMax} pts, até o ${proj.posicaoMax}º lugar`}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.4rem' }}>
+                        <span style={{ width: 3, height: 22, borderRadius: 2, background: zonaColor[zonaMax], display: 'inline-block' }} />
+                        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.1rem' }}>{proj.posicaoMax}º</span>
+                        <span style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>({proj.pontosMax} pts)</span>
+                      </div>
+                    </td>
                     <td style={{ textAlign: 'center', padding: '.6rem .5rem' }}>
                       <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
                         {forma.length === 0
@@ -194,7 +224,7 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
                   </tr>
                 );
               })}
-              {tabela.length === 0 && <tr><td colSpan={11} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Nenhuma partida encerrada ainda.</td></tr>}
+              {tabela.length === 0 && <tr><td colSpan={13} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Nenhuma partida encerrada ainda.</td></tr>}
             </tbody>
           </table>
         </div>
