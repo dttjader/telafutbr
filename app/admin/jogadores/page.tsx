@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { Jogador, Time, SubPosicao, Nacionalidade } from '@/lib/types';
 import { clientGetJogadores, clientGetTimes, clientUpsertJogador, clientDeleteJogador, uid } from '@/lib/client';
+import { NAC_FLAG, opcoesNacionalidade } from '@/lib/nacionalidades';
+import { calcularIdade, idadeJogador } from '@/lib/utils';
 import { ApiFootballBadge } from '@/components/ApiFootballBadge';
 
 const POSICOES = ['GOL','ZAG','LAT','VOL','MEI','ATA'];
@@ -34,26 +36,6 @@ const SUB_POS_LABEL: Record<string, string> = {
   CA: 'CA', PD: 'PD', PE: 'PE',
 };
 
-const NACIONALIDADES: { value: Nacionalidade; label: string; flag: string }[] = [
-  { value: 'Brasileiro',    label: 'Brasileiro',    flag: '🇧🇷' },
-  { value: 'Argentino',     label: 'Argentino',     flag: '🇦🇷' },
-  { value: 'Uruguaio',      label: 'Uruguaio',      flag: '🇺🇾' },
-  { value: 'Chileno',       label: 'Chileno',       flag: '🇨🇱' },
-  { value: 'Paraguaio',     label: 'Paraguaio',     flag: '🇵🇾' },
-  { value: 'Colombiano',    label: 'Colombiano',    flag: '🇨🇴' },
-  { value: 'Outros Países', label: 'Outros Países', flag: '🌍' },
-];
-
-const NAC_FLAG: Record<string, string> = {
-  Brasileiro:    '🇧🇷',
-  Argentino:     '🇦🇷',
-  Uruguaio:      '🇺🇾',
-  Chileno:       '🇨🇱',
-  Paraguaio:     '🇵🇾',
-  Colombiano:    '🇨🇴',
-  'Outros Países': '🌍',
-};
-
 const defaultSubPos = (posicao: string): SubPosicao => {
   const opts = SUB_POSICOES[posicao];
   return opts?.[0]?.value ?? (posicao as SubPosicao);
@@ -61,7 +43,7 @@ const defaultSubPos = (posicao: string): SubPosicao => {
 
 const emptyForm = () => ({
   nome: '', posicao: 'ATA', sub_posicao: 'CA' as SubPosicao,
-  numero: '', idade: '', nacionalidade: 'Brasileiro' as Nacionalidade,
+  numero: '', idade: '', dataNascimento: '', nacionalidade: 'Brasileiro' as Nacionalidade,
   time_atual: '', novoTime: '',
   dataTransferencia: new Date().toISOString().slice(0, 10),
   registro: '',
@@ -125,7 +107,8 @@ export default function AdminJogadores() {
       await clientUpsertJogador({
         id: editId || `j${uid()}`,
         nome: form.nome,
-        idade: form.idade ? +form.idade : undefined,
+        idade: form.idade ? +form.idade : undefined, // legado, preservado
+        data_nascimento: form.dataNascimento || null,
         nacionalidade: form.nacionalidade,
         posicao: form.posicao as Jogador['posicao'],
         sub_posicao: form.sub_posicao,
@@ -149,6 +132,7 @@ export default function AdminJogadores() {
       sub_posicao: j.sub_posicao ?? defaultSubPos(j.posicao),
       numero: j.numero?.toString() ?? '',
       idade: j.idade?.toString() ?? '',
+      dataNascimento: j.data_nascimento ?? '',
       nacionalidade: (j.nacionalidade as Nacionalidade) ?? 'Brasileiro',
       time_atual: j.time_atual,
       novoTime: '',
@@ -260,23 +244,31 @@ export default function AdminJogadores() {
               </div>
             )}
 
-            <div className="grid-3">
+            <div className="grid-3" style={{ marginBottom: '1rem' }}>
               <div className="form-group">
                 <label>Número</label>
                 <input type="number" min={1} max={99} value={form.numero} onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} />
               </div>
               <div className="form-group">
-                <label>Idade</label>
-                <input type="number" min={14} max={50} value={form.idade} onChange={e => setForm(f => ({ ...f, idade: e.target.value }))} placeholder="Ex: 28" />
+                <label>Data de nascimento</label>
+                <input type="date" value={form.dataNascimento} max={new Date().toISOString().slice(0, 10)}
+                  onChange={e => setForm(f => ({ ...f, dataNascimento: e.target.value }))} />
               </div>
               <div className="form-group">
-                <label>Nacionalidade</label>
-                <select value={form.nacionalidade} onChange={e => setForm(f => ({ ...f, nacionalidade: e.target.value as Nacionalidade }))}>
-                  {NACIONALIDADES.map(n => (
-                    <option key={n.value} value={n.value}>{n.flag} {n.label}</option>
-                  ))}
-                </select>
+                <label>Idade {form.dataNascimento && <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>(calculada)</span>}</label>
+                <input type="number" min={14} max={50}
+                  value={form.dataNascimento ? (calcularIdade(form.dataNascimento) ?? '') : form.idade}
+                  disabled={!!form.dataNascimento}
+                  onChange={e => setForm(f => ({ ...f, idade: e.target.value }))} placeholder="Ex: 28" />
               </div>
+            </div>
+            <div className="form-group">
+              <label>Nacionalidade</label>
+              <select value={form.nacionalidade} onChange={e => setForm(f => ({ ...f, nacionalidade: e.target.value as Nacionalidade }))}>
+                {opcoesNacionalidade(form.nacionalidade).map(n => (
+                  <option key={n.value} value={n.value}>{n.flag} {n.label}</option>
+                ))}
+              </select>
             </div>
 
             {/* Time / Transferência */}
@@ -387,10 +379,10 @@ export default function AdminJogadores() {
                     )}
                     {j.nacionalidade && j.nacionalidade !== 'Brasileiro' && (
                       <span className="badge badge-amarelo">
-                        {NAC_FLAG[j.nacionalidade]} {j.nacionalidade}
+                        {NAC_FLAG[j.nacionalidade] ?? '🏳️'} {j.nacionalidade}
                       </span>
                     )}
-                    {j.idade && <span className="badge badge-cinza">{j.idade} anos</span>}
+                    {idadeJogador(j) != null && <span className="badge badge-cinza">{idadeJogador(j)} anos</span>}
                   </div>
                   <div style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>🏠 {nomeTime(j.time_atual)}</div>
                   {j.transferencias.length > 1 && (
