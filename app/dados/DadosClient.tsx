@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time } from '@/lib/types';
+import { NAC_FLAG } from '@/lib/nacionalidades';
 
 interface RankingTecnico {
   tecnico_id: string; j: number; v: number; e: number; d: number;
@@ -21,7 +22,7 @@ export interface Props {
   rankingEstado: { uf: string; gols: number; jogos: number; media: number }[];
   rankingTecnicos: RankingTecnico[];
   totalRodadas: number;
-  tecnicos: { id: string; nome: string; time_atual: string | null; ativo: boolean; historico: any[] }[];
+  tecnicos: { id: string; nome: string; nacionalidade?: string | null; time_atual: string | null; ativo: boolean; historico: any[] }[];
   times: Time[];
   totalArbitros: number;
   totalArbitrosPrincipais: number;
@@ -159,6 +160,7 @@ export function DadosClient({
   const tecEstrantes      = rankingTecnicos.filter(r => r.j <= 3);
 
   const nomeTecnico   = (id: string) => tecnicos.find(t => t.id === id)?.nome ?? id;
+  const nacionalidadeTecnico = (id: string) => tecnicos.find(t => t.id === id)?.nacionalidade ?? null;
   const timeDoTecnico = (id: string) => {
     const t = tecnicos.find(t => t.id === id);
     return t?.time_atual ? times.find(tm => tm.id === t.time_atual) : undefined;
@@ -187,7 +189,7 @@ export function DadosClient({
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
             <thead style={{ background: 'var(--surface2)', borderBottom: '2px solid var(--verde)' }}>
               <tr>
-                {['#', 'Técnico', 'Time', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'Pts', 'Aprov.', '🟨', '🟥'].map(h => (
+                {['#', 'Técnico', 'Nac.', 'Time', 'J', 'V', 'E', 'D', 'GP', 'GC', 'SG', 'Pts', 'Aprov.', '🟨', '🟥'].map(h => (
                   <th key={h} style={{
                     padding: '.6rem .75rem',
                     textAlign: h === 'Técnico' || h === 'Time' ? 'left' : 'center',
@@ -200,11 +202,15 @@ export function DadosClient({
             <tbody>
               {dados.map((r, i) => {
                 const time  = timeDoTecnico(r.tecnico_id);
+                const nac   = nacionalidadeTecnico(r.tecnico_id);
                 const saldo = r.gp - r.gc;
                 return (
                   <tr key={r.tecnico_id} style={{ borderBottom: '1px solid #1a1a1a', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}>
                     <td style={{ padding: '.5rem .75rem', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--text-muted)' }}>{medalha(i)}</td>
                     <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>{nomeTecnico(r.tecnico_id)}</td>
+                    <td style={{ padding: '.5rem .5rem', textAlign: 'center', fontSize: '1rem' }} title={nac ?? undefined}>
+                      {nac ? (NAC_FLAG[nac] ?? '🏳️') : <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>—</span>}
+                    </td>
                     <td style={{ padding: '.5rem .75rem' }}>
                       {time
                         ? <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
