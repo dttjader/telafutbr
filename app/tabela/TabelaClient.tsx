@@ -69,15 +69,19 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
   const totalTimes = times.length || 20;
 
   // Projeção: melhor posição possível se o time vencer todas as partidas restantes.
-  // Pontos máximos = pontos atuais + 3 × jogos restantes. Os demais times são
-  // considerados com a pontuação atual (o mínimo que terão no fim); só ficam à
-  // frente os que já têm MAIS pontos que o máximo do time. Empate em pontos é
-  // tratado a favor do time (critério de desempate ainda em aberto).
+  // Pontos máximos = pontos atuais + 3 × jogos restantes; vitórias máximas =
+  // vitórias atuais + jogos restantes. Os demais times são considerados com os
+  // valores atuais. Fica à frente quem tem mais pontos; em empate de pontos,
+  // vale o maior número de vitórias; se ainda empatar, o time simulado fica na frente.
   const projecaoPorTime: Record<string, { restantes: number; pontosMax: number; posicaoMax: number }> = {};
   tabela.forEach(row => {
     const restantes = Math.max(TOTAL_PARTIDAS - row.jogos, 0);
     const pontosMax = row.pontos + 3 * restantes;
-    const posicaoMax = 1 + tabela.filter(o => o.time_id !== row.time_id && o.pontos > pontosMax).length;
+    const vitoriasMax = row.vitorias + restantes;
+    const posicaoMax = 1 + tabela.filter(o =>
+      o.time_id !== row.time_id &&
+      (o.pontos > pontosMax || (o.pontos === pontosMax && o.vitorias > vitoriasMax))
+    ).length;
     projecaoPorTime[row.time_id] = { restantes, pontosMax, posicaoMax };
   });
 
