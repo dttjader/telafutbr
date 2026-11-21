@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getJogadores, getPartidas, getTimes, getEstadios } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 import type { StatsJogador } from '@/lib/types';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export default async function JogadorPerfilPage({ params }: { params: Promise<{ 
 
   const time = times.find(t => t.id === jogador.time_atual);
   const encerradas = partidas
-    .filter(p => p.status === 'encerrada')
+    .filter(p => partidaContabilizada(p))
     .sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
 
   interface EventoTimeline {
