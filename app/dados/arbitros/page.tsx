@@ -1,11 +1,12 @@
 import { getPartidas } from '@/lib/data';
 import { ArbitrosClient, type CargoArbitro, type ArbitroAuxiliar, type ArbitroPrincipal } from './ArbitrosClient';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ArbitrosPage() {
   const partidas = await getPartidas();
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
 
   // Construir mapa por nome → cargos e estatísticas
   const map: Record<string, {
