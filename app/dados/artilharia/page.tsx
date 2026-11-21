@@ -1,6 +1,7 @@
 import { calcularArtilharia, getJogadores, getTimes, getTecnicos, getPartidas, calcularPesoGols, somaPesoGolsPorJogador, somaStatsOptaPorJogador } from '@/lib/data';
 import { EscudoTime } from '@/components/EscudoTime';
 import { MINIMOS } from '@/lib/rankings';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +101,7 @@ export default async function ArtilhariaPage() {
     calcularArtilharia(), getJogadores(), getTimes(), getTecnicos(), getPartidas()
   ]);
 
-  const encerradas = partidas.filter(p => p.status === 'encerrada');
+  const encerradas = partidas.filter(p => partidaContabilizada(p));
 
   // Peso dos gols/pênaltis defendidos na pontuação — usado como critério de
   // desempate na artilharia (jogadores com o mesmo nº de gols) e no ranking
