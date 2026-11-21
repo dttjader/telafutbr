@@ -44,7 +44,8 @@ export interface Jogador {
   posicao: 'GOL' | 'ZAG' | 'LAT' | 'VOL' | 'MEI' | 'ATA';
   sub_posicao?: SubPosicao;
   numero?: number;
-  idade?: number;
+  idade?: number; // legado: só usado quando não há data_nascimento
+  data_nascimento?: string | null; // AAAA-MM-DD (opcional); a idade é calculada a partir dela
   nacionalidade?: Nacionalidade;
   time_atual: string;
   transferencias: Transferencia[];

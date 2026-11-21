@@ -6,6 +6,22 @@ export function partidaContabilizada(p: { status: string }): boolean {
   return p.status === 'encerrada' || p.status === 'ao_vivo';
 }
 
+// Idade em anos completos a partir de uma data AAAA-MM-DD (null se inválida).
+export function calcularIdade(dataNascimento?: string | null, hoje: Date = new Date()): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dataNascimento ?? '');
+  if (!m) return null;
+  const [ano, mes, dia] = [+m[1], +m[2], +m[3]];
+  let idade = hoje.getFullYear() - ano;
+  if (hoje.getMonth() + 1 < mes || (hoje.getMonth() + 1 === mes && hoje.getDate() < dia)) idade--;
+  return idade >= 0 ? idade : null;
+}
+
+// Idade do jogador: calculada dinamicamente pela data de nascimento quando
+// existir; caso contrário usa o valor legado salvo em `idade`.
+export function idadeJogador(j: { data_nascimento?: string | null; idade?: number | null }): number | undefined {
+  return calcularIdade(j.data_nascimento) ?? j.idade ?? undefined;
+}
+
 export function formatDate(d: string) {
   if (!d) return '';
   const [y, m, day] = d.split('-');
