@@ -1,5 +1,6 @@
 import { getPartidas, getTimes, getJogadores, somaStatsOptaPorJogador, calcularGolsSofridosPorJogador } from '@/lib/data';
 import { GoleirosClient, type CicloGoleiro, type StatGoleiro } from './GoleirosClient';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export default async function GoleirosPage() {
   const golsSofridosPorJogador = calcularGolsSofridosPorJogador(partidas);
 
   const encerradas = partidas
-    .filter(p => p.status === 'encerrada')
+    .filter(p => partidaContabilizada(p))
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
 
   const goleiros = jogadores.filter(j => j.posicao === 'GOL');
