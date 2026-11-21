@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time, Jogador } from '@/lib/types';
+import { idadeJogador } from '@/lib/utils';
 import { PesoGolItem, StatsOptaAgregado, VinculoJogador } from '@/lib/data';
 
 export interface StatJogador {
@@ -394,8 +395,8 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
         }
       }
       if (filtroPos && s.jogador.posicao !== filtroPos) return false;
-      if (filtroIdadeMin && (s.jogador.idade ?? 0) < +filtroIdadeMin) return false;
-      if (filtroIdadeMax && (s.jogador.idade ?? 999) > +filtroIdadeMax) return false;
+      if (filtroIdadeMin && (idadeJogador(s.jogador) ?? 0) < +filtroIdadeMin) return false;
+      if (filtroIdadeMax && (idadeJogador(s.jogador) ?? 999) > +filtroIdadeMax) return false;
       if (filtroJogosMin && s.partidas < +filtroJogosMin) return false;
       if (filtroCartao === 'sem_amarelo' && s.cartoes_amarelos > 0) return false;
       if (filtroCartao === 'com_amarelo' && s.cartoes_amarelos === 0) return false;
@@ -493,7 +494,7 @@ export function AnaliticoClient({ lista, totalPartidas, times, pesoGols }: Props
               {nacFlag}
             </td>
             <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>
-              {s.jogador.idade ?? '—'}
+              {idadeJogador(s.jogador) ?? '—'}
             </td>
             <td style={{ textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.05rem' }}>{s.partidas}</td>
             <td style={{ textAlign: 'center', color: 'var(--verde)' }}>{s.titular}</td>
