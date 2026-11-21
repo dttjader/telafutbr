@@ -1,6 +1,7 @@
 import { getPartidas, getTimes } from '@/lib/data';
 import { getConfig } from '@/lib/config';
 import { TabelaClient } from './TabelaClient';
+import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,7 @@ export default async function TabelaPage() {
     getPartidas(), getTimes(), getConfig(),
   ]);
 
-  const encerradas = todasPartidas.filter(p => p.status === 'encerrada')
+  const encerradas = todasPartidas.filter(p => partidaContabilizada(p))
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
 
   // Calcular tabela ao vivo
