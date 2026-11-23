@@ -16,7 +16,7 @@ export const NACIONALIDADES: NacionalidadeOpcao[] = [
   { value: 'Paraguaio',     label: 'Paraguaio',     flag: '🇵🇾' },
   { value: 'Colombiano',    label: 'Colombiano',    flag: '🇨🇴' },
   { value: 'Português',     label: 'Português',     flag: '🇵🇹' },
-  { value: 'Francês',       label: 'Francês',       flag: '🇨🇵' },
+  { value: 'Francês',       label: 'Francês',       flag: '🇫🇷' },
   { value: 'Holandês',      label: 'Holandês',      flag: '🇳🇱' },
   { value: 'Outros Países', label: 'Outros Países', flag: '🌍' },
 ];
