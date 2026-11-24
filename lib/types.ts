@@ -127,8 +127,14 @@ export interface StatsJogador {
   Sav: number;  // Defesas
 }
 
+export interface Temporada {
+  ano: number;
+  atual: boolean; // temporada exibida por padrão no site
+}
+
 export interface Partida {
   id: string;
+  temporada: number; // ano do campeonato (ex.: 2026)
   rodada: number;
   data: string;
   hora: string;

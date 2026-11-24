@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { temporadaSelecionada } from './temporada';
 
 export interface VagaDireta {
   time_id: string;
@@ -25,20 +26,22 @@ const DEFAULT_CONFIG: Config = {
   rebaixamento: { vagas: 4 },
 };
 
-export async function getConfig(): Promise<Config> {
-  const { data, error } = await supabase
-    .from('configuracoes')
-    .select('valor')
-    .eq('chave', 'classificacao')
-    .single();
-  if (error || !data) return DEFAULT_CONFIG;
-  return data.valor as Config;
+// Configuração de classificação por temporada (chave 'classificacao:ANO').
+// Sem configuração própria, usa a linha antiga 'classificacao' e, por fim, o padrão.
+export async function getConfig(temporada?: number): Promise<Config> {
+  const ano = temporada ?? await temporadaSelecionada();
+  for (const chave of [`classificacao:${ano}`, 'classificacao']) {
+    const { data } = await supabase.from('configuracoes').select('valor').eq('chave', chave).maybeSingle();
+    if (data) return data.valor as Config;
+  }
+  return DEFAULT_CONFIG;
 }
 
-export async function saveConfig(config: Config): Promise<void> {
+export async function saveConfig(config: Config, temporada?: number): Promise<void> {
+  const ano = temporada ?? await temporadaSelecionada();
   await supabase
     .from('configuracoes')
-    .upsert({ chave: 'classificacao', valor: config });
+    .upsert({ chave: `classificacao:${ano}`, valor: config });
 }
 
 export function zonaClassificacao(

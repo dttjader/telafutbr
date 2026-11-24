@@ -45,3 +45,20 @@ export function golTipoLabel(t: string) {
 // Havia aqui uma versão hardcoded (Lib 1-4, Sula 5-6, Reb >=18) que não
 // refletia as vagas configuráveis pelo admin — foi descontinuada para
 // evitar divergência entre telas. Importe de '@/lib/config' quando precisar.
+
+// ── Temporadas ───────────────────────────────────────────────────────────────
+// Cookie que guarda a temporada escolhida no seletor do menu.
+export const COOKIE_TEMPORADA = 'temporada';
+export const ANO_PADRAO = 2026;
+
+// Times que disputam a temporada: os que aparecem nas partidas dela.
+// Se ainda não há partidas (temporada nova), considera todos os times.
+export function timesDaTemporada<T extends { id: string }>(
+  times: T[],
+  partidas: { time_casa_id: string; time_visitante_id: string }[],
+): T[] {
+  const ids = new Set<string>();
+  partidas.forEach(p => { ids.add(p.time_casa_id); ids.add(p.time_visitante_id); });
+  const filtrados = times.filter(t => ids.has(t.id));
+  return filtrados.length > 0 ? filtrados : times;
+}
