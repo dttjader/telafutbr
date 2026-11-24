@@ -1,6 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SeletorTemporada } from '@/components/SeletorTemporada';
+import type { Temporada } from '@/lib/types';
 
 const publicLinks = [
   { href: '/rodadas',    label: 'Rodadas'    },
@@ -18,7 +20,7 @@ const adminLinks = [
   { href: '/admin/sync',      label: 'API-Football' },
 ];
 
-export function Nav() {
+export function Nav({ temporadas, selecionada }: { temporadas: Temporada[]; selecionada: number }) {
   const p = usePathname();
   const isAdmin = p.startsWith('/admin');
 
@@ -50,7 +52,7 @@ export function Nav() {
           <span style={{ fontSize: '1.7rem', lineHeight: 1 }}>🇧🇷</span>
           <div>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem', letterSpacing: '.1em', color: 'var(--amarelo)', lineHeight: 1 }}>BRASILEIRÃO</div>
-            <div style={{ fontSize: '.65rem', color: 'var(--verde)', fontWeight: 700, letterSpacing: '.15em', textTransform: 'uppercase' as const }}>Série A · 2026</div>
+            <div style={{ fontSize: '.65rem', color: 'var(--verde)', fontWeight: 700, letterSpacing: '.15em', textTransform: 'uppercase' as const }}>Série A · {selecionada}</div>
           </div>
         </Link>
 
@@ -74,6 +76,8 @@ export function Nav() {
             {adminLinks.map(l => <Link key={l.href} href={l.href} style={linkStyle(l.href, true)}>{l.label}</Link>)}
           </nav>
         )}
+
+        <SeletorTemporada temporadas={temporadas} selecionada={selecionada} />
       </div>
     </header>
   );
