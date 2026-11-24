@@ -18,6 +18,7 @@ interface Props {
   posicoesPorRodada: Record<string, number[]>;
   formaTime: Record<string, string[]>;
   timesRecentes: string[];
+  totalTimes?: number; // nº de times da temporada (define as zonas de rebaixamento)
 }
 
 // Total de partidas que cada time disputa no campeonato
@@ -63,10 +64,10 @@ function misturarCores(corA: string, corB: string, peso: number): string {
   );
 }
 
-export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada, formaTime, timesRecentes }: Props) {
+export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada, formaTime, timesRecentes, totalTimes: totalTimesProp }: Props) {
   const [showChart, setShowChart] = useState(false);
   const [hoveredTime, setHoveredTime] = useState<string | null>(null);
-  const totalTimes = times.length || 20;
+  const totalTimes = totalTimesProp || times.length || 20;
 
   // Projeção: melhor posição possível se o time vencer todas as partidas restantes.
   // Pontos máximos = pontos atuais + 3 × jogos restantes; vitórias máximas =

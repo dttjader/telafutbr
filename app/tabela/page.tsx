@@ -1,6 +1,7 @@
 import { getPartidas, getTimes } from '@/lib/data';
 import { getConfig } from '@/lib/config';
 import { TabelaClient } from './TabelaClient';
+import { timesDaTemporada } from '@/lib/utils';
 import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,7 @@ export default async function TabelaPage() {
       posicoesPorRodada={posicoesPorRodada}
       formaTime={formaTime}
       timesRecentes={[...timesRecentes]}
+      totalTimes={timesDaTemporada(times, todasPartidas).length || 20}
     />
   );
 }
