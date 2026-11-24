@@ -7,7 +7,7 @@ import {
 import { getConfig, zonaClassificacao } from '@/lib/config';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Partida, Jogador, Tecnico } from '@/lib/types';
-import { partidaContabilizada } from '@/lib/utils';
+import { partidaContabilizada, timesDaTemporada } from '@/lib/utils';
 
 // Página oculta — não aparece em nenhum menu, acessada via /time/{sigla}
 // (ex: /time/vas → Vasco, /time/cor → Corinthians). O time é identificado
@@ -174,7 +174,7 @@ interface BestTeamResult {
 }
 
 function calcBestTeam(jogadoresList: MelhorTimeJogador[], totalMinutos: number): BestTeamResult {
-  const limiar = totalMinutos * 0.25;
+  const limiar = totalMinutos * 0.5;
   const com = jogadoresList.filter(j => j.stats.partidas > 0);
   const comLinha = com.filter(j => j.posicao !== 'GOL' && j.stats.minutos >= limiar);
 
@@ -492,7 +492,7 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
   if (!time) notFound();
 
   const estadioTime = estadios.find(e => e.id === time.estadio_id);
-  const totalTimes = times.length || 20;
+  const totalTimes = timesDaTemporada(times, partidas).length || 20;
 
   const encerradas = partidas
     .filter(p => partidaContabilizada(p))
