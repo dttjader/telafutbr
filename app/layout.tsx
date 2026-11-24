@@ -1,17 +1,19 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Nav } from '@/components/Nav';
+import { getTemporadas, temporadaSelecionada } from '@/lib/temporada';
 
 export const metadata: Metadata = {
-  title: 'Brasileirão Série A 2026',
-  description: 'Acompanhe o Campeonato Brasileiro Série A 2026',
+  title: 'Brasileirão Série A',
+  description: 'Acompanhe o Campeonato Brasileiro Série A',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const [temporadas, selecionada] = await Promise.all([getTemporadas(), temporadaSelecionada()]);
   return (
     <html lang="pt-BR">
       <body>
-        <Nav />
+        <Nav temporadas={temporadas} selecionada={selecionada} />
         <main style={{ minHeight: '90vh', paddingBottom: '3rem' }}>
           {children}
         </main>
