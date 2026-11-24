@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import { clientGetTimes } from '@/lib/client';
 import { Time } from '@/lib/types';
+import { GestaoTemporadas } from '@/components/GestaoTemporadas';
+import { clientGetPartidas } from '@/lib/client';
+import { timesDaTemporada } from '@/lib/utils';
 
 interface VagaDireta { time_id: string; motivo: string; }
 interface Config {
@@ -13,6 +16,7 @@ interface Config {
 export default function AdminConfig() {
   const [config, setConfig] = useState<Config | null>(null);
   const [times, setTimes] = useState<Time[]>([]);
+  const [totalTimes, setTotalTimes] = useState(20);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,12 +26,14 @@ export default function AdminConfig() {
   const [novaSulMotivo, setNovaSulMotivo] = useState('');
 
   const load = async () => {
-    const [cfg, tms] = await Promise.all([
+    const [cfg, tms, parts] = await Promise.all([
       fetch('/api/config').then(r => r.json()),
       clientGetTimes(),
+      clientGetPartidas(),
     ]);
     setConfig(cfg);
     setTimes(tms);
+    setTotalTimes(timesDaTemporada(tms, parts).length || 20);
   };
 
   useEffect(() => { load(); }, []);
@@ -83,7 +89,6 @@ export default function AdminConfig() {
   };
 
   const nomeTime = (id: string) => times.find(t => t.id === id)?.nome ?? id;
-  const totalTimes = times.length || 20;
 
   if (!config) return (
     <div className="container" style={{ paddingTop: '3rem', color: 'var(--text-muted)' }}>
@@ -178,6 +183,8 @@ export default function AdminConfig() {
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
         Defina o número de vagas por zona e registre times com vagas diretas por títulos.
       </p>
+
+      <GestaoTemporadas />
 
       {msg && <div className="toast toast-success">{msg}</div>}
       {error && <div className="toast toast-error">{error}</div>}
