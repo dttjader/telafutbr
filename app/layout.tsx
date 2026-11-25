@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Nav } from '@/components/Nav';
-import { getTemporadas, temporadaSelecionada } from '@/lib/temporada';
+import { getTemporadas, temporadaSelecionada, getDivisoesDaTemporada, divisaoSelecionada } from '@/lib/temporada';
 
 export const metadata: Metadata = {
   title: 'Brasileirão Série A',
@@ -10,10 +10,11 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [temporadas, selecionada] = await Promise.all([getTemporadas(), temporadaSelecionada()]);
+  const [divisoes, divisao] = await Promise.all([getDivisoesDaTemporada(selecionada), divisaoSelecionada(selecionada)]);
   return (
     <html lang="pt-BR">
       <body>
-        <Nav temporadas={temporadas} selecionada={selecionada} />
+        <Nav temporadas={temporadas} selecionada={selecionada} divisoes={divisoes} divisao={divisao} />
         <main style={{ minHeight: '90vh', paddingBottom: '3rem' }}>
           {children}
         </main>
