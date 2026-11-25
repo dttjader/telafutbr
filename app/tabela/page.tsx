@@ -2,6 +2,7 @@ import { getPartidas, getTimes } from '@/lib/data';
 import { getConfig } from '@/lib/config';
 import { TabelaClient } from './TabelaClient';
 import { timesDaTemporada } from '@/lib/utils';
+import { temporadaSelecionada, divisaoSelecionada, getTimeIdsDaTemporada } from '@/lib/temporada';
 import { partidaContabilizada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,10 @@ export default async function TabelaPage() {
   const [todasPartidas, times, config] = await Promise.all([
     getPartidas(), getTimes(), getConfig(),
   ]);
+
+  const ano = await temporadaSelecionada();
+  const divisao = await divisaoSelecionada(ano);
+  const participantes = await getTimeIdsDaTemporada(ano, divisao);
 
   const encerradas = todasPartidas.filter(p => partidaContabilizada(p))
     .sort((a, b) => a.rodada - b.rodada || a.data.localeCompare(b.data));
@@ -88,7 +93,8 @@ export default async function TabelaPage() {
       posicoesPorRodada={posicoesPorRodada}
       formaTime={formaTime}
       timesRecentes={[...timesRecentes]}
-      totalTimes={timesDaTemporada(times, todasPartidas).length || 20}
+      totalTimes={timesDaTemporada(times, todasPartidas, participantes).length || 20}
+      divisao={divisao}
     />
   );
 }

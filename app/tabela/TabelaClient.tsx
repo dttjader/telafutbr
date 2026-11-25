@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Time } from '@/lib/types';
 import { Config, zonaClassificacao } from '@/lib/config';
+import { infoDivisao } from '@/lib/utils';
 
 interface TabelaRow {
   time_id: string; pontos: number; jogos: number; vitorias: number;
@@ -18,7 +19,8 @@ interface Props {
   posicoesPorRodada: Record<string, number[]>;
   formaTime: Record<string, string[]>;
   timesRecentes: string[];
-  totalTimes?: number; // nº de times da temporada (define as zonas de rebaixamento)
+  totalTimes?: number; // nº de times da divisão (define as zonas de rebaixamento)
+  divisao?: number;    // define os nomes das zonas na legenda
 }
 
 // Total de partidas que cada time disputa no campeonato
@@ -64,7 +66,7 @@ function misturarCores(corA: string, corB: string, peso: number): string {
   );
 }
 
-export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada, formaTime, timesRecentes, totalTimes: totalTimesProp }: Props) {
+export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada, formaTime, timesRecentes, totalTimes: totalTimesProp, divisao = 1 }: Props) {
   const [showChart, setShowChart] = useState(false);
   const [hoveredTime, setHoveredTime] = useState<string | null>(null);
   const totalTimes = totalTimesProp || times.length || 20;
@@ -140,9 +142,9 @@ export function TabelaClient({ tabela, times, config, rodadas, posicoesPorRodada
         {/* Legenda */}
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {[
-            ['libertadores', `Libertadores (${config.libertadores.vagas_tabela} vagas)`],
-            ['sulamericana', `Sul-Americana (${config.sulamericana.vagas_tabela} vagas)`],
-            ['rebaixamento', `Rebaixamento (${config.rebaixamento.vagas} times)`],
+            ['libertadores', `${infoDivisao(divisao).zonas.libertadores} (${config.libertadores.vagas_tabela} vagas)`],
+            ['sulamericana', `${infoDivisao(divisao).zonas.sulamericana} (${config.sulamericana.vagas_tabela} vagas)`],
+            ['rebaixamento', `${infoDivisao(divisao).zonas.rebaixamento} (${config.rebaixamento.vagas} times)`],
           ].map(([z, l]) => (
             <span key={z} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontSize: '.75rem', color: 'var(--text-muted)' }}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: zonaColor[z], display: 'inline-block' }} />{l}
