@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartidas, upsertPartida, deletePartida, uid } from '@/lib/data';
 import { Partida } from '@/lib/types';
-import { temporadaSelecionada } from '@/lib/temporada';
+import { temporadaSelecionada, divisaoSelecionada } from '@/lib/temporada';
 
 export async function GET() {
   try {
@@ -14,9 +14,11 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const temporada: number = body.temporada ?? await temporadaSelecionada();
     const nova: Partida = {
       id: `p${uid()}`,
-      temporada: body.temporada ?? await temporadaSelecionada(),
+      temporada,
+      divisao: body.divisao ?? await divisaoSelecionada(temporada),
       rodada: body.rodada, data: body.data, hora: body.hora,
       status: body.status || 'agendada',
       time_casa_id: body.time_casa_id, time_visitante_id: body.time_visitante_id,
