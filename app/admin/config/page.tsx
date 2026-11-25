@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { clientGetTimes } from '@/lib/client';
 import { Time } from '@/lib/types';
 import { GestaoTemporadas } from '@/components/GestaoTemporadas';
-import { clientGetPartidas } from '@/lib/client';
-import { timesDaTemporada } from '@/lib/utils';
+import { clientGetPartidas, clientGetTemporadaTimes, clientTemporadaSelecionada, clientDivisaoSelecionada } from '@/lib/client';
+import { timesDaTemporada, infoDivisao } from '@/lib/utils';
 
 interface VagaDireta { time_id: string; motivo: string; }
 interface Config {
@@ -17,6 +17,8 @@ export default function AdminConfig() {
   const [config, setConfig] = useState<Config | null>(null);
   const [times, setTimes] = useState<Time[]>([]);
   const [totalTimes, setTotalTimes] = useState(20);
+  const [divisao, setDivisao] = useState(1);
+  const info = infoDivisao(divisao);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,14 +28,18 @@ export default function AdminConfig() {
   const [novaSulMotivo, setNovaSulMotivo] = useState('');
 
   const load = async () => {
-    const [cfg, tms, parts] = await Promise.all([
+    const ano = await clientTemporadaSelecionada();
+    const div = await clientDivisaoSelecionada(ano);
+    const [cfg, tms, parts, tt] = await Promise.all([
       fetch('/api/config').then(r => r.json()),
       clientGetTimes(),
-      clientGetPartidas(),
+      clientGetPartidas(ano, div),
+      clientGetTemporadaTimes(ano),
     ]);
     setConfig(cfg);
     setTimes(tms);
-    setTotalTimes(timesDaTemporada(tms, parts).length || 20);
+    setDivisao(div);
+    setTotalTimes(timesDaTemporada(tms, parts, tt.filter(r => r.divisao === div).map(r => r.time_id)).length || 20);
   };
 
   useEffect(() => { load(); }, []);
@@ -120,6 +126,7 @@ export default function AdminConfig() {
           </div>
         </div>
 
+        {info.vagasDiretasPorTitulo && <>
         <div style={{ marginBottom: '1rem' }}>
           <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, marginBottom: '.5rem' }}>
             Vagas diretas por título ({config[zona].vagas_diretas.length})
@@ -154,6 +161,7 @@ export default function AdminConfig() {
             </button>
           </div>
         </div>
+        </>}
 
         <div style={{ marginTop: '.75rem', fontSize: '.78rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,.03)', borderRadius: 6, padding: '.5rem .75rem' }}>
           Total {label}: <strong style={{ color: cor }}>{zona === 'libertadores' ? totalLib : totalSul}</strong>
@@ -179,7 +187,7 @@ export default function AdminConfig() {
         .toast-success { background: rgba(0,168,79,.15); border: 1px solid rgba(0,168,79,.3); color: #4ade80; }
         .toast-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
       `}</style>
-      <h1 style={{ fontSize: '2.5rem', marginBottom: '.25rem' }}>⚙️ Configurações</h1>
+      <h1 style={{ fontSize: '2.5rem', marginBottom: '.25rem' }}>⚙️ Configurações <span style={{ fontSize: '1.1rem', color: 'var(--amarelo)', marginLeft: '.5rem' }}>{info.nome}</span></h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
         Defina o número de vagas por zona e registre times com vagas diretas por títulos.
       </p>
@@ -189,11 +197,11 @@ export default function AdminConfig() {
       {msg && <div className="toast toast-success">{msg}</div>}
       {error && <div className="toast toast-error">{error}</div>}
 
-      <ZonaSection zona="libertadores" cor="var(--libertadores)" emoji="🟢" label="Libertadores" />
-      <ZonaSection zona="sulamericana" cor="var(--sulamericana)" emoji="🔵" label="Sul-Americana" />
+      <ZonaSection zona="libertadores" cor="var(--libertadores)" emoji="🟢" label={info.zonas.libertadores} />
+      <ZonaSection zona="sulamericana" cor="var(--sulamericana)" emoji="🔵" label={info.zonas.sulamericana} />
 
       <div className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--rebaixamento)' }}>
-        <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: 'var(--rebaixamento)' }}>🔴 Rebaixamento</h3>
+        <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: 'var(--rebaixamento)' }}>🔴 {info.zonas.rebaixamento}</h3>
         <div className="form-group" style={{ maxWidth: 320 }}>
           <label>Times rebaixados (últimas posições)</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginTop: '.4rem' }}>
@@ -213,10 +221,10 @@ export default function AdminConfig() {
         <h3 style={{ fontSize: '1.1rem', marginBottom: '.75rem' }}>📊 Resumo</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', fontSize: '.85rem' }}>
           {[
-            { label: `🟢 Libertadores (tabela)`, pos: `1º ao ${config.libertadores.vagas_tabela}º`, cor: 'var(--libertadores)' },
-            { label: `🔵 Sul-Americana (tabela)`, pos: `${config.libertadores.vagas_tabela + 1}º ao ${config.libertadores.vagas_tabela + config.sulamericana.vagas_tabela}º`, cor: 'var(--sulamericana)' },
+            { label: `🟢 ${info.zonas.libertadores} (tabela)`, pos: `1º ao ${config.libertadores.vagas_tabela}º`, cor: 'var(--libertadores)' },
+            { label: `🔵 ${info.zonas.sulamericana} (tabela)`, pos: `${config.libertadores.vagas_tabela + 1}º ao ${config.libertadores.vagas_tabela + config.sulamericana.vagas_tabela}º`, cor: 'var(--sulamericana)' },
             { label: `⚪ Neutro`, pos: `${config.libertadores.vagas_tabela + config.sulamericana.vagas_tabela + 1}º ao ${totalTimes - config.rebaixamento.vagas}º`, cor: 'var(--text-muted)' },
-            { label: `🔴 Rebaixamento`, pos: `${totalTimes - config.rebaixamento.vagas + 1}º ao ${totalTimes}º`, cor: 'var(--rebaixamento)' },
+            { label: `🔴 ${info.zonas.rebaixamento}`, pos: `${totalTimes - config.rebaixamento.vagas + 1}º ao ${totalTimes}º`, cor: 'var(--rebaixamento)' },
           ].map(row => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '.35rem .5rem', borderRadius: 4, background: 'var(--surface)' }}>
               <span style={{ color: row.cor, fontWeight: 600 }}>{row.label}</span>
