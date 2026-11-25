@@ -1,4 +1,5 @@
 import { getPartidas, getTimes } from '@/lib/data';
+import { temporadaSelecionada, divisaoSelecionada, getTimeIdsDaTemporada } from '@/lib/temporada';
 import { partidaContabilizada, timesDaTemporada } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,9 @@ export default async function ConfrontosPage() {
   const [partidas, todosOsTimes] = await Promise.all([getPartidas(), getTimes()]);
 
   // Filtrar apenas times reais
-  const times = timesDaTemporada(todosOsTimes.filter(t => !PSEUDO_IDS.has(t.id)), partidas);
+  const ano = await temporadaSelecionada();
+  const participantes = await getTimeIdsDaTemporada(ano, await divisaoSelecionada(ano));
+  const times = timesDaTemporada(todosOsTimes.filter(t => !PSEUDO_IDS.has(t.id)), partidas, participantes);
 
   const encerradas = partidas.filter(p => partidaContabilizada(p))
     .sort((a, b) => b.data.localeCompare(a.data) || b.hora.localeCompare(a.hora));
