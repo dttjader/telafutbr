@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { nomeDivisao } from '@/lib/utils';
 import { Partida, Time, Estadio, Tecnico } from '@/lib/types';
-import { clientGetPartidas, clientTemporadaSelecionada, clientGetTimes, clientUpsertPartida, clientDeletePartida, clientGetEstadios, clientGetTecnicos, uid } from '@/lib/client';
+import { clientGetPartidas, clientTemporadaSelecionada, clientDivisaoSelecionada, clientGetTemporadaTimes, clientGetTimes, clientUpsertPartida, clientDeletePartida, clientGetEstadios, clientGetTecnicos, uid } from '@/lib/client';
 import { VincularPartidaApiFootball } from '@/components/VincularPartidaApiFootball';
 
 const STATUS_OPTS = [{value:'agendada',label:'Agendada'},{value:'ao_vivo',label:'Ao Vivo'},{value:'encerrada',label:'Encerrada'},{value:'adiada',label:'Adiada'}];
@@ -32,14 +33,18 @@ export default function AdminPartidas() {
   const [mostrarTecnicosInativos, setMostrarTecnicosInativos] = useState(false);
 
   const [temporada, setTemporada] = useState<number | null>(null);
+  const [divisao, setDivisao] = useState<number | null>(null);
 
   const load = async () => {
     const ano = await clientTemporadaSelecionada();
-    setTemporada(ano);
-    const [p,t,e,tc] = await Promise.all([clientGetPartidas(ano),clientGetTimes(),clientGetEstadios(),clientGetTecnicos()]);
+    const div = await clientDivisaoSelecionada(ano);
+    setTemporada(ano); setDivisao(div);
+    const [p,t,e,tc,tt] = await Promise.all([clientGetPartidas(ano,div),clientGetTimes(),clientGetEstadios(),clientGetTecnicos(),clientGetTemporadaTimes(ano)]);
+    // Só os times cadastrados na divisão/temporada; sem cadastro, todos (ex.: temporada ainda não configurada)
+    const idsDivisao = tt.filter(r=>r.divisao===div).map(r=>r.time_id);
     setTecnicos(tc);
     setPartidas([...p].sort((a,b)=>b.rodada-a.rodada||a.data.localeCompare(b.data)));
-    setTimes(filtrarTimesReais(t));
+    setTimes(filtrarTimesReais(idsDivisao.length ? t.filter(x=>idsDivisao.includes(x.id)) : t));
     setEstadios(e);
   };
   useEffect(()=>{load();},[]);
@@ -73,6 +78,7 @@ export default function AdminPartidas() {
       await clientUpsertPartida({
         id: editId||`p${uid()}`,
         temporada: existente?.temporada ?? temporada ?? undefined,
+        divisao: existente?.divisao ?? divisao ?? undefined,
         rodada:+form.rodada, data:form.data || '', hora:form.hora, status:form.status as Partida['status'],
         time_casa_id:form.time_casa_id, time_visitante_id:form.time_visitante_id,
         estadio_id:form.estadio_id, publico:+form.publico||0,
@@ -142,7 +148,7 @@ export default function AdminPartidas() {
       `}</style>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.5rem'}}>
         <div>
-          <h1 style={{fontSize:'2.5rem',marginBottom:'.25rem'}}>⚽ Partidas{temporada!==null&&<span style={{fontSize:'1.1rem',color:'var(--amarelo)',marginLeft:'.75rem'}}>Temporada {temporada}</span>}</h1>
+          <h1 style={{fontSize:'2.5rem',marginBottom:'.25rem'}}>⚽ Partidas{temporada!==null&&<span style={{fontSize:'1.1rem',color:'var(--amarelo)',marginLeft:'.75rem'}}>Temporada {temporada}{divisao!==null&&` · ${nomeDivisao(divisao)}`}</span>}</h1>
           <p style={{color:'var(--text-muted)'}}>Cadastre partidas e gerencie seus eventos.</p>
         </div>
         <button className="btn btn-primary" onClick={()=>{setForm(emptyForm());setEditId(null);setShowForm(s=>!s);}}>
