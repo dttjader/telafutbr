@@ -27,10 +27,11 @@ export function GestaoTemporadas() {
     const ano = Number(novoAno);
     if (!Number.isInteger(ano) || ano < 2000 || ano > 2100) return aviso('Informe um ano válido.');
     if (lista.some(t => t.ano === ano)) return aviso(`A temporada ${ano} já existe.`);
-    if (!confirm(`Criar a temporada ${ano}? Ela começa sem partidas; os cadastros de times, estádios, jogadores e técnicos continuam os mesmos.`)) return;
+    if (!confirm(`Criar a temporada ${ano}? Ela começa sem partidas, com os mesmos times e divisões da temporada anterior (ajuste subidas e descidas em Admin/Times); estádios, jogadores e técnicos continuam os mesmos.`)) return;
     try {
-      // Copia as vagas por zona da temporada selecionada; vagas diretas (por títulos) começam zeradas.
-      const base = await fetch('/api/config').then(r => r.json());
+      // Copia as vagas por zona da Série A da temporada mais recente; vagas diretas (por títulos) começam zeradas.
+      const maisRecente = Math.max(...lista.map(t => t.ano));
+      const base = await fetch(`/api/config?temporada=${maisRecente}&divisao=1`).then(r => r.json());
       const configNova = {
         ...base,
         libertadores: { ...base.libertadores, vagas_diretas: [] },

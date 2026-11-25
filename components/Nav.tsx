@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SeletorTemporada } from '@/components/SeletorTemporada';
+import { SeletorDivisao } from '@/components/SeletorDivisao';
+import { nomeDivisao } from '@/lib/utils';
 import type { Temporada } from '@/lib/types';
 
 const publicLinks = [
@@ -12,6 +14,7 @@ const publicLinks = [
 ];
 
 const adminLinks = [
+  { href: '/admin/times',     label: 'Times'     },
   { href: '/admin/estadios',  label: 'Estádios'  },
   { href: '/admin/jogadores', label: 'Jogadores' },
   { href: '/admin/tecnicos',  label: 'Técnicos'  },
@@ -20,7 +23,7 @@ const adminLinks = [
   { href: '/admin/sync',      label: 'API-Football' },
 ];
 
-export function Nav({ temporadas, selecionada }: { temporadas: Temporada[]; selecionada: number }) {
+export function Nav({ temporadas, selecionada, divisoes, divisao }: { temporadas: Temporada[]; selecionada: number; divisoes: number[]; divisao: number }) {
   const p = usePathname();
   const isAdmin = p.startsWith('/admin');
 
@@ -52,7 +55,7 @@ export function Nav({ temporadas, selecionada }: { temporadas: Temporada[]; sele
           <span style={{ fontSize: '1.7rem', lineHeight: 1 }}>🇧🇷</span>
           <div>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem', letterSpacing: '.1em', color: 'var(--amarelo)', lineHeight: 1 }}>BRASILEIRÃO</div>
-            <div style={{ fontSize: '.65rem', color: 'var(--verde)', fontWeight: 700, letterSpacing: '.15em', textTransform: 'uppercase' as const }}>Série A · {selecionada}</div>
+            <div style={{ fontSize: '.65rem', color: 'var(--verde)', fontWeight: 700, letterSpacing: '.15em', textTransform: 'uppercase' as const }}>{nomeDivisao(divisao)} · {selecionada}</div>
           </div>
         </Link>
 
@@ -77,7 +80,10 @@ export function Nav({ temporadas, selecionada }: { temporadas: Temporada[]; sele
           </nav>
         )}
 
-        <SeletorTemporada temporadas={temporadas} selecionada={selecionada} />
+        <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+          <SeletorDivisao divisoes={divisoes} selecionada={divisao} />
+          <SeletorTemporada temporadas={temporadas} selecionada={selecionada} />
+        </div>
       </div>
     </header>
   );
