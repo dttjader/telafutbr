@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { Estadio, Time, Jogador, Partida } from './types';
-import { temporadaSelecionada } from './temporada';
+import { temporadaSelecionada, divisaoSelecionada } from './temporada';
 import { partidaContabilizada } from './utils';
 
 // IDs reservados que não são times reais
@@ -70,10 +70,11 @@ export async function deleteJogador(id: string): Promise<void> {
 }
 
 // ── Partidas ──────────────────────────────────────────────
-// Partidas de UMA temporada. Sem argumento, usa a temporada selecionada no site.
-export async function getPartidas(temporada?: number): Promise<Partida[]> {
+// Partidas de UMA temporada e divisão. Sem argumentos, usa a seleção atual do site.
+export async function getPartidas(temporada?: number, divisao?: number): Promise<Partida[]> {
   const ano = temporada ?? await temporadaSelecionada();
-  const { data, error } = await supabase.from('partidas').select('*').eq('temporada', ano).order('rodada').order('data');
+  const div = divisao ?? await divisaoSelecionada(ano);
+  const { data, error } = await supabase.from('partidas').select('*').eq('temporada', ano).eq('divisao', div).order('rodada').order('data');
   if (error) throw error;
   return data as Partida[];
 }

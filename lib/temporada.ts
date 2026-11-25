@@ -4,7 +4,7 @@
 // módulo continue seguro fora de uma requisição (ex.: scripts, rotas de sync).
 import { supabase } from './supabase';
 import type { Temporada } from './types';
-import { COOKIE_TEMPORADA, ANO_PADRAO } from './utils';
+import { COOKIE_TEMPORADA, COOKIE_DIVISAO, ANO_PADRAO } from './utils';
 
 export async function getTemporadas(): Promise<Temporada[]> {
   const { data, error } = await supabase.from('temporadas').select('ano, atual').order('ano', { ascending: false });
@@ -24,4 +24,32 @@ export async function temporadaSelecionada(): Promise<number> {
     if (lista.some(t => t.ano === v)) return v;
   } catch { /* fora de requisição: usa a temporada atual */ }
   return temporadaAtualDe(lista);
+}
+
+// Divisões que têm times cadastrados na temporada (sem cadastro: só a divisão 1).
+export async function getDivisoesDaTemporada(ano: number): Promise<number[]> {
+  const { data, error } = await supabase.from('temporada_times').select('divisao').eq('temporada', ano);
+  if (error || !data || data.length === 0) return [1];
+  return Array.from(new Set(data.map(r => r.divisao as number))).sort((a, b) => a - b);
+}
+
+// IDs dos times cadastrados na temporada (e, opcionalmente, em uma divisão).
+export async function getTimeIdsDaTemporada(ano: number, divisao?: number): Promise<string[]> {
+  let q = supabase.from('temporada_times').select('time_id').eq('temporada', ano);
+  if (divisao !== undefined) q = q.eq('divisao', divisao);
+  const { data, error } = await q;
+  if (error || !data) return [];
+  return data.map(r => r.time_id as string);
+}
+
+// Divisão escolhida no seletor (cookie), validada contra as divisões da temporada.
+export async function divisaoSelecionada(ano?: number): Promise<number> {
+  const a = ano ?? await temporadaSelecionada();
+  const divs = await getDivisoesDaTemporada(a);
+  try {
+    const { cookies } = await import('next/headers');
+    const v = Number((await cookies()).get(COOKIE_DIVISAO)?.value);
+    if (divs.includes(v)) return v;
+  } catch { /* fora de requisição */ }
+  return divs[0];
 }

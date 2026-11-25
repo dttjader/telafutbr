@@ -132,9 +132,16 @@ export interface Temporada {
   atual: boolean; // temporada exibida por padrão no site
 }
 
+export interface TemporadaTime {
+  temporada: number;
+  time_id: string;
+  divisao: number;
+}
+
 export interface Partida {
   id: string;
   temporada: number; // ano do campeonato (ex.: 2026)
+  divisao: number;   // 1 = Série A, 2 = Série B (ver DIVISOES em utils)
   rodada: number;
   data: string;
   hora: string;

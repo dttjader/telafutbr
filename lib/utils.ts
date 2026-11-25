@@ -51,14 +51,41 @@ export function golTipoLabel(t: string) {
 export const COOKIE_TEMPORADA = 'temporada';
 export const ANO_PADRAO = 2026;
 
-// Times que disputam a temporada: os que aparecem nas partidas dela.
-// Se ainda não há partidas (temporada nova), considera todos os times.
+// ── Divisões ─────────────────────────────────────────────────────────────────
+// Para renomear uma divisão ou os nomes das zonas, edite apenas esta lista.
+// Na Série B, as zonas reaproveitam os mesmos campos da configuração:
+//   libertadores → acesso direto · sulamericana → acesso por decisão (mata-mata).
+export const COOKIE_DIVISAO = 'divisao';
+
+export interface DivisaoInfo {
+  id: number;
+  nome: string;
+  zonas: { libertadores: string; sulamericana: string; rebaixamento: string };
+  vagasDiretasPorTitulo: boolean; // permite "vagas diretas por título" na config
+}
+
+export const DIVISOES: DivisaoInfo[] = [
+  { id: 1, nome: 'Série A', zonas: { libertadores: 'Libertadores', sulamericana: 'Sul-Americana', rebaixamento: 'Rebaixamento' }, vagasDiretasPorTitulo: true },
+  { id: 2, nome: 'Série B', zonas: { libertadores: 'Acesso direto', sulamericana: 'Acesso por decisão', rebaixamento: 'Rebaixamento' }, vagasDiretasPorTitulo: false },
+];
+
+export function infoDivisao(id: number): DivisaoInfo {
+  return DIVISOES.find(d => d.id === id) ?? DIVISOES[0];
+}
+export const nomeDivisao = (id: number) => infoDivisao(id).nome;
+
+// Times que disputam a divisão na temporada: os que aparecem nas partidas dela
+// (que já vêm filtradas por temporada e divisão). Sem partidas ainda, usa a
+// lista de participantes cadastrada (`participantes`); sem ela, todos os times.
 export function timesDaTemporada<T extends { id: string }>(
   times: T[],
   partidas: { time_casa_id: string; time_visitante_id: string }[],
+  participantes?: string[],
 ): T[] {
   const ids = new Set<string>();
   partidas.forEach(p => { ids.add(p.time_casa_id); ids.add(p.time_visitante_id); });
-  const filtrados = times.filter(t => ids.has(t.id));
-  return filtrados.length > 0 ? filtrados : times;
+  const porPartidas = times.filter(t => ids.has(t.id));
+  if (porPartidas.length > 0) return porPartidas;
+  if (participantes && participantes.length > 0) return times.filter(t => participantes.includes(t.id));
+  return times;
 }
