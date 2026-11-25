@@ -7,7 +7,8 @@ import {
 import { getConfig, zonaClassificacao } from '@/lib/config';
 import { EscudoTime } from '@/components/EscudoTime';
 import { Partida, Jogador, Tecnico } from '@/lib/types';
-import { partidaContabilizada, timesDaTemporada } from '@/lib/utils';
+import { partidaContabilizada, timesDaTemporada, infoDivisao } from '@/lib/utils';
+import { temporadaSelecionada, divisaoSelecionada, getTimeIdsDaTemporada } from '@/lib/temporada';
 
 // Página oculta — não aparece em nenhum menu, acessada via /time/{sigla}
 // (ex: /time/vas → Vasco, /time/cor → Corinthians). O time é identificado
@@ -447,11 +448,6 @@ const zonaColor: Record<string, string> = {
   sulamericana: 'var(--sulamericana)', 'sulamericana-direta': '#60a5fa',
   rebaixamento: 'var(--rebaixamento)', neutro: 'var(--text-muted)',
 };
-const zonaLabel: Record<string, string> = {
-  libertadores: 'Libertadores (tabela)', 'libertadores-direta': 'Libertadores (vaga direta)',
-  sulamericana: 'Sul-Americana (tabela)', 'sulamericana-direta': 'Sul-Americana (vaga direta)',
-  rebaixamento: 'Rebaixamento', neutro: 'Zona neutra',
-};
 const formaColor: Record<string, string> = { V: 'var(--libertadores)', E: '#f59e0b', D: 'var(--rebaixamento)' };
 const posLabel: Record<string, string> = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meia', ATA: 'Atacante' };
 
@@ -492,7 +488,17 @@ export default async function TimePerfilPage({ params }: { params: Promise<{ sig
   if (!time) notFound();
 
   const estadioTime = estadios.find(e => e.id === time.estadio_id);
-  const totalTimes = timesDaTemporada(times, partidas).length || 20;
+  const anoSel = await temporadaSelecionada();
+  const divisaoSel = await divisaoSelecionada(anoSel);
+  const participantes = await getTimeIdsDaTemporada(anoSel, divisaoSel);
+  const totalTimes = timesDaTemporada(times, partidas, participantes).length || 20;
+  // Nomes das zonas conforme a divisão (Série B: acesso em vez de Libertadores/Sul-Americana)
+  const zonasDiv = infoDivisao(divisaoSel).zonas;
+  const zonaLabel: Record<string, string> = {
+    libertadores: `${zonasDiv.libertadores} (tabela)`, 'libertadores-direta': `${zonasDiv.libertadores} (vaga direta)`,
+    sulamericana: `${zonasDiv.sulamericana} (tabela)`, 'sulamericana-direta': `${zonasDiv.sulamericana} (vaga direta)`,
+    rebaixamento: zonasDiv.rebaixamento, neutro: 'Zona neutra',
+  };
 
   const encerradas = partidas
     .filter(p => partidaContabilizada(p))
