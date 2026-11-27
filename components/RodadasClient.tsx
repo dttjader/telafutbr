@@ -100,7 +100,7 @@ export function RodadasClient({ partidas, times, estadios }: Props) {
               Nenhuma partida agendada para este mês.
             </p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
               {Object.entries(partidasPorDia).sort((a, b) => a[0].localeCompare(b[0])).map(([data, ps]) => (
                 <div key={data} style={{ background: 'var(--surface2)', borderRadius: 8, padding: '0.75rem', border: '1px solid var(--border)' }}>
                   <div style={{ borderBottom: '1px solid var(--border)', marginBottom: '0.5rem', paddingBottom: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
