@@ -40,7 +40,7 @@ export function CardPartida({ partida, times, estadios }: Props) {
         </div>
         <div style={{ textAlign: 'center', flex: '0 0 auto', minWidth: 80 }}>
           {enc
-            ? <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2.2rem', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+            ? <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2.2rem', display: 'flex', alignItems: 'center', gap: '1.3rem' }}>
                 <span>{partida.placar_casa}</span>
                 <span style={{ color: 'var(--verde)', fontSize: '1.4rem' }}>×</span>
                 <span>{partida.placar_visitante}</span>
@@ -48,7 +48,7 @@ export function CardPartida({ partida, times, estadios }: Props) {
             : <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.5rem', color: 'var(--text-muted)' }}>VS</div>
           }
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.3rem', flex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3rem', flex: 1 }}>
           <EscudoTime time={tv} size={48} />
           <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.95rem' }}>{tv?.sigla}</span>
         </div>
