@@ -163,7 +163,7 @@ export function RodadasClient({ partidas, times, estadios }: Props) {
                   background: isOpen ? 'var(--surface)' : 'var(--surface2)',
                   border: '1px solid var(--border)',
                   borderRadius: isOpen ? '10px 10px 0 0' : 10,
-                  padding: '.85rem 1.25rem', cursor: 'pointer',
+                  padding: '.85rem 0.5rem', cursor: 'pointer',
                   transition: 'all .15s', textAlign: 'left',
                 }}
               >
@@ -190,7 +190,7 @@ export function RodadasClient({ partidas, times, estadios }: Props) {
 
               {isOpen && (
                 <div style={{ border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '1rem', background: 'var(--surface)' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(193px,1fr))', gap: '1rem' }}>
                     {ps.map(p => <CardPartida key={p.id} partida={p} times={times} estadios={estadios} />)}
                   </div>
                 </div>
