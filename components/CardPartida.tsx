@@ -22,7 +22,7 @@ export function CardPartida({ partida, times, estadios }: Props) {
   return (
     <Link href={`/partida/${partida.id}`} style={{
       display: 'block', background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 10, padding: '1.25rem', textDecoration: 'none',
+      borderRadius: 10, padding: '0.5rem', textDecoration: 'none',
     }} className="card-partida-link">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <span style={{ fontSize: '.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: statusColor[partida.status] }}>
