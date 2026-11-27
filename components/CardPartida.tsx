@@ -34,7 +34,7 @@ export function CardPartida({ partida, times, estadios }: Props) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3rem', flex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.3rem', flex: 1 }}>
           <EscudoTime time={tc} size={48} />
           <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '.95rem' }}>{tc?.sigla}</span>
         </div>
