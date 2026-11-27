@@ -163,7 +163,7 @@ export function RodadasClient({ partidas, times, estadios }: Props) {
                   background: isOpen ? 'var(--surface)' : 'var(--surface2)',
                   border: '1px solid var(--border)',
                   borderRadius: isOpen ? '10px 10px 0 0' : 10,
-                  padding: '.85rem 0.5rem', cursor: 'pointer',
+                  padding: '.85rem 1.25rem', cursor: 'pointer',
                   transition: 'all .15s', textAlign: 'left',
                 }}
               >
