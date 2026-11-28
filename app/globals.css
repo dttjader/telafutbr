@@ -100,3 +100,66 @@ h1,h2,h3,h4,h5 { font-family: 'Bebas Neue', sans-serif; letter-spacing: .05em; l
 @media (max-width: 640px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   IMPRESSÃO / PDF
+   Layout adaptado ao papel, cores escuras sobre fundo branco e sem elementos
+   de navegação. O ajuste fino de cores inline e a escala das tabelas largas
+   são feitos por components/Impressao.tsx (eventos beforeprint/afterprint).
+   ══════════════════════════════════════════════════════════════════════════ */
+.print-only { display: none; }
+
+@media print {
+  /* Paleta escura para fundo branco (tudo que usa var(--...) se adapta) */
+  :root {
+    --verde: #047857;
+    --verde-escuro: #065f46;
+    --amarelo: #92400e;
+    --azul: #1e3a8a;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface2: #f1f5f9;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --libertadores: #15803d;
+    --sulamericana: #1d4ed8;
+    --rebaixamento: #b91c1c;
+    --amarelo-card: #b45309;
+    --vermelho-card: #b91c1c;
+  }
+
+  @page { margin: 10mm; }
+
+  /* Mantém as cores de zonas, barras e escudos no PDF */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  html, body { background: #fff !important; color: #0f172a !important; font-size: 11px; }
+
+  /* Esconde navegação e controles interativos */
+  header, footer, nav, .no-print, .btn { display: none !important; }
+  .print-only { display: block !important; }
+
+  /* Largura total do papel (responsivo a retrato/paisagem) */
+  main { min-height: 0 !important; padding-bottom: 0 !important; }
+  .container { max-width: none !important; width: 100% !important; padding-left: 0 !important; padding-right: 0 !important; }
+
+  /* Sem rolagem, sticky, sombras ou animações */
+  [style*="overflow-x"], [style*="overflow: auto"], [style*="overflow:auto"] { overflow: visible !important; }
+  [style*="sticky"] { position: static !important; }
+  * { box-shadow: none !important; text-shadow: none !important; animation: none !important; transition: none !important; }
+
+  /* Tabelas ocupam a largura e repetem o cabeçalho em cada página */
+  table { width: 100% !important; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  tr, .card, img, svg { break-inside: avoid; page-break-inside: avoid; }
+  h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+
+  /* Cartões simples */
+  .card { border: 1px solid #cbd5e1 !important; background: #fff !important; }
+
+  /* Cabeçalho do relatório */
+  .print-header { border-bottom: 2px solid #047857; margin-bottom: 8px; padding-bottom: 4px; display: flex !important; justify-content: space-between; align-items: baseline; }
+  .print-header strong { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: .08em; color: #065f46; }
+  .print-header span { font-size: 10px; color: #475569; }
+}
