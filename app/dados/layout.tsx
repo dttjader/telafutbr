@@ -24,7 +24,7 @@ export default function DadosLayout({ children }: { children: React.ReactNode })
   return (
     <div>
       {/* Sub-nav */}
-      <div style={{
+      <div className="no-print" style={{
         background: '#0e0e0e',
         borderBottom: '1px solid var(--border)',
         position: 'sticky',
