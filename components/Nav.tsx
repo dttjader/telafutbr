@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SeletorTemporada } from '@/components/SeletorTemporada';
 import { SeletorDivisao } from '@/components/SeletorDivisao';
+import { BotaoImprimir } from '@/components/Impressao';
 import { nomeDivisao } from '@/lib/utils';
 import type { Temporada } from '@/lib/types';
 
@@ -83,6 +84,7 @@ export function Nav({ temporadas, selecionada, divisoes, divisao }: { temporadas
         <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
           <SeletorDivisao divisoes={divisoes} selecionada={divisao} />
           <SeletorTemporada temporadas={temporadas} selecionada={selecionada} />
+          <BotaoImprimir />
         </div>
       </div>
     </header>

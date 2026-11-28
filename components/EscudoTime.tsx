@@ -295,7 +295,7 @@ export function EscudoTime({ time, size = 44, showNome = false }: Props) {
   if (!time) return null;
 
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+    <span data-print-keep style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <EscudoImagem
         sigla={time.sigla}
         size={size}
